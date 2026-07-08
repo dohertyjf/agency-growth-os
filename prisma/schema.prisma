@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  coach
+  client
+}
+
+enum ClientStatus {
+  active
+  paused
+  archived
+}
+
+enum ContractStatus {
+  active
+  potential
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  role         Role     @default(client)
+  passwordHash String?
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model Client {
+  id        String          @id @default(cuid())
+  name      String
+  agency    String?
+  email     String          @unique
+  status    ClientStatus    @default(active)
+  users     User[]
+  goal      Goal?
+  metrics   MonthlyMetric[]
+  contracts Contract[]
+  calls     Call[]
+  createdAt DateTime        @default(now())
+}
+
+model MonthlyMetric {
+  id            String @id @default(cuid())
+  clientId      String
+  client        Client @relation(fields: [clientId], references: [id])
+  month         String
+  revenue       Float  @default(0)
+  totalExpenses Float  @default(0)
+  salaries      Float  @default(0)
+  software      Float  @default(0)
+  cashInBank    Float  @default(0)
+  leads         Float  @default(0)
+  newClients    Float  @default(0)
+  closeRate     Float  @default(0)
+  churn         Float  @default(0)
+
+  @@unique([clientId, month])
+}
+
+model Goal {
+  id            String @id @default(cuid())
+  clientId      String @unique
+  client        Client @relation(fields: [clientId], references: [id])
+  annualRevenue Float  @default(0)
+  profit        Float  @default(0)
+}
+
+model Contract {
+  id                String         @id @default(cuid())
+  clientId          String
+  client            Client         @relation(fields: [clientId], references: [id])
+  name              String
+  monthly           Float
+  start             String
+  contractedThrough String
+  status            ContractStatus @default(active)
+  createdAt         DateTime       @default(now())
+}
+
+model Call {
+  id         String     @id @default(cuid())
+  clientId   String
+  client     Client     @relation(fields: [clientId], references: [id])
+  date       String
+  title      String
+  transcript String?
+  video      String?
+  synopsis   String?
+  notes      String?
+  questions  Question[]
+  createdAt  DateTime   @default(now())
+}
+
+model Question {
+  id     String  @id @default(cuid())
+  callId String
+  call   Call    @relation(fields: [callId], references: [id], onDelete: Cascade)
+  q      String
+  a      String?
+  order  Int
+}
+
+model IntakeSubmission {
+  id        String   @id @default(cuid())
+  email     String
+  name      String?
+  agency    String?
+  data      String
+  answers   String
+  converted Boolean  @default(false)
+  clientId  String?
+  createdAt DateTime @default(now())
+}
+
+model InviteToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
