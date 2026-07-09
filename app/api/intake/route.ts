@@ -6,8 +6,8 @@ const schema = z.object({
   email: z.string().email(),
   name: z.string().optional(),
   agency: z.string().optional(),
-  data: z.record(z.array(z.string()).length(3)),
-  answers: z.record(z.string()),
+  data: z.record(z.string(), z.unknown()),
+  answers: z.record(z.string(), z.string()),
   honeypot: z.string().max(0).optional(),
 })
 
