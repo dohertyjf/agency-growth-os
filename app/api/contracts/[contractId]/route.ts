@@ -10,7 +10,7 @@ const schema = z.object({
   status: z.enum(["active", "potential"]).optional(),
 })
 
-async function authorizeContract(session: Awaited<ReturnType<typeof auth>>, contractId: string) {
+async function authorizeContract(session: import("next-auth").Session | null, contractId: string) {
   if (!session) return null
   const contract = await prisma.contract.findUnique({ where: { id: contractId } })
   if (!contract) return null

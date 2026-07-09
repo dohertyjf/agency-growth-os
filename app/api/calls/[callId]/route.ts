@@ -11,7 +11,7 @@ const schema = z.object({
   notes: z.string().optional(),
 })
 
-async function authorizeCall(session: Awaited<ReturnType<typeof auth>>, callId: string) {
+async function authorizeCall(session: import("next-auth").Session | null, callId: string) {
   if (!session) return null
   const call = await prisma.call.findUnique({ where: { id: callId } })
   if (!call) return null

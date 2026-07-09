@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { netProfit, netMargin, momDelta } from "@/lib/calc"
 import { z } from "zod"
 
-function authorize(session: Awaited<ReturnType<typeof auth>>, clientId: string) {
+function authorize(session: import("next-auth").Session | null, clientId: string) {
   if (!session) return false
   if (session.user.role === "coach") return true
   return session.user.clientId === clientId
