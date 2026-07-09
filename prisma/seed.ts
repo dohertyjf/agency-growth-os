@@ -8,15 +8,15 @@ const prisma = new PrismaClient({ adapter })
 
 async function main() {
   // Clean slate
-  await prisma.$executeRawUnsafe("DELETE FROM Question")
-  await prisma.$executeRawUnsafe("DELETE FROM Call")
-  await prisma.$executeRawUnsafe("DELETE FROM Contract")
-  await prisma.$executeRawUnsafe("DELETE FROM Goal")
-  await prisma.$executeRawUnsafe("DELETE FROM MonthlyMetric")
-  await prisma.$executeRawUnsafe("DELETE FROM InviteToken")
-  await prisma.$executeRawUnsafe("DELETE FROM User")
-  await prisma.$executeRawUnsafe("DELETE FROM IntakeSubmission")
-  await prisma.$executeRawUnsafe("DELETE FROM Client")
+  await prisma.$executeRawUnsafe('DELETE FROM "Question"')
+  await prisma.$executeRawUnsafe('DELETE FROM "Call"')
+  await prisma.$executeRawUnsafe('DELETE FROM "Contract"')
+  await prisma.$executeRawUnsafe('DELETE FROM "Goal"')
+  await prisma.$executeRawUnsafe('DELETE FROM "MonthlyMetric"')
+  await prisma.$executeRawUnsafe('DELETE FROM "InviteToken"')
+  await prisma.$executeRawUnsafe('DELETE FROM "User"')
+  await prisma.$executeRawUnsafe('DELETE FROM "IntakeSubmission"')
+  await prisma.$executeRawUnsafe('DELETE FROM "Client"')
 
   // ── Coach (John Doherty) ────────────────────────────────────────────────────
   const coachHash = await bcrypt.hash("coach1234", 12)
