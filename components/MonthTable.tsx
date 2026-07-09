@@ -62,7 +62,7 @@ function monthLabel(ym: string): string {
 export default function MonthTable({ clientId, months, onUpdate }: Props) {
   const [data, setData] = useState<Record<string, Record<string, number>>>(() => {
     const m: Record<string, Record<string, number>> = {}
-    months.forEach(row => { m[row.month] = { ...row } })
+    months.forEach(({ month, ...rest }) => { m[month] = rest })
     return m
   })
   const [saving, setSaving] = useState<Record<string, boolean>>({})
