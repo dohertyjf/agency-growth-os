@@ -80,7 +80,7 @@ async function main() {
   }
 
   // 8 Contracts
-  const contracts = [
+  const contracts: { name: string; monthly: number; start: string; contractedThrough: string; status: "active" | "potential" }[] = [
     { name: "RetailBridge", monthly: 6500, start: "2024-07", contractedThrough: "2025-06", status: "active" },
     { name: "NovaBuild Co", monthly: 5000, start: "2024-09", contractedThrough: "2025-08", status: "active" },
     { name: "Clarity Health", monthly: 4500, start: "2024-10", contractedThrough: "2025-03", status: "active" },
