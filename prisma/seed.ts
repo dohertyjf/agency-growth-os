@@ -22,7 +22,7 @@ async function main() {
   const coachHash = await bcrypt.hash("coach1234", 12)
   await prisma.user.create({
     data: {
-      email: "john@getcredo.com",
+      email: "john@hoytenterprisesltd.com",
       name: "John Doherty",
       role: "coach",
       passwordHash: coachHash,
@@ -173,7 +173,7 @@ async function main() {
   })
 
   console.log("✓ Seed complete")
-  console.log("  Coach:  john@getcredo.com / coach1234")
+  console.log("  Coach:  john@hoytenterprisesltd.com / coach1234")
   console.log("  Client: maria@apexstudio.co / client1234")
 }
 
