@@ -37,12 +37,17 @@ interface Goal {
   profit: number
 }
 
+type ClientStatus = "potential" | "active" | "paused"
+
 interface Props {
   clientId: string
   clientName: string
   metrics: Metric[]
   contracts: Contract[]
   goal: Goal | null
+  initialStatus: ClientStatus
+  initialStartDate: string | null
+  initialEndDate: string | null
 }
 
 type CardKey = "revenue" | "netProfit" | "grossProfit" | "netMargin" | "leads" | "closeRate" | "newClients" | "churn"
@@ -73,9 +78,42 @@ function fmtValue(v: number, fmt: "currency" | "percent" | "number"): string {
   return String(Math.round(v))
 }
 
-export default function Dashboard({ clientId, clientName, metrics: rawMetrics, contracts, goal }: Props) {
+const STATUS_COLORS: Record<ClientStatus, { bg: string; text: string }> = {
+  potential: { bg: "#DBEAFE", text: "#1E40AF" },
+  active: { bg: "#DCFCE7", text: "#166534" },
+  paused: { bg: "#FEF9C3", text: "#854D0E" },
+}
+
+const inputStyle: React.CSSProperties = {
+  padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6,
+  fontSize: 13, background: "#fff", color: "#1A1916",
+  width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none",
+}
+const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
+
+export default function Dashboard({ clientId, clientName, metrics: rawMetrics, contracts, goal, initialStatus, initialStartDate, initialEndDate }: Props) {
   const [range, setRange] = useState<6 | 12>(6)
   const [selectedCard, setSelectedCard] = useState<CardKey>("revenue")
+  const [editOpen, setEditOpen] = useState(false)
+  const [status, setStatus] = useState<ClientStatus>(initialStatus)
+  const [startDate, setStartDate] = useState(initialStartDate ?? "")
+  const [endDate, setEndDate] = useState(initialEndDate ?? "")
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  async function handleEditSave(e: React.FormEvent) {
+    e.preventDefault()
+    setEditSaving(true)
+    setEditError(null)
+    const res = await fetch(`/api/clients/${clientId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, startDate: startDate || null, endDate: endDate || null }),
+    })
+    setEditSaving(false)
+    if (!res.ok) { setEditError("Failed to save"); return }
+    setEditOpen(false)
+  }
 
   // Slice to range (last N months)
   const metrics = useMemo(() => {
@@ -136,11 +174,71 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetrics, c
 
   return (
     <div>
+      {/* Edit Client Modal */}
+      {editOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={e => { if (e.target === e.currentTarget) setEditOpen(false) }}
+        >
+          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 420, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
+            <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 20px", color: "#1A1916" }}>
+              Edit Client
+            </h2>
+            <form onSubmit={handleEditSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={labelStyle}>Status</label>
+                <select style={inputStyle} value={status} onChange={e => setStatus(e.target.value as ClientStatus)}>
+                  <option value="potential">Potential</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                </select>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Start Date</label>
+                  <input style={inputStyle} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>End Date</label>
+                  <input style={inputStyle} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                </div>
+              </div>
+              {editError && <div style={{ fontSize: 13, color: "#C2410C" }}>{editError}</div>}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <button type="button" onClick={() => setEditOpen(false)}
+                  style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={editSaving}
+                  style={{ padding: "8px 18px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: editSaving ? "default" : "pointer", opacity: editSaving ? 0.7 : 1 }}>
+                  {editSaving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, color: "#1A1916", margin: 0 }}>
-          {clientName}
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, color: "#1A1916", margin: 0 }}>
+            {clientName}
+          </h1>
+          <button
+            onClick={() => setEditOpen(true)}
+            style={{ padding: "4px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, color: "#6B6760", cursor: "pointer" }}
+          >
+            Edit
+          </button>
+          <span style={{
+            fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 99,
+            background: STATUS_COLORS[status].bg, color: STATUS_COLORS[status].text,
+            textTransform: "uppercase", letterSpacing: "0.04em",
+          }}>
+            {status}
+          </span>
+        </div>
         <div style={{ display: "flex", gap: 2, background: "#F0EDE8", borderRadius: 7, padding: 3 }}>
           {([6, 12] as const).map(n => (
             <button
