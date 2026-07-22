@@ -45,9 +45,9 @@ interface Props {
   metrics: Metric[]
   contracts: Contract[]
   goal: Goal | null
-  initialStatus: ClientStatus
-  initialStartDate: string | null
-  initialEndDate: string | null
+  initialStatus?: ClientStatus
+  initialStartDate?: string | null
+  initialEndDate?: string | null
 }
 
 type CardKey = "revenue" | "netProfit" | "grossProfit" | "netMargin" | "leads" | "closeRate" | "newClients" | "churn"
@@ -95,7 +95,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetrics, c
   const [range, setRange] = useState<6 | 12>(6)
   const [selectedCard, setSelectedCard] = useState<CardKey>("revenue")
   const [editOpen, setEditOpen] = useState(false)
-  const [status, setStatus] = useState<ClientStatus>(initialStatus)
+  const [status, setStatus] = useState<ClientStatus>(initialStatus ?? "active")
   const [startDate, setStartDate] = useState(initialStartDate ?? "")
   const [endDate, setEndDate] = useState(initialEndDate ?? "")
   const [editSaving, setEditSaving] = useState(false)
@@ -225,19 +225,21 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetrics, c
           <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, color: "#1A1916", margin: 0 }}>
             {clientName}
           </h1>
-          <button
-            onClick={() => setEditOpen(true)}
-            style={{ padding: "4px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, color: "#6B6760", cursor: "pointer" }}
-          >
-            Edit
-          </button>
-          <span style={{
+          {initialStatus !== undefined && (
+            <button
+              onClick={() => setEditOpen(true)}
+              style={{ padding: "4px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, color: "#6B6760", cursor: "pointer" }}
+            >
+              Edit
+            </button>
+          )}
+          {initialStatus !== undefined && <span style={{
             fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 99,
             background: STATUS_COLORS[status].bg, color: STATUS_COLORS[status].text,
             textTransform: "uppercase", letterSpacing: "0.04em",
           }}>
             {status}
-          </span>
+          </span>}
         </div>
         <div style={{ display: "flex", gap: 2, background: "#F0EDE8", borderRadius: 7, padding: 3 }}>
           {([6, 12] as const).map(n => (
