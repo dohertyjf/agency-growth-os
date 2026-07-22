@@ -298,7 +298,11 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
             <form onSubmit={handleEditSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={labelStyle}>Status</label>
-                <select style={inputStyle} value={status} onChange={e => setStatus(e.target.value as ClientStatus)}>
+                <select style={inputStyle} value={status} onChange={e => {
+                  const next = e.target.value as ClientStatus
+                  setStatus(next)
+                  if (next === "active" && !startDate) setStartDate(new Date().toISOString().slice(0, 10))
+                }}>
                   <option value="potential">Potential</option>
                   <option value="active">Active</option>
                   <option value="paused">Paused</option>
