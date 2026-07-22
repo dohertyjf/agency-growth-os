@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { currentMRR, type ContractRow } from "@/lib/calc"
 import ClientCard from "./ClientCard"
+import AddClientModal from "./AddClientModal"
 
 export default async function ClientsPage() {
   const session = await auth()
@@ -19,9 +20,12 @@ export default async function ClientsPage() {
 
   return (
     <div>
-      <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, color: "#1A1916", margin: "0 0 24px" }}>
-        Clients
-      </h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, color: "#1A1916", margin: 0 }}>
+          Clients
+        </h1>
+        <AddClientModal />
+      </div>
 
       {clients.length === 0 ? (
         <div style={{ color: "#9C9590", fontSize: 14 }}>No clients yet. Convert a prospect to get started.</div>
