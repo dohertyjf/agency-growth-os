@@ -72,6 +72,7 @@ function derivedMetrics(m: Metric) {
     netProfit: netProfit(m.revenue, m.totalExpenses),
     grossProfit: grossProfit(m.revenue, m.salaries, m.software),
     netMargin: netMargin(m.revenue, m.totalExpenses),
+    closeRate: m.leads > 0 ? (m.newClients / m.leads) * 100 : 0,
   }
 }
 
