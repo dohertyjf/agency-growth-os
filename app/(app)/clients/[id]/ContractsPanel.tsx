@@ -9,6 +9,7 @@ interface Contract {
   start: string
   contractedThrough: string
   status: string
+  type: string
 }
 
 interface Props {
@@ -27,7 +28,7 @@ const STATUS_COLORS: Record<ContractStatus, { bg: string; text: string }> = {
 }
 
 function toRow(c: Contract): ContractRow {
-  return { monthly: c.monthly, start: c.start, contractedThrough: c.contractedThrough, status: c.status as "active" | "potential" }
+  return { monthly: c.monthly, start: c.start, contractedThrough: c.contractedThrough, status: c.status as "active" | "potential", type: c.type as "retainer" | "oneoff" }
 }
 
 const now = new Date().toISOString().slice(0, 7)
@@ -39,12 +40,15 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
+type ContractTypeField = "retainer" | "oneoff"
+
 interface EditForm {
   name: string
   monthly: string
   start: string
   contractedThrough: string
   status: ContractStatus
+  type: ContractTypeField
 }
 
 function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose: () => void; onSave: (c: Contract) => void }) {
@@ -54,6 +58,7 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
     start: contract.start,
     contractedThrough: contract.contractedThrough,
     status: contract.status as ContractStatus,
+    type: (contract.type as ContractTypeField) ?? "retainer",
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -84,32 +89,48 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
           Edit Contract
         </h2>
         <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Type</label>
+              <select style={inputStyle} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as ContractTypeField }))}>
+                <option value="retainer">Retainer</option>
+                <option value="oneoff">One-off</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Status</label>
+              <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
+                <option value="potential">Potential</option>
+                <option value="active">Active</option>
+                <option value="finished">Finished</option>
+              </select>
+            </div>
+          </div>
           <div>
             <label style={labelStyle}>Contract Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
           <div>
-            <label style={labelStyle}>Monthly ($)</label>
+            <label style={labelStyle}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
             <input style={inputStyle} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required min={0} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {form.type === "oneoff" ? (
             <div>
-              <label style={labelStyle}>Start</label>
-              <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
+              <label style={labelStyle}>Month Paid</label>
+              <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
             </div>
-            <div>
-              <label style={labelStyle}>Through</label>
-              <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Start</label>
+                <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
+              </div>
+              <div>
+                <label style={labelStyle}>Through</label>
+                <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+              </div>
             </div>
-          </div>
-          <div>
-            <label style={labelStyle}>Status</label>
-            <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
-              <option value="potential">Potential</option>
-              <option value="active">Active</option>
-              <option value="finished">Finished</option>
-            </select>
-          </div>
+          )}
           {error && <div style={{ fontSize: 13, color: "#C2410C" }}>{error}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
             <button type="button" onClick={onClose}
@@ -131,7 +152,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [adding, setAdding] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
-  const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus })
+  const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField })
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
 
@@ -161,7 +182,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
     const data = await res.json()
     if (res.ok) {
       updateContracts([...contracts, data.contract ?? data])
-      setForm({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" })
+      setForm({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential", type: "retainer" })
       setAdding(false)
     }
     setSaving(false)
@@ -198,34 +219,52 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
       </div>
 
       {adding && (
-        <form onSubmit={handleAdd} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: 16, marginBottom: 16, display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
-          <div>
-            <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Contract Name</label>
-            <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Acme Corp" autoFocus />
+        <form onSubmit={handleAdd} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: 16, marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
+            <div>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Contract Name</label>
+              <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Acme Corp" autoFocus />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Type</label>
+              <select style={{ ...inputStyle, background: "#FBFAF7" }} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as ContractTypeField }))}>
+                <option value="retainer">Retainer</option>
+                <option value="oneoff">One-off</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
+              <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required placeholder="5000" />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Status</label>
+              <select style={{ ...inputStyle, background: "#FBFAF7" }} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
+                <option value="potential">Potential</option>
+                <option value="active">Active</option>
+                <option value="finished">Finished</option>
+              </select>
+            </div>
+            <button type="submit" disabled={saving} style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", height: 32, alignSelf: "end" }}>
+              Save
+            </button>
           </div>
-          <div>
-            <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Monthly ($)</label>
-            <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required placeholder="5000" />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Start</label>
-            <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Through</label>
-            <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Status</label>
-            <select style={{ ...inputStyle, background: "#FBFAF7" }} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
-              <option value="potential">Potential</option>
-              <option value="active">Active</option>
-              <option value="finished">Finished</option>
-            </select>
-          </div>
-          <button type="submit" disabled={saving} style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", height: 32, alignSelf: "end" }}>
-            Save
-          </button>
+          {form.type === "oneoff" ? (
+            <div style={{ maxWidth: 200 }}>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Month Paid</label>
+              <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 3fr", gap: 8 }}>
+              <div>
+                <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Start</label>
+                <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Through</label>
+                <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+              </div>
+            </div>
+          )}
         </form>
       )}
 
@@ -299,15 +338,23 @@ function ContractSection({ title, contracts, onEdit, onDelete, dimmed }: {
       {contracts.map(c => {
         const s = (c.status as ContractStatus) in STATUS_COLORS ? c.status as ContractStatus : "potential"
         const colors = STATUS_COLORS[s]
+        const isOneoff = c.type === "oneoff"
         return (
           <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #F5F1EC", opacity: dimmed ? 0.6 : 1 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</div>
-              <div style={{ fontSize: 11, color: "#9C9590" }}>{ymLabel(c.start)} – {ymLabel(c.contractedThrough)}</div>
+              <div style={{ fontSize: 11, color: "#9C9590" }}>
+                {isOneoff ? ymLabel(c.start) : `${ymLabel(c.start)} – ${ymLabel(c.contractedThrough)}`}
+              </div>
             </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }}>
-              {fmtCurrency(c.monthly)}/mo
+              {fmtCurrency(c.monthly)}{isOneoff ? "" : "/mo"}
             </div>
+            {isOneoff && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: "#EFF6FF", color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+                One-off
+              </span>
+            )}
             <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: colors.bg, color: colors.text, textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
               {STATUS_LABELS[s]}
             </span>

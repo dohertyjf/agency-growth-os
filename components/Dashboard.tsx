@@ -31,6 +31,7 @@ interface Contract {
   start: string
   contractedThrough: string
   status: string
+  type?: string
 }
 
 interface Goal {
@@ -191,6 +192,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
     start: c.start,
     contractedThrough: c.contractedThrough,
     status: c.status as "active" | "potential",
+    type: (c.type ?? "retainer") as "retainer" | "oneoff",
   }))
 
   const nowYM = new Date().toISOString().slice(0, 7)

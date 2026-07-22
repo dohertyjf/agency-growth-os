@@ -24,6 +24,11 @@ enum ContractStatus {
   finished
 }
 
+enum ContractType {
+  retainer
+  oneoff
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -86,6 +91,7 @@ model Contract {
   start             String
   contractedThrough String
   status            ContractStatus @default(active)
+  type              ContractType   @default(retainer)
   createdAt         DateTime       @default(now())
 }
 

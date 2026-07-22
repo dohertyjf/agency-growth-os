@@ -8,6 +8,7 @@ interface Contract {
   start: string
   contractedThrough: string
   status: string
+  type: string
 }
 
 interface Metric {
@@ -65,6 +66,7 @@ export default function ClientsGrid({ clients, now }: Props) {
               start: c.start,
               contractedThrough: c.contractedThrough,
               status: c.status as "active" | "potential",
+              type: (c.type ?? "retainer") as "retainer" | "oneoff",
             }))
             const mrr = currentMRR(contractRows, now)
             const latest = client.metrics[0]

@@ -8,6 +8,7 @@ const schema = z.object({
   start: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   status: z.enum(["potential", "active", "finished"]).optional(),
+  type: z.enum(["retainer", "oneoff"]).optional(),
 })
 
 async function authorizeContract(session: import("next-auth").Session | null, contractId: string) {
@@ -32,9 +33,15 @@ export async function PATCH(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
+  const updateData = { ...parsed.data }
+  // One-offs: keep contractedThrough pinned to start
+  if (updateData.type === "oneoff" || (contract.type === "oneoff" && !updateData.type)) {
+    updateData.contractedThrough = updateData.start ?? contract.start
+  }
+
   const updated = await prisma.contract.update({
     where: { id: contractId },
-    data: parsed.data,
+    data: updateData,
   })
   return Response.json(updated)
 }

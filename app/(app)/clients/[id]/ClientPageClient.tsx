@@ -27,6 +27,7 @@ interface Contract {
   start: string
   contractedThrough: string
   status: string
+  type: string
 }
 
 interface Goal {

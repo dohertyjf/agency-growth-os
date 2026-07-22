@@ -74,6 +74,7 @@ export interface ContractRow {
   start: string
   contractedThrough: string
   status: "active" | "potential"
+  type?: "retainer" | "oneoff"
 }
 
 export function ymDiff(a: string, b: string) {
@@ -101,7 +102,11 @@ export function monthsRemaining(contract: ContractRow, now: string) {
 export function bookedAhead(contracts: ContractRow[], now: string) {
   return contracts
     .filter(c => c.status !== "potential")
-    .reduce((s, c) => s + c.monthly * monthsRemaining(c, now), 0)
+    .reduce((s, c) => {
+      // One-offs count their full amount once if not yet past
+      if (c.type === "oneoff") return s + (c.contractedThrough >= now ? c.monthly : 0)
+      return s + c.monthly * monthsRemaining(c, now)
+    }, 0)
 }
 
 export function currentMRR(contracts: ContractRow[], now: string) {
