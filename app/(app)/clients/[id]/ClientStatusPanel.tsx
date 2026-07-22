@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
-type Status = "active" | "paused" | "archived"
+type Status = "potential" | "active" | "paused"
 
 interface Props {
   clientId: string
@@ -12,15 +12,15 @@ interface Props {
 }
 
 const STATUS_LABELS: Record<Status, string> = {
+  potential: "Potential",
   active: "Active",
   paused: "Paused",
-  archived: "Archived",
 }
 
 const STATUS_COLORS: Record<Status, { bg: string; text: string }> = {
+  potential: { bg: "#DBEAFE", text: "#1E40AF" },
   active: { bg: "#DCFCE7", text: "#166534" },
   paused: { bg: "#FEF9C3", text: "#854D0E" },
-  archived: { bg: "#F3F4F6", text: "#6B7280" },
 }
 
 export default function ClientStatusPanel({ clientId, initialStatus, initialStartDate, initialEndDate }: Props) {
@@ -78,9 +78,9 @@ export default function ClientStatusPanel({ clientId, initialStatus, initialStar
         <div>
           <label style={labelStyle}>Status</label>
           <select style={{ ...inputStyle, width: "100%" }} value={status} onChange={e => setStatus(e.target.value as Status)}>
+            <option value="potential">Potential</option>
             <option value="active">Active</option>
             <option value="paused">Paused</option>
-            <option value="archived">Archived</option>
           </select>
         </div>
         <div>

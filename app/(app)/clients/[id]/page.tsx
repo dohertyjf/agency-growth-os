@@ -37,7 +37,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
       <div style={{ marginTop: 32 }}>
         <ClientStatusPanel
           clientId={id}
-          initialStatus={client.status as "active" | "paused" | "archived"}
+          initialStatus={client.status as "potential" | "active" | "paused"}
           initialStartDate={client.startDate ?? null}
           initialEndDate={client.endDate ?? null}
         />

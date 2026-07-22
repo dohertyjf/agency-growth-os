@@ -68,6 +68,7 @@ export default function AddClientModal() {
               <div>
                 <label style={labelStyle}>Status</label>
                 <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                  <option value="potential">Potential</option>
                   <option value="active">Active</option>
                   <option value="paused">Paused</option>
                 </select>

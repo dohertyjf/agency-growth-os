@@ -11,7 +11,7 @@ export default async function ClientsPage() {
   if (session.user.role !== "coach") redirect("/dashboard")
 
   const clients = await prisma.client.findMany({
-    where: { status: { not: "archived" } },
+    where: { status: { in: ["potential", "active", "paused"] } },
     include: { contracts: true, metrics: { orderBy: { month: "desc" }, take: 1 } },
     orderBy: { name: "asc" },
   })

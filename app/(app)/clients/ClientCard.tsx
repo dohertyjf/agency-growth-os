@@ -36,8 +36,8 @@ export default function ClientCard({ id, name, agency, status, mrr, latestRevenu
           </div>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20,
-            background: status === "active" ? "#DCFCE7" : "#F3F4F6",
-            color: status === "active" ? "#166534" : "#6B7280",
+            background: status === "active" ? "#DCFCE7" : status === "potential" ? "#DBEAFE" : "#FEF9C3",
+            color: status === "active" ? "#166534" : status === "potential" ? "#1E40AF" : "#854D0E",
             textTransform: "uppercase", letterSpacing: "0.04em",
           }}>
             {status}

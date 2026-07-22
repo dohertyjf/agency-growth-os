@@ -13,9 +13,9 @@ enum Role {
 }
 
 enum ClientStatus {
+  potential
   active
   paused
-  archived
 }
 
 enum ContractStatus {

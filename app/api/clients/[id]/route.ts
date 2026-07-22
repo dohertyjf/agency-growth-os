@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
 const schema = z.object({
-  status: z.enum(["active", "paused", "archived"]).optional(),
+  status: z.enum(["potential", "active", "paused"]).optional(),
   endDate: z.string().nullable().optional(),
   startDate: z.string().nullable().optional(),
   name: z.string().min(1).optional(),

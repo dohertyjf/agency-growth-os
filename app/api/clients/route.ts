@@ -6,7 +6,7 @@ const schema = z.object({
   name: z.string().min(1),
   agency: z.string().optional(),
   email: z.string().email(),
-  status: z.enum(["active", "paused"]).default("active"),
+  status: z.enum(["potential", "active", "paused"]).default("active"),
   startDate: z.string().optional(),
 })
 
