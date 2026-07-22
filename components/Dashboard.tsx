@@ -132,7 +132,8 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetrics, c
     status: c.status as "active" | "potential",
   }))
 
-  const currentYM = latest?.month ?? ""
+  const nowYM = new Date().toISOString().slice(0, 7)
+  const currentYM = latest?.month ?? nowYM
 
   const projInput: ProjectionInput = {
     contracts: contractRows,
@@ -144,6 +145,24 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetrics, c
 
   // Build chart points for selected metric
   const chartPoints: ChartPoint[] = useMemo(() => {
+    // If no monthly data but contracts exist, show contract MRR timeline
+    if (metrics.length === 0 && contractRows.length > 0) {
+      const earliest = contractRows.map(c => c.start).reduce((a, b) => a < b ? a : b)
+      const pts: ChartPoint[] = []
+      let ym = earliest
+      let i = 0
+      while (ym <= nowYM && i < 60) {
+        pts.push({ label: ymLabel(ym), value: currentMRR(contractRows, ym) })
+        ym = ymAdd(ym, 1)
+        i++
+      }
+      for (let j = 1; j <= 6; j++) {
+        const fym = ymAdd(nowYM, j)
+        pts.push({ label: ymLabel(fym), value: currentMRR(contractRows, fym), projected: true })
+      }
+      return pts
+    }
+
     const hist: ChartPoint[] = metrics.map(m => ({
       label: ymLabel(m.month),
       value: m[selectedCard] as number,
@@ -291,8 +310,8 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetrics, c
         <div style={{ flex: 1, background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 24 }}>
           <MetricChart
             points={chartPoints}
-            format={CARDS.find(c => c.key === selectedCard)?.fmt ?? "number"}
-            label={CARDS.find(c => c.key === selectedCard)?.label ?? ""}
+            format="currency"
+            label={rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
           />
         </div>
 

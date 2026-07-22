@@ -9,8 +9,7 @@ export default function AddClientModal() {
   const [form, setForm] = useState({ name: "", agency: "", email: "", status: "active", startDate: "" })
   const router = useRouter()
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function save() {
     setSaving(true)
     setError(null)
     const res = await fetch("/api/clients", {
@@ -22,11 +21,25 @@ export default function AddClientModal() {
     setSaving(false)
     if (!res.ok) {
       setError(typeof data.error === "string" ? data.error : "Something went wrong")
-      return
+      return false
     }
-    setOpen(false)
-    setForm({ name: "", agency: "", email: "", status: "active", startDate: "" })
     router.refresh()
+    return true
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (await save()) {
+      setOpen(false)
+      setForm({ name: "", agency: "", email: "", status: "active", startDate: "" })
+    }
+  }
+
+  async function handleAddAnother(e: React.MouseEvent) {
+    e.preventDefault()
+    if (await save()) {
+      setForm({ name: "", agency: "", email: "", status: "active", startDate: "" })
+    }
   }
 
   const inputStyle = {
@@ -55,7 +68,7 @@ export default function AddClientModal() {
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={labelStyle}>Name *</label>
-                <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Jane Smith" />
+                <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Jane Smith" autoFocus />
               </div>
               <div>
                 <label style={labelStyle}>Agency</label>
@@ -82,6 +95,10 @@ export default function AddClientModal() {
                 <button type="button" onClick={() => setOpen(false)}
                   style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
                   Cancel
+                </button>
+                <button type="button" onClick={handleAddAnother} disabled={saving}
+                  style={{ padding: "8px 16px", background: "none", border: "1px solid #E9532A", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: saving ? "default" : "pointer", color: "#E9532A", opacity: saving ? 0.7 : 1 }}>
+                  {saving ? "Saving…" : "+ Add Another"}
                 </button>
                 <button type="submit" disabled={saving}
                   style={{ padding: "8px 18px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
