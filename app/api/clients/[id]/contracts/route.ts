@@ -28,7 +28,7 @@ const schema = z.object({
   monthly: z.number().min(0),
   start: z.string().regex(/^\d{4}-\d{2}$/),
   contractedThrough: z.string().regex(/^\d{4}-\d{2}$/),
-  status: z.enum(["active", "potential"]).default("potential"),
+  status: z.enum(["potential", "active", "finished"]).default("potential"),
 })
 
 export async function POST(

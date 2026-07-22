@@ -7,7 +7,7 @@ const schema = z.object({
   monthly: z.number().min(0).optional(),
   start: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-  status: z.enum(["active", "potential"]).optional(),
+  status: z.enum(["potential", "active", "finished"]).optional(),
 })
 
 async function authorizeContract(session: import("next-auth").Session | null, contractId: string) {

@@ -19,8 +19,9 @@ enum ClientStatus {
 }
 
 enum ContractStatus {
-  active
   potential
+  active
+  finished
 }
 
 model User {
