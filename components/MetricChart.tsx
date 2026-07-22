@@ -45,7 +45,8 @@ export default function MetricChart({ points, format, label }: Props) {
   const dataMin = Math.min(...vals)
   const dataMax = Math.max(...vals)
   const spread = dataMax - dataMin || Math.abs(dataMax) || 1
-  const yMin = dataMin - spread * 0.12
+  const rawYMin = dataMin - spread * 0.12
+  const yMin = format === "currency" ? Math.max(0, rawYMin) : rawYMin
   const yMax = dataMax + spread * 0.12
   const yRange = yMax - yMin
 
@@ -108,12 +109,16 @@ export default function MetricChart({ points, format, label }: Props) {
           </g>
         ))}
 
-        {/* X labels */}
-        {points.map((p, i) => (
-          <text key={i} x={toX(i)} y={VH - 6} textAnchor="middle" fontSize={10} fill={p.projected ? "#C0BAB2" : "#6B6760"}>
-            {p.label}
-          </text>
-        ))}
+        {/* X labels — skip intermediate labels when crowded */}
+        {points.map((p, i) => {
+          const step = points.length > 18 ? 4 : points.length > 10 ? 2 : 1
+          if (i % step !== 0 && i !== points.length - 1) return null
+          return (
+            <text key={i} x={toX(i)} y={VH - 6} textAnchor="middle" fontSize={10} fill={p.projected ? "#C0BAB2" : "#6B6760"}>
+              {p.label}
+            </text>
+          )
+        })}
 
         {/* Historical line */}
         {histPath && (

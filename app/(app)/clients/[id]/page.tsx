@@ -1,9 +1,7 @@
 import { auth } from "@/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import Dashboard from "@/components/Dashboard"
-import Link from "next/link"
-import ContractsPanel from "./ContractsPanel"
+import ClientPageClient from "./ClientPageClient"
 
 export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -22,23 +20,15 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   if (!client) notFound()
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-        <Link href="/clients" style={{ fontSize: 13, color: "#9C9590", textDecoration: "none" }}>← Clients</Link>
-      </div>
-      <Dashboard
-        clientId={id}
-        clientName={client.name}
-        metrics={metrics}
-        contracts={contracts}
-        goal={goal}
-        initialStatus={client.status as "potential" | "active" | "paused"}
-        initialStartDate={client.startDate ?? null}
-        initialEndDate={client.endDate ?? null}
-      />
-      <div style={{ marginTop: 32 }}>
-        <ContractsPanel clientId={id} initialContracts={contracts} />
-      </div>
-    </div>
+    <ClientPageClient
+      clientId={id}
+      clientName={client.name}
+      initialStatus={client.status as "potential" | "active" | "paused"}
+      initialStartDate={client.startDate ?? null}
+      initialEndDate={client.endDate ?? null}
+      metrics={metrics}
+      initialContracts={contracts}
+      goal={goal}
+    />
   )
 }

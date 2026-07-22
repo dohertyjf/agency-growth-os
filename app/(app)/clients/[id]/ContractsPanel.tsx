@@ -14,6 +14,7 @@ interface Contract {
 interface Props {
   clientId: string
   initialContracts: Contract[]
+  onContractsChange?: (contracts: Contract[]) => void
 }
 
 type ContractStatus = "potential" | "active" | "finished"
@@ -126,8 +127,13 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
   )
 }
 
-export default function ContractsPanel({ clientId, initialContracts }: Props) {
+export default function ContractsPanel({ clientId, initialContracts, onContractsChange }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
+
+  function updateContracts(next: Contract[]) {
+    setContracts(next)
+    onContractsChange?.(next)
+  }
   const [adding, setAdding] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus })
@@ -148,7 +154,7 @@ export default function ContractsPanel({ clientId, initialContracts }: Props) {
     const data = await res.json()
     if (res.ok) {
       const contract = data.contract ?? data
-      setContracts(prev => [...prev, contract])
+      updateContracts([...contracts, contract])
       setForm({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" })
       setAdding(false)
     }
@@ -157,11 +163,11 @@ export default function ContractsPanel({ clientId, initialContracts }: Props) {
 
   async function handleDelete(contractId: string) {
     await fetch(`/api/contracts/${contractId}`, { method: "DELETE" })
-    setContracts(prev => prev.filter(c => c.id !== contractId))
+    updateContracts(contracts.filter(c => c.id !== contractId))
   }
 
   function handleEdited(updated: Contract) {
-    setContracts(prev => prev.map(c => c.id === updated.id ? updated : c))
+    updateContracts(contracts.map(c => c.id === updated.id ? updated : c))
   }
 
   return (
