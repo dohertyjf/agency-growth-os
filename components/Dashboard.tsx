@@ -6,7 +6,7 @@ import MetricChart, { ChartPoint } from "./MetricChart"
 import MonthTable from "./MonthTable"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
-  projectMetric, ymAdd, ymLabel, currentMRR, bookedAhead,
+  projectMetric, ymAdd, ymLabel, currentMRR, bookedActive, bookedPotential, bookedAhead,
   mrrGoal, goalProgress,
   type ContractRow, type ProjectionInput, type ProjectableMetric,
 } from "@/lib/calc"
@@ -96,7 +96,7 @@ const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 
 export default function Dashboard({ clientId, clientName, metrics: rawMetricsProp, contracts, goal, initialStatus, initialStartDate, initialEndDate }: Props) {
   const router = useRouter()
   const [range, setRange] = useState<3 | 6 | 12>(3)
-  const [selectedCard, setSelectedCard] = useState<CardKey>("revenue")
+  const [selectedCard, setSelectedCard] = useState<CardKey>("contractMRR")
   const [editOpen, setEditOpen] = useState(false)
   const [status, setStatus] = useState<ClientStatus>(initialStatus ?? "active")
   const [startDate, setStartDate] = useState(initialStartDate ?? "")
@@ -258,6 +258,22 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metrics, selectedCard, contracts])
 
+  // Second series: contracted + potential (only when contractMRR card selected)
+  const chartPoints2: ChartPoint[] | undefined = useMemo(() => {
+    if (selectedCard !== "contractMRR") return undefined
+    const pts: ChartPoint[] = []
+    for (let i = range - 1; i >= 0; i--) {
+      const ym = ymAdd(nowYM, -i)
+      pts.push({ label: ymLabel(ym), value: bookedActive(contractRows, ym) + bookedPotential(contractRows, ym) })
+    }
+    for (let j = 1; j <= 6; j++) {
+      const ym = ymAdd(nowYM, j)
+      pts.push({ label: ymLabel(ym), value: bookedActive(contractRows, ym) + bookedPotential(contractRows, ym), projected: true })
+    }
+    return pts
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCard, contracts, range, nowYM])
+
   // Goals
   const mrr = currentMRR(contractRows, currentYM)
   const booked = bookedAhead(contractRows, currentYM)
@@ -383,6 +399,17 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
         </div>
       </div>
 
+      {/* Chart — full width, at top */}
+      <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 24, marginBottom: 24 }}>
+        <MetricChart
+          points={chartPoints}
+          series2={chartPoints2}
+          series2Label="With Potential"
+          format={selectedCard === "contractMRR" ? "currency" : (CARDS.find(c => c.key === selectedCard)?.fmt ?? "currency")}
+          label={selectedCard === "contractMRR" ? "Contracted MRR" : rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
+        />
+      </div>
+
       {/* Metric Cards */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 24 }}>
         <MetricCard
@@ -410,15 +437,6 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
             />
           )
         })}
-      </div>
-
-      {/* Chart — full width */}
-      <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 24, marginBottom: 24 }}>
-        <MetricChart
-          points={chartPoints}
-          format="currency"
-          label={selectedCard === "contractMRR" ? "Contracted MRR" : rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
-        />
       </div>
 
       {/* Goals Panel — full width below chart */}
