@@ -51,6 +51,104 @@ interface EditForm {
   type: ContractTypeField
 }
 
+function DuplicateModal({ contract, clientId, onClose, onSave }: { contract: Contract; clientId: string; onClose: () => void; onSave: (c: Contract) => void }) {
+  const [form, setForm] = useState<EditForm>({
+    name: "",
+    monthly: String(contract.monthly),
+    start: contract.start,
+    contractedThrough: contract.contractedThrough,
+    status: "potential" as ContractStatus,
+    type: (contract.type as ContractTypeField) ?? "retainer",
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    const res = await fetch(`/api/clients/${clientId}/contracts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, monthly: parseFloat(form.monthly) }),
+    })
+    setSaving(false)
+    if (!res.ok) { setError("Failed to save"); return }
+    const created = await res.json()
+    onSave(created.contract ?? created)
+    onClose()
+  }
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 460, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
+        <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>
+          Duplicate Contract
+        </h2>
+        <p style={{ fontSize: 12, color: "#9C9590", margin: "0 0 20px" }}>Copied from <strong style={{ color: "#6B6760" }}>{contract.name}</strong> — enter a new name to save.</p>
+        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Type</label>
+              <select style={inputStyle} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as ContractTypeField }))}>
+                <option value="retainer">Retainer</option>
+                <option value="oneoff">One-off</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Status</label>
+              <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
+                <option value="potential">Potential</option>
+                <option value="active">Active</option>
+                <option value="finished">Finished</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Contract Name</label>
+            <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="New client name" autoFocus />
+          </div>
+          <div>
+            <label style={labelStyle}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
+            <input style={inputStyle} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required min={0} />
+          </div>
+          {form.type === "oneoff" ? (
+            <div>
+              <label style={labelStyle}>Month Paid</label>
+              <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Start</label>
+                <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
+              </div>
+              <div>
+                <label style={labelStyle}>Through</label>
+                <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+              </div>
+            </div>
+          )}
+          {error && <div style={{ fontSize: 13, color: "#C2410C" }}>{error}</div>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+            <button type="button" onClick={onClose}
+              style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
+              Cancel
+            </button>
+            <button type="submit" disabled={saving}
+              style={{ padding: "8px 18px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+              {saving ? "Saving…" : "Save Copy"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose: () => void; onSave: (c: Contract) => void }) {
   const [form, setForm] = useState<EditForm>({
     name: contract.name,
@@ -152,6 +250,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [adding, setAdding] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
+  const [duplicatingContract, setDuplicatingContract] = useState<Contract | null>(null)
   const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField })
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
@@ -197,10 +296,17 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
     updateContracts(contracts.map(c => c.id === updated.id ? updated : c))
   }
 
+  function handleDuplicated(created: Contract) {
+    updateContracts([...contracts, created])
+  }
+
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       {editingContract && (
         <EditModal contract={editingContract} onClose={() => setEditingContract(null)} onSave={handleEdited} />
+      )}
+      {duplicatingContract && (
+        <DuplicateModal contract={duplicatingContract} clientId={clientId} onClose={() => setDuplicatingContract(null)} onSave={handleDuplicated} />
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -281,6 +387,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
               contracts={byStatus.active}
               onEdit={setEditingContract}
               onDelete={handleDelete}
+              onDuplicate={setDuplicatingContract}
             />
           )}
 
@@ -291,6 +398,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
               contracts={byStatus.potential}
               onEdit={setEditingContract}
               onDelete={handleDelete}
+              onDuplicate={setDuplicatingContract}
             />
           )}
 
@@ -310,6 +418,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
                   contracts={byStatus.finished}
                   onEdit={setEditingContract}
                   onDelete={handleDelete}
+                  onDuplicate={setDuplicatingContract}
                   dimmed
                 />
               )}
@@ -321,11 +430,12 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
   )
 }
 
-function ContractSection({ title, contracts, onEdit, onDelete, dimmed }: {
+function ContractSection({ title, contracts, onEdit, onDelete, onDuplicate, dimmed }: {
   title: string
   contracts: Contract[]
   onEdit: (c: Contract) => void
   onDelete: (id: string) => void
+  onDuplicate: (c: Contract) => void
   dimmed?: boolean
 }) {
   return (
@@ -358,6 +468,9 @@ function ContractSection({ title, contracts, onEdit, onDelete, dimmed }: {
             <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: colors.bg, color: colors.text, textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
               {STATUS_LABELS[s]}
             </span>
+            <button onClick={() => onDuplicate(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>
+              Copy
+            </button>
             <button onClick={() => onEdit(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>
               Edit
             </button>
