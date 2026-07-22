@@ -1,5 +1,6 @@
 "use client"
 import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import MetricCard from "./MetricCard"
 import MetricChart, { ChartPoint } from "./MetricChart"
 import MonthTable from "./MonthTable"
@@ -92,6 +93,7 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
 export default function Dashboard({ clientId, clientName, metrics: rawMetricsProp, contracts, goal, initialStatus, initialStartDate, initialEndDate }: Props) {
+  const router = useRouter()
   const [range, setRange] = useState<6 | 12>(6)
   const [selectedCard, setSelectedCard] = useState<CardKey>("revenue")
   const [editOpen, setEditOpen] = useState(false)
@@ -100,6 +102,8 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   const [endDate, setEndDate] = useState(initialEndDate ?? "")
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [rawMetrics, setRawMetrics] = useState(rawMetricsProp)
   const [addingMonth, setAddingMonth] = useState(false)
   const [newMonth, setNewMonth] = useState("")
@@ -121,6 +125,13 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
     setAddingMonth(false)
     setNewMonth("")
     setAddingMonthSaving(false)
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    await fetch(`/api/clients/${clientId}`, { method: "DELETE" })
+    router.push("/clients")
+    router.refresh()
   }
 
   async function handleEditSave(e: React.FormEvent) {
@@ -254,6 +265,30 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
                   style={{ padding: "8px 18px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: editSaving ? "default" : "pointer", opacity: editSaving ? 0.7 : 1 }}>
                   {editSaving ? "Saving…" : "Save"}
                 </button>
+              </div>
+
+              {/* Delete zone */}
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #ECE7DE" }}>
+                {confirmDelete ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 13, color: "#6B6760", flex: 1 }}>
+                      Permanently delete <strong>{clientName}</strong> and all their data?
+                    </span>
+                    <button type="button" onClick={() => setConfirmDelete(false)}
+                      style={{ padding: "6px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, cursor: "pointer", color: "#6B6760" }}>
+                      No, keep
+                    </button>
+                    <button type="button" onClick={handleDelete} disabled={deleting}
+                      style={{ padding: "6px 14px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.7 : 1 }}>
+                      {deleting ? "Deleting…" : "Yes, delete"}
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setConfirmDelete(true)}
+                    style={{ background: "none", border: "none", fontSize: 12, color: "#9C9590", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
+                    Delete this client
+                  </button>
+                )}
               </div>
             </form>
           </div>
