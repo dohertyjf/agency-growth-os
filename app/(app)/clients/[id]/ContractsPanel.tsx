@@ -86,7 +86,7 @@ function DuplicateModal({ contract, clientId, onClose, onSave }: { contract: Con
     >
       <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 460, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
         <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>
-          Duplicate Contract
+          Duplicate Account
         </h2>
         <p style={{ fontSize: 12, color: "#9C9590", margin: "0 0 20px" }}>Copied from <strong style={{ color: "#6B6760" }}>{contract.name}</strong> — enter a new name to save.</p>
         <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -108,7 +108,7 @@ function DuplicateModal({ contract, clientId, onClose, onSave }: { contract: Con
             </div>
           </div>
           <div>
-            <label style={labelStyle}>Contract Name</label>
+            <label style={labelStyle}>Account Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="New client name" autoFocus />
           </div>
           <div>
@@ -184,7 +184,7 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
     >
       <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 460, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
         <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 20px", color: "#1A1916" }}>
-          Edit Contract
+          Edit Account
         </h2>
         <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -205,7 +205,7 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
             </div>
           </div>
           <div>
-            <label style={labelStyle}>Contract Name</label>
+            <label style={labelStyle}>Account Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
           <div>
@@ -311,7 +311,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Contracts</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Accounts</div>
           <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
             MRR {fmtCurrency(mrr)} · {fmtCurrency(booked)} booked ahead
           </div>
@@ -320,7 +320,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
           onClick={() => setAdding(a => !a)}
           style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
         >
-          + Add Contract
+          + Add Account
         </button>
       </div>
 
@@ -328,7 +328,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
         <form onSubmit={handleAdd} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: 16, marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
             <div>
-              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Contract Name</label>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Account Name</label>
               <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Acme Corp" autoFocus />
             </div>
             <div>
@@ -505,7 +505,7 @@ function ContractGantt({ contracts, now }: { contracts: Contract[]; now: string 
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 10, color: "#9C9590", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Contract Runway</div>
+      <div style={{ fontSize: 10, color: "#9C9590", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Account Runway</div>
       <div style={{ position: "relative", height: contracts.length * 24 + 8 }}>
         {contracts.map((c, i) => {
           const left = ((toMonths(c.start) - startMo) / totalMo) * 100
