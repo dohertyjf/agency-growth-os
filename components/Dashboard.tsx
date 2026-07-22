@@ -51,9 +51,10 @@ interface Props {
   initialEndDate?: string | null
 }
 
-type CardKey = "revenue" | "netProfit" | "grossProfit" | "netMargin" | "leads" | "closeRate" | "newClients" | "churn"
+type MetricKey = "revenue" | "netProfit" | "grossProfit" | "netMargin" | "leads" | "closeRate" | "newClients" | "churn"
+type CardKey = MetricKey | "contractMRR"
 
-const CARDS: { key: CardKey; label: string; fmt: "currency" | "percent" | "number"; projectable?: boolean }[] = [
+const CARDS: { key: MetricKey; label: string; fmt: "currency" | "percent" | "number"; projectable?: boolean }[] = [
   { key: "revenue", label: "Revenue", fmt: "currency", projectable: true },
   { key: "netProfit", label: "Net Profit", fmt: "currency", projectable: true },
   { key: "grossProfit", label: "Gross Profit", fmt: "currency", projectable: true },
@@ -94,7 +95,7 @@ const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 
 
 export default function Dashboard({ clientId, clientName, metrics: rawMetricsProp, contracts, goal, initialStatus, initialStartDate, initialEndDate }: Props) {
   const router = useRouter()
-  const [range, setRange] = useState<6 | 12>(6)
+  const [range, setRange] = useState<3 | 6 | 12>(3)
   const [selectedCard, setSelectedCard] = useState<CardKey>("revenue")
   const [editOpen, setEditOpen] = useState(false)
   const [status, setStatus] = useState<ClientStatus>(initialStatus ?? "active")
@@ -132,6 +133,12 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
     await fetch(`/api/clients/${clientId}`, { method: "DELETE" })
     router.push("/clients")
     router.refresh()
+  }
+
+  function handleMetricUpdate(month: string, field: string, value: number) {
+    setRawMetrics(prev => prev.map(m =>
+      m.month === month ? { ...m, [field]: value } : m
+    ))
   }
 
   async function handleEditSave(e: React.FormEvent) {
@@ -176,8 +183,28 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
     currentYM,
   }
 
+  // Contract MRR sparkline over range months
+  const contractMRRSparkline = useMemo(() => {
+    return Array.from({ length: range }, (_, i) => currentMRR(contractRows, ymAdd(nowYM, i - range + 1)))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contracts, range, nowYM])
+
   // Build chart points for selected metric
   const chartPoints: ChartPoint[] = useMemo(() => {
+    // Contract MRR view
+    if (selectedCard === "contractMRR") {
+      const pts: ChartPoint[] = []
+      for (let i = range - 1; i >= 0; i--) {
+        const ym = ymAdd(nowYM, -i)
+        pts.push({ label: ymLabel(ym), value: currentMRR(contractRows, ym) })
+      }
+      for (let j = 1; j <= 6; j++) {
+        const ym = ymAdd(nowYM, j)
+        pts.push({ label: ymLabel(ym), value: currentMRR(contractRows, ym), projected: true })
+      }
+      return pts
+    }
+
     // If no monthly data but contracts exist, show contract MRR timeline
     if (metrics.length === 0 && contractRows.length > 0) {
       const earliest = contractRows.map(c => c.start).reduce((a, b) => a < b ? a : b)
@@ -196,13 +223,29 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
       return pts
     }
 
-    const hist: ChartPoint[] = metrics.map(m => ({
-      label: ymLabel(m.month),
-      value: m[selectedCard] as number,
-    }))
+    const pts: ChartPoint[] = []
+
+    // Fill earlier months with contract MRR when we have fewer months than the range
+    if (selectedCard === "revenue" && contractRows.length > 0 && metrics.length < range) {
+      const firstMonth = metrics[0]?.month ?? nowYM
+      const gap = range - metrics.length
+      for (let i = gap; i >= 1; i--) {
+        const ym = ymAdd(firstMonth, -i)
+        pts.push({ label: ymLabel(ym), value: currentMRR(contractRows, ym), projected: true })
+      }
+    }
+
+    // Actual months — for revenue, use contract MRR when value is 0 (empty month)
+    const hist: ChartPoint[] = metrics.map(m => {
+      const val = m[selectedCard] as number
+      if (selectedCard === "revenue" && val === 0 && contractRows.length > 0)
+        return { label: ymLabel(m.month), value: currentMRR(contractRows, m.month), projected: true }
+      return { label: ymLabel(m.month), value: val }
+    })
+    pts.push(...hist)
 
     const card = CARDS.find(c => c.key === selectedCard)
-    if (!card?.projectable || !currentYM) return hist
+    if (!card?.projectable || !currentYM) return pts
 
     const projValues = projectMetric(selectedCard as ProjectableMetric, projInput)
     const projPts: ChartPoint[] = projValues.map((v, i) => ({
@@ -211,7 +254,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
       projected: true,
     }))
 
-    return [...hist, ...projPts]
+    return [...pts, ...projPts]
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metrics, selectedCard, contracts])
 
@@ -318,7 +361,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
           </span>}
         </div>
         <div style={{ display: "flex", gap: 2, background: "#F0EDE8", borderRadius: 7, padding: 3 }}>
-          {([6, 12] as const).map(n => (
+          {([3, 6, 12] as const).map(n => (
             <button
               key={n}
               onClick={() => setRange(n)}
@@ -342,6 +385,14 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
 
       {/* Metric Cards */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 24 }}>
+        <MetricCard
+          label="Contracted MRR"
+          value={fmtCurrency(currentMRR(contractRows, nowYM))}
+          delta={contractMRRSparkline.length >= 2 ? momDelta(contractMRRSparkline[contractMRRSparkline.length - 1], contractMRRSparkline[contractMRRSparkline.length - 2]) : null}
+          sparkline={contractMRRSparkline}
+          selected={selectedCard === "contractMRR"}
+          onClick={() => setSelectedCard("contractMRR")}
+        />
         {CARDS.map(card => {
           const val = latest ? (latest[card.key] as number) : 0
           const prevVal = prev ? (prev[card.key] as number) : null
@@ -366,7 +417,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
         <MetricChart
           points={chartPoints}
           format="currency"
-          label={rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
+          label={selectedCard === "contractMRR" ? "Contracted MRR" : rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
         />
       </div>
 
@@ -422,6 +473,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
           key={rawMetrics.length}
           clientId={clientId}
           months={[...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).slice(-range)}
+          onUpdate={handleMetricUpdate}
         />
       </div>
     </div>
