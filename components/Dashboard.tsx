@@ -109,6 +109,12 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   const [addingMonth, setAddingMonth] = useState(false)
   const [newMonth, setNewMonth] = useState("")
   const [addingMonthSaving, setAddingMonthSaving] = useState(false)
+  // Pin metric cards to current month (or most recent past month with data)
+  const [cardMonth, setCardMonth] = useState(() => {
+    const now = new Date().toISOString().slice(0, 7)
+    const pastOrCurrent = rawMetricsProp.filter(m => m.month <= now).sort((a, b) => b.month.localeCompare(a.month))
+    return pastOrCurrent[0]?.month ?? rawMetricsProp.sort((a, b) => b.month.localeCompare(a.month))[0]?.month ?? now
+  })
 
   async function handleAddMonth(e: React.FormEvent) {
     e.preventDefault()
@@ -155,14 +161,29 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
     setEditOpen(false)
   }
 
-  // Slice to range (last N months)
+  // Slice to range (last N months) — used for chart sparklines
   const metrics = useMemo(() => {
     const sorted = [...rawMetrics].sort((a, b) => a.month.localeCompare(b.month))
     return sorted.slice(-range).map(derivedMetrics)
   }, [rawMetrics, range])
 
-  const latest = metrics[metrics.length - 1]
-  const prev = metrics[metrics.length - 2]
+  // All months sorted+derived — used for card month picker
+  const allDerived = useMemo(() =>
+    [...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).map(derivedMetrics),
+    [rawMetrics]
+  )
+
+  // Metric card values: use cardMonth (or nearest past month with data)
+  const latest = useMemo(() => {
+    const exact = allDerived.find(m => m.month === cardMonth)
+    if (exact) return exact
+    return [...allDerived].filter(m => m.month <= cardMonth).at(-1) ?? null
+  }, [allDerived, cardMonth])
+
+  const prev = useMemo(() => {
+    if (!latest) return null
+    return [...allDerived].filter(m => m.month < latest.month).at(-1) ?? null
+  }, [allDerived, latest])
 
   // Contract rows for projections
   const contractRows: ContractRow[] = contracts.map(c => ({
@@ -415,6 +436,25 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
       </div>
 
       {/* Metric Cards */}
+      {allDerived.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Showing
+          </span>
+          <select
+            value={cardMonth}
+            onChange={e => setCardMonth(e.target.value)}
+            style={{ fontSize: 12, color: "#1A1916", border: "1px solid #ECE7DE", borderRadius: 6, padding: "3px 8px", background: "#fff", fontFamily: "inherit", cursor: "pointer", outline: "none" }}
+          >
+            {[...allDerived].sort((a, b) => b.month.localeCompare(a.month)).map(m => (
+              <option key={m.month} value={m.month}>{ymLabel(m.month)}{m.month === nowYM ? " (current)" : m.month > nowYM ? " (future)" : ""}</option>
+            ))}
+          </select>
+          {latest && latest.month !== cardMonth && (
+            <span style={{ fontSize: 11, color: "#9C9590" }}>→ showing {ymLabel(latest.month)}</span>
+          )}
+        </div>
+      )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 24 }}>
         <MetricCard
           label="Contracted MRR"

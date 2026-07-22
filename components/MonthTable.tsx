@@ -29,7 +29,6 @@ const EDITABLE_ROWS = [
   { key: "cashInBank", label: "Cash in Bank", format: "currency" },
   { key: "leads", label: "Leads", format: "number" },
   { key: "newClients", label: "New Clients", format: "number" },
-  { key: "closeRate", label: "Close Rate", format: "percent" },
   { key: "churn", label: "Churn", format: "number" },
 ] as const
 
@@ -37,6 +36,7 @@ const DERIVED_ROWS = [
   { key: "netProfit", label: "Net Profit", format: "currency" },
   { key: "grossProfit", label: "Gross Profit", format: "currency" },
   { key: "netMargin", label: "Net Margin", format: "percent" },
+  { key: "closeRate", label: "Close Rate", format: "percent" },
 ] as const
 
 type EditableKey = typeof EDITABLE_ROWS[number]["key"]
@@ -69,10 +69,13 @@ export default function MonthTable({ clientId, months, onUpdate }: Props) {
 
   const getDerived = useCallback((month: string) => {
     const r = data[month] ?? {}
+    const leads = r.leads ?? 0
+    const newClients = r.newClients ?? 0
     return {
       netProfit: netProfit(r.revenue ?? 0, r.totalExpenses ?? 0),
       grossProfit: grossProfit(r.revenue ?? 0, r.salaries ?? 0, r.software ?? 0),
       netMargin: netMargin(r.revenue ?? 0, r.totalExpenses ?? 0),
+      closeRate: leads > 0 ? (newClients / leads) * 100 : 0,
     }
   }, [data])
 
