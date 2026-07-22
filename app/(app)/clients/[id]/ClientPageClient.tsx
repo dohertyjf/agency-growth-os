@@ -3,6 +3,7 @@ import { useState } from "react"
 import Link from "next/link"
 import Dashboard from "@/components/Dashboard"
 import ContractsPanel from "./ContractsPanel"
+import AddClientModal from "../AddClientModal"
 
 interface Metric {
   id: string
@@ -52,8 +53,9 @@ export default function ClientPageClient({
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <Link href="/clients" style={{ fontSize: 13, color: "#9C9590", textDecoration: "none" }}>← Clients</Link>
+        <AddClientModal />
       </div>
       <Dashboard
         clientId={clientId}
