@@ -129,19 +129,26 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
 
 export default function ContractsPanel({ clientId, initialContracts, onContractsChange }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
+  const [adding, setAdding] = useState(false)
+  const [editingContract, setEditingContract] = useState<Contract | null>(null)
+  const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus })
+  const [saving, setSaving] = useState(false)
+  const [showPast, setShowPast] = useState(false)
 
   function updateContracts(next: Contract[]) {
     setContracts(next)
     onContractsChange?.(next)
   }
-  const [adding, setAdding] = useState(false)
-  const [editingContract, setEditingContract] = useState<Contract | null>(null)
-  const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus })
-  const [saving, setSaving] = useState(false)
 
   const rows = contracts.map(toRow)
   const mrr = currentMRR(rows, now)
   const booked = bookedAhead(rows, now)
+
+  const byStatus = {
+    active: contracts.filter(c => c.status === "active").sort((a, b) => a.start.localeCompare(b.start)),
+    potential: contracts.filter(c => c.status === "potential").sort((a, b) => a.start.localeCompare(b.start)),
+    finished: contracts.filter(c => c.status === "finished").sort((a, b) => a.start.localeCompare(b.start)),
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -153,8 +160,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
     })
     const data = await res.json()
     if (res.ok) {
-      const contract = data.contract ?? data
-      updateContracts([...contracts, contract])
+      updateContracts([...contracts, data.contract ?? data])
       setForm({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" })
       setAdding(false)
     }
@@ -173,11 +179,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       {editingContract && (
-        <EditModal
-          contract={editingContract}
-          onClose={() => setEditingContract(null)}
-          onSave={handleEdited}
-        />
+        <EditModal contract={editingContract} onClose={() => setEditingContract(null)} onSave={handleEdited} />
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -199,7 +201,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
         <form onSubmit={handleAdd} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: 16, marginBottom: 16, display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
           <div>
             <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Contract Name</label>
-            <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Acme Corp" />
+            <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Acme Corp" autoFocus />
           </div>
           <div>
             <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Monthly ($)</label>
@@ -230,39 +232,92 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
       {contracts.length === 0 ? (
         <div style={{ color: "#9C9590", fontSize: 13 }}>No contracts yet.</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        <>
           <ContractGantt contracts={contracts} now={now} />
-          {contracts.map(c => {
-            const s = (c.status as ContractStatus) in STATUS_COLORS ? c.status as ContractStatus : "potential"
-            const colors = STATUS_COLORS[s]
-            return (
-              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #F5F1EC" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</div>
-                  <div style={{ fontSize: 11, color: "#9C9590" }}>{ymLabel(c.start)} – {ymLabel(c.contractedThrough)}</div>
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }}>
-                  {fmtCurrency(c.monthly)}/mo
-                </div>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20,
-                  background: colors.bg, color: colors.text,
-                  textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap",
-                }}>
-                  {STATUS_LABELS[s]}
-                </span>
-                <button
-                  onClick={() => setEditingContract(c)}
-                  style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}
-                >
-                  Edit
-                </button>
-                <button onClick={() => handleDelete(c.id)} style={{ background: "none", border: "none", color: "#9C9590", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
-              </div>
-            )
-          })}
+
+          {/* Active */}
+          {byStatus.active.length > 0 && (
+            <ContractSection
+              title="Active"
+              contracts={byStatus.active}
+              onEdit={setEditingContract}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {/* Pipeline */}
+          {byStatus.potential.length > 0 && (
+            <ContractSection
+              title="Pipeline"
+              contracts={byStatus.potential}
+              onEdit={setEditingContract}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {/* Past (collapsed by default) */}
+          {byStatus.finished.length > 0 && (
+            <div style={{ marginTop: byStatus.active.length || byStatus.potential.length ? 12 : 0 }}>
+              <button
+                onClick={() => setShowPast(p => !p)}
+                style={{ background: "none", border: "none", fontSize: 11, fontWeight: 600, color: "#9C9590", cursor: "pointer", padding: 0, textTransform: "uppercase", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 4 }}
+              >
+                <span style={{ fontSize: 10 }}>{showPast ? "▾" : "▸"}</span>
+                Past ({byStatus.finished.length})
+              </button>
+              {showPast && (
+                <ContractSection
+                  title=""
+                  contracts={byStatus.finished}
+                  onEdit={setEditingContract}
+                  onDelete={handleDelete}
+                  dimmed
+                />
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function ContractSection({ title, contracts, onEdit, onDelete, dimmed }: {
+  title: string
+  contracts: Contract[]
+  onEdit: (c: Contract) => void
+  onDelete: (id: string) => void
+  dimmed?: boolean
+}) {
+  return (
+    <div style={{ marginTop: title ? 12 : 4 }}>
+      {title && (
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9C9590", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4, paddingBottom: 4, borderBottom: "1px solid #F5F1EC" }}>
+          {title}
         </div>
       )}
+      {contracts.map(c => {
+        const s = (c.status as ContractStatus) in STATUS_COLORS ? c.status as ContractStatus : "potential"
+        const colors = STATUS_COLORS[s]
+        return (
+          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #F5F1EC", opacity: dimmed ? 0.6 : 1 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</div>
+              <div style={{ fontSize: 11, color: "#9C9590" }}>{ymLabel(c.start)} – {ymLabel(c.contractedThrough)}</div>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }}>
+              {fmtCurrency(c.monthly)}/mo
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: colors.bg, color: colors.text, textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+              {STATUS_LABELS[s]}
+            </span>
+            <button onClick={() => onEdit(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>
+              Edit
+            </button>
+            <button onClick={() => onDelete(c.id)} style={{ background: "none", border: "none", color: "#9C9590", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
+          </div>
+        )
+      })}
     </div>
   )
 }
