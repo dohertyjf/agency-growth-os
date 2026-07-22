@@ -91,7 +91,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, clientName, metrics: rawMetrics, contracts, goal, initialStatus, initialStartDate, initialEndDate }: Props) {
+export default function Dashboard({ clientId, clientName, metrics: rawMetricsProp, contracts, goal, initialStatus, initialStartDate, initialEndDate }: Props) {
   const [range, setRange] = useState<6 | 12>(6)
   const [selectedCard, setSelectedCard] = useState<CardKey>("revenue")
   const [editOpen, setEditOpen] = useState(false)
@@ -100,6 +100,28 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetrics, c
   const [endDate, setEndDate] = useState(initialEndDate ?? "")
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [rawMetrics, setRawMetrics] = useState(rawMetricsProp)
+  const [addingMonth, setAddingMonth] = useState(false)
+  const [newMonth, setNewMonth] = useState("")
+  const [addingMonthSaving, setAddingMonthSaving] = useState(false)
+
+  async function handleAddMonth(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newMonth) return
+    setAddingMonthSaving(true)
+    await fetch(`/api/clients/${clientId}/metrics/${newMonth}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revenue: 0 }),
+    })
+    setRawMetrics(prev => {
+      if (prev.find(m => m.month === newMonth)) return prev
+      return [...prev, { month: newMonth, revenue: 0, totalExpenses: 0, salaries: 0, software: 0, cashInBank: 0, leads: 0, newClients: 0, closeRate: 0, churn: 0 }]
+    })
+    setAddingMonth(false)
+    setNewMonth("")
+    setAddingMonthSaving(false)
+  }
 
   async function handleEditSave(e: React.FormEvent) {
     e.preventDefault()
@@ -304,57 +326,67 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetrics, c
         })}
       </div>
 
-      {/* Chart + Goals */}
-      <div style={{ display: "flex", gap: 20, marginBottom: 24, alignItems: "flex-start" }}>
-        {/* Chart */}
-        <div style={{ flex: 1, background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 24 }}>
-          <MetricChart
-            points={chartPoints}
-            format="currency"
-            label={rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
-          />
-        </div>
+      {/* Chart — full width */}
+      <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 24, marginBottom: 24 }}>
+        <MetricChart
+          points={chartPoints}
+          format="currency"
+          label={rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
+        />
+      </div>
 
-        {/* Goals Panel */}
-        {goal && (
-          <div style={{ width: 240, flexShrink: 0, background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#9C9590", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 16 }}>
-              Goals
-            </div>
-
-            <GoalItem
-              label="Monthly Revenue"
-              current={mrr}
-              target={mrrTarget}
-              pct={mrrPct}
-              fmt="currency"
-            />
-
-            <GoalItem
-              label="Net Profit / Mo"
-              current={latest?.netProfit ?? 0}
-              target={goal.profit / 12}
-              pct={npPct}
-              fmt="currency"
-            />
-
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #ECE7DE" }}>
+      {/* Goals Panel — full width below chart */}
+      {goal && (
+        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#9C9590", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 16 }}>
+            Goals
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24 }}>
+            <GoalItem label="Monthly Revenue" current={mrr} target={mrrTarget} pct={mrrPct} fmt="currency" />
+            <GoalItem label="Net Profit / Mo" current={latest?.netProfit ?? 0} target={goal.profit / 12} pct={npPct} fmt="currency" />
+            <div>
               <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 4 }}>Booked ahead</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>
-                {fmtCurrency(booked)}
-              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(booked)}</div>
               <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>in active contracts</div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Month Table */}
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 14 }}>Monthly Metrics</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Monthly Metrics</div>
+          {addingMonth ? (
+            <form onSubmit={handleAddMonth} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="month"
+                value={newMonth}
+                onChange={e => setNewMonth(e.target.value)}
+                required
+                autoFocus
+                style={{ padding: "5px 8px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+              />
+              <button type="submit" disabled={addingMonthSaving}
+                style={{ padding: "5px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                {addingMonthSaving ? "…" : "Add"}
+              </button>
+              <button type="button" onClick={() => setAddingMonth(false)}
+                style={{ padding: "5px 10px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, cursor: "pointer", color: "#6B6760" }}>
+                Cancel
+              </button>
+            </form>
+          ) : (
+            <button onClick={() => setAddingMonth(true)}
+              style={{ padding: "5px 14px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#6B6760" }}>
+              + Add Month
+            </button>
+          )}
+        </div>
         <MonthTable
+          key={rawMetrics.length}
           clientId={clientId}
-          months={rawMetrics.sort((a, b) => a.month.localeCompare(b.month)).slice(-range)}
+          months={[...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).slice(-range)}
         />
       </div>
     </div>

@@ -1,18 +1,11 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { z } from "zod"
 import { netProfit, grossProfit, netMargin } from "@/lib/calc"
 
-const DERIVED = ["netProfit", "grossProfit", "netMargin"]
 const INPUT_FIELDS = [
   "revenue", "totalExpenses", "salaries", "software",
   "cashInBank", "leads", "newClients", "closeRate", "churn",
 ]
-
-const schema = z.object({
-  field: z.string().refine(f => INPUT_FIELDS.includes(f), "Not an editable field"),
-  value: z.number(),
-})
 
 function authorize(session: import("next-auth").Session | null, clientId: string) {
   if (!session) return false
@@ -29,15 +22,22 @@ export async function PATCH(
   if (!authorize(session, id)) return Response.json({ error: "Forbidden" }, { status: 403 })
 
   const body = await req.json().catch(() => null)
-  const parsed = schema.safeParse(body)
-  if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    return Response.json({ error: "Invalid body" }, { status: 422 })
 
-  const { field, value } = parsed.data
+  const updates: Record<string, number> = {}
+  for (const [key, val] of Object.entries(body)) {
+    if (!INPUT_FIELDS.includes(key) || typeof val !== "number")
+      return Response.json({ error: `Invalid field: ${key}` }, { status: 422 })
+    updates[key] = val
+  }
+  if (!Object.keys(updates).length)
+    return Response.json({ error: "No valid fields" }, { status: 422 })
 
   const m = await prisma.monthlyMetric.upsert({
     where: { clientId_month: { clientId: id, month } },
-    update: { [field]: value },
-    create: { clientId: id, month, [field]: value },
+    update: updates,
+    create: { clientId: id, month, ...updates },
   })
 
   return Response.json({
