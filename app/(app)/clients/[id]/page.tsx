@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import Dashboard from "@/components/Dashboard"
 import Link from "next/link"
 import ContractsPanel from "./ContractsPanel"
+import ClientStatusPanel from "./ClientStatusPanel"
 
 export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -33,6 +34,14 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         contracts={contracts}
         goal={goal}
       />
+      <div style={{ marginTop: 32 }}>
+        <ClientStatusPanel
+          clientId={id}
+          initialStatus={client.status as "active" | "paused" | "archived"}
+          initialStartDate={client.startDate ?? null}
+          initialEndDate={client.endDate ?? null}
+        />
+      </div>
       <div style={{ marginTop: 32 }}>
         <ContractsPanel clientId={id} initialContracts={contracts} />
       </div>

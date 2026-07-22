@@ -6,7 +6,7 @@ export default function AddClientModal() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: "", agency: "", email: "", status: "active" })
+  const [form, setForm] = useState({ name: "", agency: "", email: "", status: "active", startDate: "" })
   const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -16,7 +16,7 @@ export default function AddClientModal() {
     const res = await fetch("/api/clients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, startDate: form.startDate || undefined }),
     })
     const data = await res.json()
     setSaving(false)
@@ -25,7 +25,7 @@ export default function AddClientModal() {
       return
     }
     setOpen(false)
-    setForm({ name: "", agency: "", email: "", status: "active" })
+    setForm({ name: "", agency: "", email: "", status: "active", startDate: "" })
     router.refresh()
   }
 
@@ -71,6 +71,10 @@ export default function AddClientModal() {
                   <option value="active">Active</option>
                   <option value="paused">Paused</option>
                 </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Start Date</label>
+                <input style={inputStyle} type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} />
               </div>
               {error && <div style={{ fontSize: 13, color: "#C2410C" }}>{error}</div>}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>

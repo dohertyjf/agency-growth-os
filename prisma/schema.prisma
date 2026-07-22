@@ -40,6 +40,8 @@ model Client {
   agency    String?
   email     String          @unique
   status    ClientStatus    @default(active)
+  startDate String?
+  endDate   String?
   users     User[]
   goal      Goal?
   metrics   MonthlyMetric[]

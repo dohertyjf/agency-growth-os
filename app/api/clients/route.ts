@@ -7,6 +7,7 @@ const schema = z.object({
   agency: z.string().optional(),
   email: z.string().email(),
   status: z.enum(["active", "paused"]).default("active"),
+  startDate: z.string().optional(),
 })
 
 export async function POST(req: Request) {
@@ -19,13 +20,13 @@ export async function POST(req: Request) {
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { name, agency, email, status } = parsed.data
+  const { name, agency, email, status, startDate } = parsed.data
 
   const existing = await prisma.client.findUnique({ where: { email } })
   if (existing) return Response.json({ error: "A client with that email already exists" }, { status: 409 })
 
   const client = await prisma.client.create({
-    data: { name, agency: agency ?? null, email, status },
+    data: { name, agency: agency ?? null, email, status, startDate: startDate ?? null },
   })
 
   return Response.json(client, { status: 201 })
