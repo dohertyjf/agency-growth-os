@@ -93,6 +93,18 @@ model Contract {
   status            ContractStatus @default(active)
   type              ContractType   @default(retainer)
   createdAt         DateTime       @default(now())
+  accountMonths     AccountMonth[]
+}
+
+model AccountMonth {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  month      String
+  actual     Float
+  createdAt  DateTime @default(now())
+
+  @@unique([contractId, month])
 }
 
 model Call {

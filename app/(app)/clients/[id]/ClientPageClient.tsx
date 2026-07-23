@@ -3,6 +3,7 @@ import { useState } from "react"
 import Link from "next/link"
 import Dashboard from "@/components/Dashboard"
 import ContractsPanel from "./ContractsPanel"
+import ReconciliationTable from "./ReconciliationTable"
 import AddClientModal from "../AddClientModal"
 
 interface Metric {
@@ -30,6 +31,12 @@ interface Contract {
   type: string
 }
 
+interface AccountMonth {
+  contractId: string
+  month: string
+  actual: number
+}
+
 interface Goal {
   annualRevenue: number
   profit: number
@@ -43,14 +50,24 @@ interface Props {
   initialEndDate: string | null
   metrics: Metric[]
   initialContracts: Contract[]
+  initialAccountMonths: AccountMonth[]
   goal: Goal | null
 }
 
 export default function ClientPageClient({
   clientId, clientName, initialStatus, initialStartDate, initialEndDate,
-  metrics, initialContracts, goal,
+  metrics: initialMetrics, initialContracts, initialAccountMonths, goal,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
+  const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
+
+  function handleRevenueUpdate(month: string, revenue: number) {
+    setMetrics(prev => {
+      const exists = prev.find(m => m.month === month)
+      if (exists) return prev.map(m => m.month === month ? { ...m, revenue } : m)
+      return [...prev, { id: "", clientId, month, revenue, totalExpenses: 0, salaries: 0, software: 0, cashInBank: 0, leads: 0, newClients: 0, closeRate: 0, churn: 0 }]
+    })
+  }
 
   return (
     <div>
@@ -68,7 +85,12 @@ export default function ClientPageClient({
         initialStartDate={initialStartDate}
         initialEndDate={initialEndDate}
       />
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 24 }}>
+        <ReconciliationTable
+          contracts={contracts}
+          initialAccountMonths={initialAccountMonths}
+          onRevenueUpdate={handleRevenueUpdate}
+        />
         <ContractsPanel
           clientId={clientId}
           initialContracts={initialContracts}
