@@ -245,7 +245,7 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
                         {isEditing ? (
                           <input
                             autoFocus
-                            defaultValue={pm ? String(pm.amount) : "0"}
+                            defaultValue={pm ? String(pm.amount) : String(getActual(contract.id, month)?.actual ?? contract.monthly)}
                             onBlur={e => handlePaymentSave(contract.id, month, e.target.value)}
                             onKeyDown={e => {
                               if (e.key === "Enter") (e.target as HTMLInputElement).blur()
@@ -264,13 +264,17 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
                             style={{
                               padding: "5px 10px", fontSize: 11, textAlign: "right",
                               cursor: "pointer", fontVariantNumeric: "tabular-nums",
-                              color: pm && pm.amount > 0 ? "#0F766E" : "#A7D8D2",
-                              fontWeight: pm && pm.amount > 0 ? 600 : 400,
+                              color: pm ? "#0F766E" : contractActiveInMonth(contract, month) ? "#99D6CE" : "#A7D8D2",
+                              fontWeight: pm ? 600 : 400,
                               background: isSaving ? "#CCFBF1" : "transparent",
                               minWidth: 80,
                             }}
                           >
-                            {pm && pm.amount > 0 ? fmtCurrency(pm.amount) : "—"}
+                            {pm
+                              ? fmtCurrency(pm.amount)
+                              : contractActiveInMonth(contract, month)
+                                ? fmtCurrency(getActual(contract.id, month)?.actual ?? contract.monthly)
+                                : "—"}
                           </div>
                         )}
                       </td>
@@ -303,12 +307,14 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
               <td style={{ ...labelStyle, fontWeight: 700, color: "#0D9488", background: "#F0FDFA" }}>Total Cash In</td>
               {months.map(month => {
                 const total = activeContracts.reduce((sum, c) => {
+                  if (!contractActiveInMonth(c, month)) return sum
                   const pm = getPayment(c.id, month)
-                  return sum + (pm?.amount ?? 0)
+                  return sum + (pm ? pm.amount : (getActual(c.id, month)?.actual ?? c.monthly))
                 }, 0)
+                const isOverridden = activeContracts.some(c => contractActiveInMonth(c, month) && getPayment(c.id, month))
                 return (
-                  <td key={month} style={{ padding: "7px 10px", textAlign: "right", fontSize: 12, fontWeight: 700, color: total > 0 ? "#0D9488" : "#A7D8D2", fontVariantNumeric: "tabular-nums", borderRight: "1px solid #CCFBF1", background: "transparent" }}>
-                    {total > 0 ? fmtCurrency(total) : "—"}
+                  <td key={month} style={{ padding: "7px 10px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isOverridden ? "#0D9488" : "#99D6CE", fontVariantNumeric: "tabular-nums", borderRight: "1px solid #CCFBF1", background: "transparent" }}>
+                    {fmtCurrency(total)}
                   </td>
                 )
               })}

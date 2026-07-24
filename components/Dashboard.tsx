@@ -341,20 +341,22 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showMRRFlow, contracts, range, nowYM])
 
-  // Cash collected per month from payments
+  // Cash collected per month: explicit payments if entered, otherwise default to MRR (actuals/retainer)
   const cashCollectedPoints: ChartPoint[] | undefined = useMemo(() => {
     if (!showCashCollected) return undefined
-    const byMonth = new Map<string, number>()
-    payments.forEach(p => byMonth.set(p.month, (byMonth.get(p.month) ?? 0) + p.amount))
-    // Build for the `range` past months (aligns with contractMRR chart's historical portion)
+    const paymentByMonth = new Map<string, number>()
+    payments.forEach(p => paymentByMonth.set(p.month, (paymentByMonth.get(p.month) ?? 0) + p.amount))
+    const mrrByMonth = new Map(rawMetrics.map(m => [m.month, m.revenue]))
     const pts: ChartPoint[] = []
     for (let i = range - 1; i >= 0; i--) {
       const ym = ymAdd(nowYM, -i)
-      pts.push({ label: ymLabel(ym), value: byMonth.get(ym) ?? 0 })
+      const explicit = paymentByMonth.get(ym)
+      const value = explicit !== undefined ? explicit : (mrrByMonth.get(ym) ?? currentMRR(contractRows, ym))
+      pts.push({ label: ymLabel(ym), value })
     }
     return pts
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showCashCollected, payments, range, nowYM])
+  }, [showCashCollected, payments, rawMetrics, contractRows, range, nowYM])
 
   // Goals
   const mrr = currentMRR(contractRows, currentYM)
