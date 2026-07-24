@@ -26,6 +26,7 @@ enum ContractStatus {
 
 enum ContractType {
   retainer
+  ongoing
   oneoff
 }
 
