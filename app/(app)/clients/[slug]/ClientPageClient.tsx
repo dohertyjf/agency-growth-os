@@ -63,7 +63,7 @@ interface Product {
   id: string
   name: string
   description: string | null
-  type: "retainer" | "oneoff"
+  type: "retainer" | "ongoing" | "oneoff"
   monthly: number
 }
 

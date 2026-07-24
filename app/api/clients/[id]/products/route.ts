@@ -9,7 +9,7 @@ function coachOnly(session: import("next-auth").Session | null) {
 const schema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
-  type: z.enum(["retainer", "oneoff"]).default("retainer"),
+  type: z.enum(["retainer", "ongoing", "oneoff"]).default("retainer"),
   monthly: z.number().min(0),
 })
 

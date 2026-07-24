@@ -6,11 +6,11 @@ interface Product {
   id: string
   name: string
   description: string | null
-  type: "retainer" | "oneoff"
+  type: "retainer" | "ongoing" | "oneoff"
   monthly: number
 }
 
-type ProductForm = { name: string; description: string; type: "retainer" | "oneoff"; monthly: string }
+type ProductForm = { name: string; description: string; type: "retainer" | "ongoing" | "oneoff"; monthly: string }
 
 const defaultForm: ProductForm = { name: "", description: "", type: "retainer", monthly: "" }
 
@@ -64,7 +64,7 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
 
   function startEdit(p: Product) {
     setEditingId(p.id)
-    setEditForm({ name: p.name, description: p.description ?? "", type: p.type, monthly: String(p.monthly) })
+    setEditForm({ name: p.name, description: p.description ?? "", type: p.type as "retainer" | "ongoing" | "oneoff", monthly: String(p.monthly) })
   }
 
   async function handleEditSave(e: React.FormEvent, id: string) {
@@ -116,13 +116,14 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
             </div>
             <div>
               <label style={labelStyle}>Type</label>
-              <select style={inputStyle} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as "retainer" | "oneoff" }))}>
+              <select style={inputStyle} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as "retainer" | "ongoing" | "oneoff" }))}>
                 <option value="retainer">Retainer (monthly)</option>
+                <option value="ongoing">Retainer – Ongoing</option>
                 <option value="oneoff">One-off</option>
               </select>
             </div>
             <div>
-              <label style={labelStyle}>{form.type === "oneoff" ? "Price ($)" : "Monthly ($)"}</label>
+              <label style={labelStyle}>{form.type === "oneoff" ? "Price ($)" : "Monthly Rate ($)"}</label>
               <input style={inputStyle} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required placeholder="3000" min={0} />
             </div>
           </div>
@@ -160,8 +161,9 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
                     </div>
                     <div>
                       <label style={labelStyle}>Type</label>
-                      <select style={inputStyle} value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value as "retainer" | "oneoff" }))}>
+                      <select style={inputStyle} value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value as "retainer" | "ongoing" | "oneoff" }))}>
                         <option value="retainer">Retainer (monthly)</option>
+                        <option value="ongoing">Retainer – Ongoing</option>
                         <option value="oneoff">One-off</option>
                       </select>
                     </div>
@@ -191,11 +193,11 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1916" }}>{p.name}</div>
                     {p.description && <div style={{ fontSize: 12, color: "#9C9590", marginTop: 2 }}>{p.description}</div>}
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: p.type === "retainer" ? "#EFF6FF" : "#F5F3FF", color: p.type === "retainer" ? "#1D4ED8" : "#6D28D9", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    {p.type === "retainer" ? "Retainer" : "One-off"}
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: p.type === "oneoff" ? "#F5F3FF" : "#EFF6FF", color: p.type === "oneoff" ? "#6D28D9" : "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    {p.type === "retainer" ? "Retainer" : p.type === "ongoing" ? "Ongoing" : "One-off"}
                   </span>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", minWidth: 90, textAlign: "right" }}>
-                    {fmtCurrency(p.monthly)}{p.type === "retainer" ? "/mo" : ""}
+                    {fmtCurrency(p.monthly)}{p.type !== "oneoff" ? "/mo" : ""}
                   </div>
                   <button onClick={() => startEdit(p)}
                     style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 12, color: "#6B6760", cursor: "pointer", padding: "4px 10px" }}>
