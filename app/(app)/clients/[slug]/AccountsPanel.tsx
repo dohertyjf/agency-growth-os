@@ -51,32 +51,74 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
+const now2 = new Date().toISOString().slice(0, 7)
+
+function normalizeType(raw: string): ContractType {
+  const s = raw.toLowerCase().trim()
+  if (s === "oneoff" || s === "one-off" || s === "one off" || s === "o") return "oneoff"
+  if (s === "ongoing" || s === "retainer-ongoing" || s === "retainer ongoing") return "ongoing"
+  return "retainer"
+}
+
+function normalizeStatus(raw: string): ContractStatus {
+  const s = raw.toLowerCase().trim()
+  if (s === "potential" || s === "p") return "potential"
+  if (s === "finished" || s === "f" || s === "done" || s === "ended") return "finished"
+  return "active"
+}
+
+function normalizeMonth(raw: string): string {
+  if (!raw) return ""
+  const s = raw.trim()
+  if (/^\d{4}-\d{2}$/.test(s)) return s
+  const mmyyyy = s.match(/^(\d{1,2})\/(\d{4})$/)
+  if (mmyyyy) return `${mmyyyy[2]}-${mmyyyy[1].padStart(2, "0")}`
+  return ""
+}
+
 interface ParsedRow {
-  name: string
-  contactName: string
-  contactEmail: string
-  error: boolean
+  accountName: string
+  projectName: string
+  type: ContractType
+  monthly: number
+  status: ContractStatus
+  start: string
+  contractedThrough: string | null
+  errors: string[]
 }
 
 function parseBulk(text: string): ParsedRow[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim())
   if (!lines.length) return []
   const first = lines[0].split(/\t/).map(s => s.trim().toLowerCase())
-  const startIdx = first[0] === "account name" || first[0] === "name" ? 1 : 0
+  const startIdx = first[0] === "account" || first[0] === "account name" ? 1 : 0
   return lines.slice(startIdx).map(line => {
-    const [name = "", contactName = "", contactEmail = ""] = line.split(/\t/).map(s => s.trim())
-    return { name, contactName, contactEmail, error: !name }
+    const cols = line.split(/\t/).map(s => s.trim())
+    const [rawAccount = "", rawProject = "", rawType = "", rawMonthly = "", rawStatus = "", rawStart = "", rawThrough = ""] = cols
+    const errors: string[] = []
+    if (!rawAccount) errors.push("Account required")
+    if (!rawProject) errors.push("Project name required")
+    const type = normalizeType(rawType)
+    const status = normalizeStatus(rawStatus)
+    const monthlyNum = parseFloat(rawMonthly.replace(/[$,\s]/g, ""))
+    if (isNaN(monthlyNum) || monthlyNum < 0) errors.push("Invalid amount")
+    const start = normalizeMonth(rawStart) || now2
+    if (rawStart && !normalizeMonth(rawStart)) errors.push("Invalid start (use YYYY-MM)")
+    const throughRaw = normalizeMonth(rawThrough)
+    const contractedThrough = type === "oneoff" ? start : type === "ongoing" ? null : (throughRaw || null)
+    if (type === "retainer" && !throughRaw) errors.push("Through date required for Retainer – End Date")
+    return { accountName: rawAccount, projectName: rawProject, type, monthly: isNaN(monthlyNum) ? 0 : monthlyNum, status, start, contractedThrough, errors }
   })
 }
 
-function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; onClose: () => void; onImport: (accounts: Account[]) => void }) {
+function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; onClose: () => void; onImport: (accounts: Account[], contracts: Contract[]) => void }) {
   const [text, setText] = useState("")
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const rows = text.trim() ? parseBulk(text) : []
   const overLimit = rows.length > 200
-  const valid = rows.filter(r => !r.error).slice(0, 200)
+  const valid = rows.filter(r => r.errors.length === 0).slice(0, 200)
 
   async function handleImport() {
     if (!valid.length) return
@@ -86,15 +128,19 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(valid.map(r => ({
-        name: r.name,
-        contactName: r.contactName || undefined,
-        contactEmail: r.contactEmail || undefined,
+        accountName: r.accountName,
+        projectName: r.projectName,
+        type: r.type,
+        monthly: r.monthly,
+        status: r.status,
+        start: r.start,
+        contractedThrough: r.contractedThrough,
       }))),
     })
     setImporting(false)
-    if (!res.ok) { setError("Import failed"); return }
-    const created: Account[] = await res.json()
-    onImport(created)
+    if (!res.ok) { setError("Import failed — check your data and try again"); return }
+    const { accounts, contracts } = await res.json()
+    onImport(accounts, contracts)
     onClose()
   }
 
@@ -105,39 +151,48 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
     >
       <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: "min(680px, 100%)", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
-          <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Bulk Import Accounts</h2>
+          <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Bulk Import Accounts & Projects</h2>
           <p style={{ fontSize: 12, color: "#9C9590", margin: 0 }}>
-            Paste from a spreadsheet — columns: <strong>Account Name · Contact Name · Contact Email</strong>
-            <span style={{ marginLeft: 8, color: "#C2410C" }}>(max 200 rows per import)</span>
+            Paste from a spreadsheet — columns in order: <strong>Account · Project Name · Type · Monthly · Status · Start · Through</strong>
+            <br />Multiple rows with the same Account name create one account with multiple projects.
+            <br />Type: <code>retainer</code> (needs Through), <code>ongoing</code> (no Through), <code>oneoff</code> &nbsp;·&nbsp; Status: active, potential, finished &nbsp;·&nbsp; Dates: YYYY-MM
           </p>
         </div>
         <textarea
           autoFocus
           value={text}
           onChange={e => setText(e.target.value)}
-          placeholder={"Acme Marketing\tJim McDannald\tjim@acme.com\nBlue Goose Creative\tMelissa Jones\tmelissa@bluegoose.co\nBG Collective"}
-          style={{ width: "100%", height: 160, padding: "10px 12px", border: "1px solid #ECE7DE", borderRadius: 8, fontSize: 12, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box", outline: "none", color: "#1A1916" }}
+          placeholder={"Acme Marketing\tSEO Retainer\tretainer\t2500\tactive\t2026-01\t2026-12\nAcme Marketing\tContent Strategy\tongoing\t1500\tactive\t2026-01\nBlue Goose Creative\tWebsite Redesign\toneoff\t8500\tactive\t2026-03"}
+          style={{ width: "100%", height: 120, padding: "10px 12px", border: "1px solid #ECE7DE", borderRadius: 8, fontSize: 12, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box", outline: "none", color: "#1A1916" }}
         />
         {rows.length > 0 && (
           <div style={{ overflowX: "auto", border: "1px solid #ECE7DE", borderRadius: 8 }}>
             <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
               <thead>
                 <tr style={{ background: "#FBFAF7" }}>
-                  {["Account Name", "Contact Name", "Contact Email", ""].map(h => (
-                    <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: "#9C9590", fontSize: 11, borderBottom: "1px solid #ECE7DE" }}>{h}</th>
+                  {["Account", "Project", "Type", "Monthly", "Status", "Start", "Through", ""].map(h => (
+                    <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: "#9C9590", fontSize: 11, borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, i) => (
-                  <tr key={i} style={{ background: row.error ? "#FFF5F5" : "transparent" }}>
+                  <tr key={i} style={{ background: row.errors.length ? "#FFF5F5" : "transparent" }}>
                     <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#1A1916", fontWeight: 500 }}>
-                      {row.name || <em style={{ color: "#C2410C" }}>missing</em>}
+                      {row.accountName || <em style={{ color: "#C2410C" }}>missing</em>}
                     </td>
-                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#6B6760" }}>{row.contactName || "—"}</td>
-                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#9C9590" }}>{row.contactEmail || "—"}</td>
+                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#1A1916" }}>
+                      {row.projectName || <em style={{ color: "#C2410C" }}>missing</em>}
+                    </td>
+                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#6B6760" }}>{row.type}</td>
+                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", fontVariantNumeric: "tabular-nums" }}>{isNaN(row.monthly) ? <span style={{ color: "#C2410C" }}>?</span> : fmtCurrency(row.monthly)}</td>
                     <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC" }}>
-                      {row.error ? <span style={{ color: "#C2410C", fontSize: 11 }}>⚠ Name required</span> : <span style={{ color: "#166534" }}>✓</span>}
+                      <span style={{ fontSize: 10, fontWeight: 700, color: row.status === "active" ? "#166534" : row.status === "potential" ? "#92400E" : "#6B7280" }}>{row.status}</span>
+                    </td>
+                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#6B6760", fontVariantNumeric: "tabular-nums" }}>{row.start}</td>
+                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#6B6760", fontVariantNumeric: "tabular-nums" }}>{row.contractedThrough ?? "—"}</td>
+                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC" }}>
+                      {row.errors.length ? <span style={{ color: "#C2410C", fontSize: 11 }}>⚠ {row.errors.join(", ")}</span> : <span style={{ color: "#166534" }}>✓</span>}
                     </td>
                   </tr>
                 ))}
@@ -153,7 +208,11 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
         {error && <div style={{ fontSize: 13, color: "#C2410C" }}>{error}</div>}
         <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 12, color: "#9C9590" }}>
-            {valid.length > 0 && `${valid.length} of ${Math.min(rows.length, 200)} rows ready`}
+            {rows.length > 0 && (
+              valid.length === rows.length
+                ? `${rows.length} row${rows.length !== 1 ? "s" : ""} ready to import`
+                : `${valid.length} of ${Math.min(rows.length, 200)} rows valid — fix errors to include them`
+            )}
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button type="button" onClick={onClose}
@@ -162,7 +221,7 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
             </button>
             <button onClick={handleImport} disabled={importing || valid.length === 0}
               style={{ padding: "8px 18px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: importing || valid.length === 0 ? "default" : "pointer", opacity: importing || valid.length === 0 ? 0.5 : 1 }}>
-              {importing ? "Importing…" : `Import ${valid.length}`}
+              {importing ? "Importing…" : `Import ${valid.length} row${valid.length !== 1 ? "s" : ""}`}
             </button>
           </div>
         </div>
@@ -301,7 +360,10 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
         <BulkImportModal
           clientId={clientId}
           onClose={() => setBulkOpen(false)}
-          onImport={created => updateAccounts([...accounts, ...created].sort((a, b) => a.name.localeCompare(b.name)))}
+          onImport={(newAccounts, newContracts) => {
+            updateAccounts([...accounts, ...newAccounts].sort((a, b) => a.name.localeCompare(b.name)))
+            newContracts.forEach(c => onContractCreated?.(c))
+          }}
         />
       )}
 

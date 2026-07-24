@@ -178,187 +178,7 @@ function AccountCombobox({ accounts, value, onChange, clientId, onAccountCreated
   )
 }
 
-// ── Bulk import ───────────────────────────────────────────────────────────────
 
-interface ParsedRow {
-  name: string
-  type: ContractTypeField
-  monthly: number
-  status: ContractStatus
-  start: string
-  contractedThrough: string | null
-  errors: string[]
-}
-
-const now2 = new Date().toISOString().slice(0, 7)
-
-function normalizeType(raw: string): ContractTypeField {
-  const s = raw.toLowerCase().trim()
-  if (s === "oneoff" || s === "one-off" || s === "one off" || s === "o") return "oneoff"
-  if (s === "ongoing" || s === "retainer-ongoing" || s === "retainer ongoing") return "ongoing"
-  return "retainer"
-}
-
-function normalizeStatus(raw: string): ContractStatus {
-  const s = raw.toLowerCase().trim()
-  if (s === "potential" || s === "p") return "potential"
-  if (s === "finished" || s === "f" || s === "done" || s === "ended") return "finished"
-  return "active"
-}
-
-function normalizeMonth(raw: string): string {
-  if (!raw) return ""
-  const s = raw.trim()
-  if (/^\d{4}-\d{2}$/.test(s)) return s
-  // MM/YYYY
-  const mmyyyy = s.match(/^(\d{1,2})\/(\d{4})$/)
-  if (mmyyyy) return `${mmyyyy[2]}-${mmyyyy[1].padStart(2, "0")}`
-  return ""
-}
-
-function parsePaste(text: string): ParsedRow[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim())
-  if (!lines.length) return []
-
-  // Skip header row
-  const first = lines[0].split(/\t/).map(s => s.trim().toLowerCase())
-  const startIdx = first[0] === "name" ? 1 : 0
-  const dataLines = lines.slice(startIdx)
-
-  return dataLines.map(line => {
-    const cols = line.split(/\t/).map(s => s.trim())
-    const [rawName = "", rawType = "", rawMonthly = "", rawStatus = "", rawStart = "", rawThrough = ""] = cols
-
-    const errors: string[] = []
-    const name = rawName.trim()
-    if (!name) errors.push("Name required")
-
-    const type = normalizeType(rawType)
-    const status = normalizeStatus(rawStatus)
-
-    const monthlyNum = parseFloat(rawMonthly.replace(/[$,\s]/g, ""))
-    if (isNaN(monthlyNum) || monthlyNum < 0) errors.push("Invalid amount")
-
-    const start = normalizeMonth(rawStart) || now2
-    if (rawStart && !normalizeMonth(rawStart)) errors.push("Invalid start (use YYYY-MM)")
-
-    const throughRaw = normalizeMonth(rawThrough)
-    const contractedThrough = type === "oneoff" ? start : type === "ongoing" ? null : (throughRaw || null)
-    if (type === "retainer" && !throughRaw) errors.push("Through date required for Retainer – End Date")
-
-    return { name, type, monthly: isNaN(monthlyNum) ? 0 : monthlyNum, status, start, contractedThrough, errors }
-  })
-}
-
-function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; onClose: () => void; onImport: (contracts: Contract[]) => void }) {
-  const [text, setText] = useState("")
-  const [importing, setImporting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const rows = text.trim() ? parsePaste(text) : []
-  const validRows = rows.filter(r => r.errors.length === 0)
-
-  async function handleImport() {
-    if (!validRows.length) return
-    setImporting(true)
-    setError(null)
-    const res = await fetch(`/api/clients/${clientId}/contracts/bulk`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(validRows.map(r => ({
-        name: r.name, type: r.type, monthly: r.monthly,
-        status: r.status, start: r.start, contractedThrough: r.contractedThrough,
-      }))),
-    })
-    setImporting(false)
-    if (!res.ok) { setError("Import failed — check your data and try again"); return }
-    const created: Contract[] = await res.json()
-    onImport(created)
-    onClose()
-  }
-
-  const STATUS_BADGE: Record<ContractStatus, string> = { active: "#166534", potential: "#92400E", finished: "#6B7280" }
-
-  return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: "min(720px, 100%)", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", gap: 16 }}>
-        <div>
-          <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Bulk Import Accounts</h2>
-          <p style={{ fontSize: 12, color: "#9C9590", margin: 0 }}>
-            Paste from a spreadsheet — columns in order: <strong>Name · Type · Monthly · Status · Start · Through</strong>
-            <br />Type: <code>retainer</code> (needs Through date), <code>ongoing</code> (no Through), <code>oneoff</code> &nbsp;·&nbsp; Status: active, potential, finished &nbsp;·&nbsp; Dates: YYYY-MM
-          </p>
-        </div>
-
-        <textarea
-          autoFocus
-          value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder={"Acme Corp\tretainer\t1500\tactive\t2026-01\t2026-12\nBeta Co\tongoing\t2000\tactive\t2026-01\nGamma Co\toneoff\t850\tactive\t2026-05"}
-          style={{ width: "100%", height: 120, padding: "10px 12px", border: "1px solid #ECE7DE", borderRadius: 8, fontSize: 12, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box", outline: "none", color: "#1A1916" }}
-        />
-
-        {rows.length > 0 && (
-          <div style={{ overflowX: "auto", border: "1px solid #ECE7DE", borderRadius: 8 }}>
-            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: "#FBFAF7" }}>
-                  {["Name", "Type", "Monthly", "Status", "Start", "Through", ""].map(h => (
-                    <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: "#9C9590", fontSize: 11, borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, i) => (
-                  <tr key={i} style={{ background: row.errors.length ? "#FFF5F5" : "transparent" }}>
-                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#1A1916" }}>{row.name || <em style={{ color: "#C2410C" }}>missing</em>}</td>
-                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#6B6760" }}>{row.type}</td>
-                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", fontVariantNumeric: "tabular-nums" }}>{isNaN(row.monthly) ? <span style={{ color: "#C2410C" }}>?</span> : fmtCurrency(row.monthly)}</td>
-                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC" }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_BADGE[row.status] }}>{row.status}</span>
-                    </td>
-                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#6B6760", fontVariantNumeric: "tabular-nums" }}>{row.start}</td>
-                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#6B6760", fontVariantNumeric: "tabular-nums" }}>{row.contractedThrough}</td>
-                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC" }}>
-                      {row.errors.length
-                        ? <span style={{ color: "#C2410C", fontSize: 11 }}>⚠ {row.errors.join(", ")}</span>
-                        : <span style={{ color: "#166534", fontSize: 13 }}>✓</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {error && <div style={{ fontSize: 13, color: "#C2410C" }}>{error}</div>}
-
-        <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 12, color: "#9C9590" }}>
-            {rows.length > 0 && (
-              validRows.length === rows.length
-                ? `${rows.length} row${rows.length !== 1 ? "s" : ""} ready to import`
-                : `${validRows.length} of ${rows.length} rows valid — fix errors above to include them`
-            )}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button type="button" onClick={onClose}
-              style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
-              Cancel
-            </button>
-            <button onClick={handleImport} disabled={importing || validRows.length === 0}
-              style={{ padding: "8px 18px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: importing || validRows.length === 0 ? "default" : "pointer", opacity: importing || validRows.length === 0 ? 0.5 : 1 }}>
-              {importing ? "Importing…" : `Import ${validRows.length} Account${validRows.length !== 1 ? "s" : ""}`}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -617,7 +437,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
   const [adding, setAdding] = useState(false)
-  const [bulkImporting, setBulkImporting] = useState(false)
+
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [duplicatingContract, setDuplicatingContract] = useState<Contract | null>(null)
   const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null })
@@ -682,10 +502,6 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     updateContracts([...contracts, created])
   }
 
-  function handleBulkImported(created: Contract[]) {
-    updateContracts([...contracts, ...created])
-  }
-
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       {editingContract && (
@@ -693,9 +509,6 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
       )}
       {duplicatingContract && (
         <DuplicateModal contract={duplicatingContract} clientId={clientId} accounts={localAccounts} onClose={() => setDuplicatingContract(null)} onSave={handleDuplicated} onAccountCreated={handleAccountCreated} />
-      )}
-      {bulkImporting && (
-        <BulkImportModal clientId={clientId} onClose={() => setBulkImporting(false)} onImport={handleBulkImported} />
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -706,12 +519,6 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setBulkImporting(true)}
-            style={{ padding: "6px 14px", background: "none", color: "#6B6760", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-          >
-            Bulk Import
-          </button>
           <button
             onClick={() => setAdding(a => !a)}
             style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}

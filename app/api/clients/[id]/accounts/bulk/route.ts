@@ -9,10 +9,13 @@ function authorize(session: import("next-auth").Session | null, clientId: string
 }
 
 const rowSchema = z.object({
-  name: z.string().min(1),
-  contactName: z.string().optional(),
-  contactEmail: z.string().optional(),
-  notes: z.string().optional(),
+  accountName: z.string().min(1),
+  projectName: z.string().min(1),
+  type: z.enum(["retainer", "ongoing", "oneoff"]).default("retainer"),
+  monthly: z.number().min(0),
+  status: z.enum(["potential", "active", "finished"]).default("active"),
+  start: z.string().regex(/^\d{4}-\d{2}$/),
+  contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
 })
 
 const schema = z.array(rowSchema).min(1).max(200)
@@ -29,8 +32,41 @@ export async function POST(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid", details: parsed.error.flatten() }, { status: 422 })
 
-  const accounts = await prisma.$transaction(
-    parsed.data.map(row => prisma.account.create({ data: { clientId: id, ...row } }))
+  // Collect unique account names and find or create each
+  const uniqueNames = [...new Set(parsed.data.map(r => r.accountName))]
+  const existing = await prisma.account.findMany({
+    where: { clientId: id, name: { in: uniqueNames } },
+  })
+  const existingMap = new Map(existing.map(a => [a.name, a]))
+
+  const toCreate = uniqueNames.filter(n => !existingMap.has(n))
+  const created = toCreate.length
+    ? await prisma.$transaction(
+        toCreate.map(name => prisma.account.create({ data: { clientId: id, name } }))
+      )
+    : []
+
+  const accountMap = new Map([...existing, ...created].map(a => [a.name, a]))
+
+  // Create all projects linked to their accounts
+  const contracts = await prisma.$transaction(
+    parsed.data.map(row => {
+      const account = accountMap.get(row.accountName)!
+      const isOngoing = row.type === "ongoing"
+      return prisma.contract.create({
+        data: {
+          clientId: id,
+          accountId: account.id,
+          name: row.projectName,
+          type: isOngoing ? "retainer" : row.type,
+          monthly: row.monthly,
+          status: row.status,
+          start: row.start,
+          contractedThrough: isOngoing ? null : row.type === "oneoff" ? row.start : (row.contractedThrough ?? null),
+        },
+      })
+    })
   )
-  return Response.json(accounts, { status: 201 })
+
+  return Response.json({ accounts: created, contracts }, { status: 201 })
 }
