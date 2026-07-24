@@ -6,7 +6,6 @@ import ContractsPanel from "./ContractsPanel"
 import ReconciliationTable from "./ReconciliationTable"
 import AccountsPanel from "./AccountsPanel"
 import ProductsPanel from "./ProductsPanel"
-import AddClientModal from "../AddClientModal"
 
 interface Metric {
   id: string
@@ -120,9 +119,8 @@ export default function ClientPageClient({
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ marginBottom: 20 }}>
         <Link href="/clients" style={{ fontSize: 13, color: "#9C9590", textDecoration: "none" }}>← Clients</Link>
-        <AddClientModal />
       </div>
 
       <div style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE" }}>
