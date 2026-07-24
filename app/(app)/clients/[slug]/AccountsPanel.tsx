@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import { fmtCurrency, ymLabel } from "@/lib/calc"
 
 interface Account {
   id: string
@@ -489,7 +490,15 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                   <div style={{ padding: "6px 14px 10px" }}>
                     {accountContracts.map(c => (
                       <div key={c.id} style={{ fontSize: 12, color: "#6B6760", padding: "4px 0", borderBottom: "1px solid #F5F1EC", display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ flex: 1 }}>{c.name}</span>
+                        <span style={{ fontWeight: 500, color: "#1A1916" }}>{c.name}</span>
+                        <span style={{ color: "#9C9590" }}>
+                          {c.type === "oneoff" ? ymLabel(c.start) : `${ymLabel(c.start)} – ${ymLabel(c.contractedThrough)}`}
+                        </span>
+                        <span style={{ color: "#9C9590" }}>·</span>
+                        <span style={{ fontVariantNumeric: "tabular-nums", color: "#6B6760" }}>
+                          {fmtCurrency(c.monthly)}{c.type === "retainer" ? "/mo" : ""}
+                        </span>
+                        <span style={{ flex: 1 }} />
                         {assigningContract === c.id
                           ? assignSelect(c.id, c.accountId ?? null)
                           : <button onClick={() => setAssigningContract(c.id)}
