@@ -421,9 +421,9 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                 )}
                 {!isEditing && addingProjectForAccount === account.id && (
                   <form onSubmit={e => handleAddProject(e, account.id)} style={{ padding: "10px 14px", borderTop: "1px solid #F5F1EC", background: "#FDFCFA", display: "flex", flexDirection: "column", gap: 8 }}>
-                    {products && products.length > 0 && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 8, borderBottom: "1px solid #F0EDE8" }}>
-                        <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, whiteSpace: "nowrap" }}>Start from product:</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 8, borderBottom: "1px solid #F0EDE8" }}>
+                      <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, whiteSpace: "nowrap" }}>Product:</span>
+                      {products && products.length > 0 ? (
                         <select
                           style={{ fontSize: 12, border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 8px", color: "#1A1916", background: "#fff", outline: "none", cursor: "pointer" }}
                           value=""
@@ -432,11 +432,13 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                             if (p) setProjectForm(f => ({ ...f, name: p.name, type: p.type as ContractType, monthly: String(p.monthly) }))
                           }}
                         >
-                          <option value="">— Select a product —</option>
+                          <option value="">— Select to pre-fill —</option>
                           {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
-                      </div>
-                    )}
+                      ) : (
+                        <span style={{ fontSize: 11, color: "#C2956C" }}>No products yet — add them in the <strong>Products</strong> tab first.</span>
+                      )}
+                    </div>
                     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 8 }}>
                       <div>
                         <label style={labelStyle}>Project Name</label>
