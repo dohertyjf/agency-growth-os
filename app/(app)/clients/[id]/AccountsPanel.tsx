@@ -81,7 +81,7 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: "min(680px, 100%)", boxShadow: "0 8px 32px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: "min(680px, 100%)", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
           <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Bulk Import Accounts</h2>
           <p style={{ fontSize: 12, color: "#9C9590", margin: 0 }}>
