@@ -54,7 +54,8 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
   const [error, setError] = useState<string | null>(null)
 
   const rows = text.trim() ? parseBulk(text) : []
-  const valid = rows.filter(r => !r.error)
+  const overLimit = rows.length > 200
+  const valid = rows.filter(r => !r.error).slice(0, 200)
 
   async function handleImport() {
     if (!valid.length) return
@@ -86,6 +87,7 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
           <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Bulk Import Accounts</h2>
           <p style={{ fontSize: 12, color: "#9C9590", margin: 0 }}>
             Paste from a spreadsheet — columns: <strong>Account Name · Contact Name · Contact Email</strong>
+            <span style={{ marginLeft: 8, color: "#C2410C" }}>(max 200 rows per import)</span>
           </p>
         </div>
         <textarea
@@ -122,10 +124,15 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
             </table>
           </div>
         )}
+        {overLimit && (
+          <div style={{ fontSize: 12, color: "#C2410C", background: "#FFF5F5", border: "1px solid #FECACA", borderRadius: 6, padding: "8px 12px" }}>
+            Only the first 200 rows will be imported. Remove {rows.length - 200} row{rows.length - 200 !== 1 ? "s" : ""} or split into multiple imports.
+          </div>
+        )}
         {error && <div style={{ fontSize: 13, color: "#C2410C" }}>{error}</div>}
         <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 12, color: "#9C9590" }}>
-            {valid.length > 0 && `${valid.length} of ${rows.length} rows ready`}
+            {valid.length > 0 && `${valid.length} of ${Math.min(rows.length, 200)} rows ready`}
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button type="button" onClick={onClose}
