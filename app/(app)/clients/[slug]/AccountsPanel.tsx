@@ -94,7 +94,12 @@ function parseBulk(text: string): ParsedRow[] {
   const startIdx = first[0] === "account" || first[0] === "account name" ? 1 : 0
   return lines.slice(startIdx).map(line => {
     const cols = line.split(/\t/).map(s => s.trim())
-    const [rawAccount = "", rawProject = "", rawType = "", rawMonthly = "", rawStatus = "", rawStart = "", rawThrough = ""] = cols
+    const [rawAccount = "", rawProject = "", rawType = "", rawMonthly = "", col4 = "", col5 = "", col6 = ""] = cols
+    // Status is optional — detect by checking if col4 looks like a date
+    const statusSkipped = !!normalizeMonth(col4)
+    const rawStatus = statusSkipped ? "" : col4
+    const rawStart = statusSkipped ? col4 : col5
+    const rawThrough = statusSkipped ? col5 : col6
     const errors: string[] = []
     if (!rawAccount) errors.push("Account required")
     if (!rawProject) errors.push("Project name required")

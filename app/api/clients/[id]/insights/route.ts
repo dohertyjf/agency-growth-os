@@ -41,9 +41,9 @@ export async function GET(
 
   const leads = metrics.map(m => m.leads)
   const closeRate = metrics.map(m => m.closeRate)
-  const np = metrics.map(m => netProfit(m.revenue, m.totalExpenses))
+  const np = metrics.map(m => netProfit(m.revenue, m.salaries, m.software, m.totalExpenses))
   const software = metrics.map(m => m.software)
-  const nm = metrics.map(m => netMargin(m.revenue, m.totalExpenses))
+  const nm = metrics.map(m => netMargin(m.revenue, m.salaries, m.software, m.totalExpenses))
 
   const leadsP = pct(leads)
   const closeP = pct(closeRate)

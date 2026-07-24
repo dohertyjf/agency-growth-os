@@ -76,9 +76,9 @@ const CARDS: { key: MetricKey; label: string; fmt: "currency" | "percent" | "num
 function derivedMetrics(m: Metric) {
   return {
     ...m,
-    netProfit: netProfit(m.revenue, m.totalExpenses),
-    grossProfit: grossProfit(m.revenue, m.salaries, m.software),
-    netMargin: netMargin(m.revenue, m.totalExpenses),
+    grossProfit: grossProfit(m.revenue, m.salaries),
+    netProfit: netProfit(m.revenue, m.salaries, m.software, m.totalExpenses),
+    netMargin: netMargin(m.revenue, m.salaries, m.software, m.totalExpenses),
     closeRate: m.leads > 0 ? (m.newClients / m.leads) * 100 : 0,
   }
 }

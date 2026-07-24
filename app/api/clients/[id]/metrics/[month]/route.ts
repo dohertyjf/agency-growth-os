@@ -42,8 +42,8 @@ export async function PATCH(
 
   return Response.json({
     ...m,
-    netProfit: netProfit(m.revenue, m.totalExpenses),
-    grossProfit: grossProfit(m.revenue, m.salaries, m.software),
-    netMargin: netMargin(m.revenue, m.totalExpenses),
+    grossProfit: grossProfit(m.revenue, m.salaries),
+    netProfit: netProfit(m.revenue, m.salaries, m.software, m.totalExpenses),
+    netMargin: netMargin(m.revenue, m.salaries, m.software, m.totalExpenses),
   })
 }
