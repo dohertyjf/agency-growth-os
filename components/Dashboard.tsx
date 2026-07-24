@@ -559,7 +559,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
         <MonthTable
           key={rawMetrics.length}
           clientId={clientId}
-          months={[...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).slice(-range)}
+          months={[...rawMetrics].sort((a, b) => a.month.localeCompare(b.month))}
           onUpdate={handleMetricUpdate}
           onBulkImport={handleBulkMetricImport}
         />
