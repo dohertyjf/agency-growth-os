@@ -55,6 +55,7 @@ model Client {
   contracts Contract[]
   accounts  Account[]
   calls     Call[]
+  products  Product[]
   createdAt DateTime        @default(now())
 }
 
@@ -173,6 +174,8 @@ model IntakeSubmission {
 
 model Product {
   id          String       @id @default(cuid())
+  clientId    String?
+  client      Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name        String
   description String?
   type        ContractType @default(retainer)

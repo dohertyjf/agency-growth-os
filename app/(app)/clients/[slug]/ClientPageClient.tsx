@@ -5,6 +5,7 @@ import Dashboard from "@/components/Dashboard"
 import ContractsPanel from "./ContractsPanel"
 import ReconciliationTable from "./ReconciliationTable"
 import AccountsPanel from "./AccountsPanel"
+import ProductsPanel from "./ProductsPanel"
 import AddClientModal from "../AddClientModal"
 
 interface Metric {
@@ -61,11 +62,12 @@ interface Goal {
 interface Product {
   id: string
   name: string
-  type: string
+  description: string | null
+  type: "retainer" | "oneoff"
   monthly: number
 }
 
-type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress"
+type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress" | "products"
 
 interface Props {
   clientId: string
@@ -90,6 +92,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "projects", label: "Projects" },
   { key: "reconciliation", label: "Reconciliation" },
   { key: "progress", label: "Progress" },
+  { key: "products", label: "Products" },
 ]
 
 export default function ClientPageClient({
@@ -101,6 +104,7 @@ export default function ClientPageClient({
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
   const [payments, setPayments] = useState<Payment[]>(initialPayments)
+  const [clientProducts, setClientProducts] = useState<Product[]>(products)
 
   function handleRevenueUpdate(month: string, revenue: number) {
     setMetrics(prev => {
@@ -162,7 +166,7 @@ export default function ClientPageClient({
           clientId={clientId}
           initialAccounts={accounts}
           contracts={contracts}
-          products={products}
+          products={clientProducts}
           onAccountsChange={setAccounts}
           onContractAccountChange={handleContractAccountChange}
           onContractCreated={contract => setContracts(prev => [...prev, contract])}
@@ -174,7 +178,7 @@ export default function ClientPageClient({
           clientId={clientId}
           initialContracts={initialContracts}
           accounts={accounts}
-          products={products}
+          products={clientProducts}
           onContractsChange={updated => setContracts(updated)}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
         />
@@ -195,6 +199,14 @@ export default function ClientPageClient({
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Progress</div>
           <div style={{ fontSize: 13 }}>Coming soon.</div>
         </div>
+      )}
+
+      {currentTab === "products" && (
+        <ProductsPanel
+          clientId={clientId}
+          initialProducts={clientProducts}
+          onProductsChange={setClientProducts}
+        />
       )}
     </div>
   )

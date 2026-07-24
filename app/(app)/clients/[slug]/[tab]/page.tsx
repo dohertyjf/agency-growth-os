@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import ClientPageClient from "../ClientPageClient"
 
-const VALID_TABS = ["dashboard", "accounts", "projects", "reconciliation", "progress"] as const
+const VALID_TABS = ["dashboard", "accounts", "projects", "reconciliation", "progress", "products"] as const
 type Tab = typeof VALID_TABS[number]
 
 export default async function ClientTabPage({ params }: { params: Promise<{ slug: string; tab: string }> }) {
@@ -26,7 +26,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
     prisma.accountMonth.findMany({ where: { contract: { clientId: id } } }),
     prisma.contractPayment.findMany({ where: { contract: { clientId: id } } }),
     prisma.account.findMany({ where: { clientId: id }, orderBy: { name: "asc" } }),
-    prisma.product.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.product.findMany({ where: { clientId: id }, orderBy: { createdAt: "asc" } }),
   ])
 
   return (
@@ -44,7 +44,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
       goal={goal}
-      products={products.map(p => ({ id: p.id, name: p.name, type: p.type, monthly: p.monthly }))}
+      products={products.map(p => ({ id: p.id, name: p.name, description: p.description ?? null, type: p.type as "retainer" | "oneoff", monthly: p.monthly }))}
     />
   )
 }
