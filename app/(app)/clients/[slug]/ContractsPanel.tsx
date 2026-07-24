@@ -742,7 +742,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Project Name</label>
-              <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Jim McDannald Retainer" autoFocus />
+              <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Project Name" autoFocus />
             </div>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Type</label>
