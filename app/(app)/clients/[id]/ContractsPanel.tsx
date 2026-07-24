@@ -466,6 +466,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts, o
   const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null })
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
+  const [showAllGantt, setShowAllGantt] = useState(false)
 
   function updateContracts(next: Contract[]) {
     setContracts(next)
@@ -605,7 +606,12 @@ export default function ContractsPanel({ clientId, initialContracts, accounts, o
         <div style={{ color: "#9C9590", fontSize: 13 }}>No contracts yet.</div>
       ) : (
         <>
-          <ContractGantt contracts={contracts} now={now} />
+          <ContractGantt
+            contracts={showAllGantt ? contracts : contracts.filter(c => c.status !== "finished")}
+            now={now}
+            showAll={showAllGantt}
+            onToggleShowAll={() => setShowAllGantt(v => !v)}
+          />
 
           {/* Active */}
           {byStatus.active.length > 0 && (
@@ -709,7 +715,7 @@ function ContractSection({ title, contracts, onEdit, onDelete, onDuplicate, dimm
   )
 }
 
-function ContractGantt({ contracts, now }: { contracts: Contract[]; now: string }) {
+function ContractGantt({ contracts, now, showAll, onToggleShowAll }: { contracts: Contract[]; now: string; showAll: boolean; onToggleShowAll: () => void }) {
   if (!contracts.length) return null
 
   const allYMs = contracts.flatMap(c => [c.start, c.contractedThrough])
@@ -732,7 +738,12 @@ function ContractGantt({ contracts, now }: { contracts: Contract[]; now: string 
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 10, color: "#9C9590", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Account Runway</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <div style={{ fontSize: 10, color: "#9C9590", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Account Runway</div>
+        <button onClick={onToggleShowAll} style={{ background: "none", border: "none", fontSize: 10, color: "#9C9590", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
+          {showAll ? "Active only" : "Show all"}
+        </button>
+      </div>
       <div style={{ position: "relative", height: contracts.length * 24 + 8 }}>
         {contracts.map((c, i) => {
           const left = ((toMonths(c.start) - startMo) / totalMo) * 100
