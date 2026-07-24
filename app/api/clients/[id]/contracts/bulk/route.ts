@@ -10,11 +10,11 @@ function authorize(session: import("next-auth").Session | null, clientId: string
 
 const itemSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["retainer", "oneoff"]).default("retainer"),
+  type: z.enum(["retainer", "ongoing", "oneoff"]).default("retainer"),
   monthly: z.number().min(0),
   status: z.enum(["potential", "active", "finished"]).default("active"),
   start: z.string().regex(/^\d{4}-\d{2}$/),
-  contractedThrough: z.string().regex(/^\d{4}-\d{2}$/),
+  contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
 })
 
 const schema = z.array(itemSchema).min(1).max(200)
@@ -37,11 +37,11 @@ export async function POST(
         data: {
           clientId: id,
           name: row.name,
-          type: row.type,
+          type: row.type === "ongoing" ? "retainer" : row.type,
           monthly: row.monthly,
           status: row.status,
           start: row.start,
-          contractedThrough: row.type === "oneoff" ? row.start : row.contractedThrough,
+          contractedThrough: row.type === "oneoff" ? row.start : row.type === "ongoing" ? null : (row.contractedThrough ?? null),
         },
       })
     )

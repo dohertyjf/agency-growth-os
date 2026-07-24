@@ -186,7 +186,7 @@ interface ParsedRow {
   monthly: number
   status: ContractStatus
   start: string
-  contractedThrough: string
+  contractedThrough: string | null
   errors: string[]
 }
 
@@ -195,6 +195,7 @@ const now2 = new Date().toISOString().slice(0, 7)
 function normalizeType(raw: string): ContractTypeField {
   const s = raw.toLowerCase().trim()
   if (s === "oneoff" || s === "one-off" || s === "one off" || s === "o") return "oneoff"
+  if (s === "ongoing" || s === "retainer-ongoing" || s === "retainer ongoing") return "ongoing"
   return "retainer"
 }
 
@@ -242,8 +243,8 @@ function parsePaste(text: string): ParsedRow[] {
     if (rawStart && !normalizeMonth(rawStart)) errors.push("Invalid start (use YYYY-MM)")
 
     const throughRaw = normalizeMonth(rawThrough)
-    const contractedThrough = type === "oneoff" ? start : (throughRaw || start)
-    if (type === "retainer" && !throughRaw) errors.push("Through date required for retainer")
+    const contractedThrough = type === "oneoff" ? start : type === "ongoing" ? null : (throughRaw || null)
+    if (type === "retainer" && !throughRaw) errors.push("Through date required for Retainer – End Date")
 
     return { name, type, monthly: isNaN(monthlyNum) ? 0 : monthlyNum, status, start, contractedThrough, errors }
   })
@@ -288,7 +289,7 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
           <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Bulk Import Accounts</h2>
           <p style={{ fontSize: 12, color: "#9C9590", margin: 0 }}>
             Paste from a spreadsheet — columns in order: <strong>Name · Type · Monthly · Status · Start · Through</strong>
-            <br />Type: retainer or one-off &nbsp;·&nbsp; Status: active, potential, or finished &nbsp;·&nbsp; Dates: YYYY-MM
+            <br />Type: <code>retainer</code> (needs Through date), <code>ongoing</code> (no Through), <code>oneoff</code> &nbsp;·&nbsp; Status: active, potential, finished &nbsp;·&nbsp; Dates: YYYY-MM
           </p>
         </div>
 
@@ -296,7 +297,7 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
           autoFocus
           value={text}
           onChange={e => setText(e.target.value)}
-          placeholder={"Acme Corp\tretainer\t1500\tactive\t2026-01\t2026-12\nBeta Co\toneoff\t850\tactive\t2026-05\t2026-05"}
+          placeholder={"Acme Corp\tretainer\t1500\tactive\t2026-01\t2026-12\nBeta Co\tongoing\t2000\tactive\t2026-01\nGamma Co\toneoff\t850\tactive\t2026-05"}
           style={{ width: "100%", height: 120, padding: "10px 12px", border: "1px solid #ECE7DE", borderRadius: 8, fontSize: 12, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box", outline: "none", color: "#1A1916" }}
         />
 
