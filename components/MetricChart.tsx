@@ -7,12 +7,18 @@ export interface ChartPoint {
   projected?: boolean
 }
 
+export interface FlowBars {
+  newRevenue: number[]
+  churnedRevenue: number[]
+}
+
 interface Props {
   points: ChartPoint[]
   format: "currency" | "percent" | "number"
   label: string
   series2?: ChartPoint[]
   series2Label?: string
+  flowBars?: FlowBars
 }
 
 function fmt(v: number, format: "currency" | "percent" | "number"): string {
@@ -29,7 +35,7 @@ const PAD = { top: 20, right: 24, bottom: 36, left: 60 }
 const VW = 880
 const VH = 240
 
-export default function MetricChart({ points, format, label, series2, series2Label }: Props) {
+export default function MetricChart({ points, format, label, series2, series2Label, flowBars }: Props) {
   const [hover, setHover] = useState<number | null>(null)
 
   if (!points.length && !series2?.length) {
@@ -48,7 +54,8 @@ export default function MetricChart({ points, format, label, series2, series2Lab
   const plotW = VW - PAD.left - PAD.right
   const plotH = VH - PAD.top - PAD.bottom
 
-  const allVals = [...points, ...(series2 ?? [])].map(p => p.value)
+  const barVals = flowBars ? [...flowBars.newRevenue, ...flowBars.churnedRevenue] : []
+  const allVals = [...points, ...(series2 ?? [])].map(p => p.value).concat(barVals)
   const dataMin = Math.min(...allVals)
   const dataMax = Math.max(...allVals)
   const spread = dataMax - dataMin || Math.abs(dataMax) || 1
@@ -124,6 +131,28 @@ export default function MetricChart({ points, format, label, series2, series2Lab
             )
           })}
 
+          {/* Flow bars — new (green) and churned (red), drawn behind everything */}
+          {flowBars && (() => {
+            const barW = Math.max(4, colW * 0.22)
+            const baseY = toY(0)
+            return (
+              <>
+                {flowBars.newRevenue.map((v, i) => {
+                  if (!v) return null
+                  const x = toX(i) - barW - 1
+                  const y = toY(v)
+                  return <rect key={i} x={x} y={y} width={barW} height={baseY - y} fill="#22C55E" opacity={0.75} rx={1} />
+                })}
+                {flowBars.churnedRevenue.map((v, i) => {
+                  if (!v) return null
+                  const x = toX(i) + 1
+                  const y = toY(v)
+                  return <rect key={i} x={x} y={y} width={barW} height={baseY - y} fill="#EF4444" opacity={0.75} rx={1} />
+                })}
+              </>
+            )
+          })()}
+
           {/* Series 2 (with potential) — drawn behind series 1 */}
           {s2 && (
             <>
@@ -185,7 +214,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
       </div>
 
       {/* Legend */}
-      {(hasBothSeries || hasProjected) && (
+      {(hasBothSeries || hasProjected || flowBars) && (
         <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#9C9590", marginTop: 6 }}>
           {hasBothSeries ? (
             <>
@@ -198,7 +227,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
                 {series2Label ?? "With Potential"}
               </span>
             </>
-          ) : (
+          ) : hasProjected ? (
             <>
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#E9532A" strokeWidth={2} /></svg>
@@ -207,6 +236,18 @@ export default function MetricChart({ points, format, label, series2, series2Lab
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#E9532A" strokeWidth={2} strokeDasharray="4,3" opacity={0.6} /></svg>
                 Projected
+              </span>
+            </>
+          ) : null}
+          {flowBars && (
+            <>
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <svg width={12} height={10}><rect x={0} y={0} width={12} height={10} fill="#22C55E" opacity={0.75} rx={1} /></svg>
+                New revenue
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <svg width={12} height={10}><rect x={0} y={0} width={12} height={10} fill="#EF4444" opacity={0.75} rx={1} /></svg>
+                Churned revenue
               </span>
             </>
           )}

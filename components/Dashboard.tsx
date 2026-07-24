@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import MetricCard from "./MetricCard"
 import MetricChart, { ChartPoint } from "./MetricChart"
 import MonthTable, { BulkMetricsModal } from "./MonthTable"
+import type { FlowBars } from "./MetricChart"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
   projectMetric, ymAdd, ymLabel, currentMRR, bookedActive, bookedPotential, bookedAhead,
@@ -111,6 +112,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   const [addingMonth, setAddingMonth] = useState(false)
   const [bulkMetricsOpen, setBulkMetricsOpen] = useState(false)
   const [tableRange, setTableRange] = useState<3 | 6 | 12 | "all">("all")
+  const [showMRRFlow, setShowMRRFlow] = useState(false)
   const [newMonth, setNewMonth] = useState("")
   const [addingMonthSaving, setAddingMonthSaving] = useState(false)
   // Pin metric cards to current month (or most recent past month with data)
@@ -308,6 +310,26 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCard, contracts, range, nowYM])
 
+  // New vs churned MRR flow bars
+  const flowBars: FlowBars | undefined = useMemo(() => {
+    if (!showMRRFlow) return undefined
+    const retainers = contractRows.filter(c => c.type !== "oneoff")
+    const months: string[] = []
+    for (let i = range - 1; i >= 0; i--) months.push(ymAdd(nowYM, -i))
+    const newRevenue = months.map(m =>
+      contracts.filter(c => c.start === m && c.status === "active" && c.type !== "oneoff")
+               .reduce((s, c) => s + c.monthly, 0)
+    )
+    const churnedRevenue = months.map(m => {
+      const prev = ymAdd(m, -1)
+      return contracts.filter(c => c.contractedThrough === prev && c.type !== "oneoff")
+                      .reduce((s, c) => s + c.monthly, 0)
+    })
+    void retainers
+    return { newRevenue, churnedRevenue }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMRRFlow, contracts, range, nowYM])
+
   // Goals
   const mrr = currentMRR(contractRows, currentYM)
   const booked = bookedAhead(contractRows, currentYM)
@@ -445,7 +467,21 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
           series2Label="With Potential"
           format={selectedCard === "contractMRR" ? "currency" : (CARDS.find(c => c.key === selectedCard)?.fmt ?? "currency")}
           label={selectedCard === "contractMRR" ? "Contracted MRR" : rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
+          flowBars={flowBars}
         />
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+          <button
+            onClick={() => setShowMRRFlow(v => !v)}
+            style={{
+              padding: "4px 12px", fontSize: 11, fontWeight: 600, borderRadius: 20, cursor: "pointer", border: "1px solid",
+              background: showMRRFlow ? "#F0FDF4" : "transparent",
+              borderColor: showMRRFlow ? "#22C55E" : "#ECE7DE",
+              color: showMRRFlow ? "#166534" : "#9C9590",
+            }}
+          >
+            {showMRRFlow ? "● MRR Flow" : "○ MRR Flow"}
+          </button>
+        </div>
       </div>
 
       {/* Metric Cards */}
