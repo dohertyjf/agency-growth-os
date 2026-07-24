@@ -317,14 +317,13 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
     const months: string[] = []
     for (let i = range - 1; i >= 0; i--) months.push(ymAdd(nowYM, -i))
     const newRevenue = months.map(m =>
-      contracts.filter(c => c.start === m && c.status === "active" && c.type !== "oneoff")
+      contracts.filter(c => c.start === m && c.status !== "potential" && c.type !== "oneoff")
                .reduce((s, c) => s + c.monthly, 0)
     )
-    const churnedRevenue = months.map(m => {
-      const prev = ymAdd(m, -1)
-      return contracts.filter(c => c.contractedThrough === prev && c.type !== "oneoff")
-                      .reduce((s, c) => s + c.monthly, 0)
-    })
+    const churnedRevenue = months.map(m =>
+      contracts.filter(c => c.contractedThrough === m && c.status !== "potential" && c.type !== "oneoff")
+               .reduce((s, c) => s + c.monthly, 0)
+    )
     void retainers
     return { newRevenue, churnedRevenue }
   // eslint-disable-next-line react-hooks/exhaustive-deps
