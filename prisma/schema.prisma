@@ -94,6 +94,7 @@ model Contract {
   type              ContractType   @default(retainer)
   createdAt         DateTime       @default(now())
   accountMonths     AccountMonth[]
+  payments          ContractPayment[]
 }
 
 model AccountMonth {
@@ -102,6 +103,18 @@ model AccountMonth {
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
   month      String
   actual     Float
+  createdAt  DateTime @default(now())
+
+  @@unique([contractId, month])
+}
+
+model ContractPayment {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  month      String
+  amount     Float
+  note       String?
   createdAt  DateTime @default(now())
 
   @@unique([contractId, month])

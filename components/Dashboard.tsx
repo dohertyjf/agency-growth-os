@@ -2,9 +2,8 @@
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import MetricCard from "./MetricCard"
-import MetricChart, { ChartPoint } from "./MetricChart"
+import MetricChart, { ChartPoint, FlowBars } from "./MetricChart"
 import MonthTable, { BulkMetricsModal } from "./MonthTable"
-import type { FlowBars } from "./MetricChart"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
   projectMetric, ymAdd, ymLabel, currentMRR, bookedActive, bookedPotential, bookedAhead,
@@ -40,6 +39,12 @@ interface Goal {
   profit: number
 }
 
+interface Payment {
+  contractId: string
+  month: string
+  amount: number
+}
+
 type ClientStatus = "potential" | "active" | "paused"
 
 interface Props {
@@ -48,6 +53,7 @@ interface Props {
   metrics: Metric[]
   contracts: Contract[]
   goal: Goal | null
+  payments?: Payment[]
   initialStatus?: ClientStatus
   initialStartDate?: string | null
   initialEndDate?: string | null
@@ -96,7 +102,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, clientName, metrics: rawMetricsProp, contracts, goal, initialStatus, initialStartDate, initialEndDate }: Props) {
+export default function Dashboard({ clientId, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate }: Props) {
   const router = useRouter()
   const [range, setRange] = useState<3 | 6 | 12>(3)
   const [selectedCard, setSelectedCard] = useState<CardKey>("contractMRR")
@@ -113,6 +119,8 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   const [bulkMetricsOpen, setBulkMetricsOpen] = useState(false)
   const [tableRange, setTableRange] = useState<3 | 6 | 12 | "all">("all")
   const [showMRRFlow, setShowMRRFlow] = useState(false)
+  const [showCashCollected, setShowCashCollected] = useState(false)
+  const [payments, setPayments] = useState<Payment[]>(paymentsProp ?? [])
   const [newMonth, setNewMonth] = useState("")
   const [addingMonthSaving, setAddingMonthSaving] = useState(false)
   // Pin metric cards to current month (or most recent past month with data)
@@ -151,6 +159,10 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
     setRawMetrics(prev => prev.map(m =>
       m.month === month ? { ...m, [field]: value } : m
     ))
+  }
+
+  function handlePaymentsChange(updated: Payment[]) {
+    setPayments(updated)
   }
 
   function handleBulkMetricImport(imported: typeof rawMetrics) {
@@ -329,6 +341,21 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showMRRFlow, contracts, range, nowYM])
 
+  // Cash collected per month from payments
+  const cashCollectedPoints: ChartPoint[] | undefined = useMemo(() => {
+    if (!showCashCollected) return undefined
+    const byMonth = new Map<string, number>()
+    payments.forEach(p => byMonth.set(p.month, (byMonth.get(p.month) ?? 0) + p.amount))
+    // Build for the `range` past months (aligns with contractMRR chart's historical portion)
+    const pts: ChartPoint[] = []
+    for (let i = range - 1; i >= 0; i--) {
+      const ym = ymAdd(nowYM, -i)
+      pts.push({ label: ymLabel(ym), value: byMonth.get(ym) ?? 0 })
+    }
+    return pts
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCashCollected, payments, range, nowYM])
+
   // Goals
   const mrr = currentMRR(contractRows, currentYM)
   const booked = bookedAhead(contractRows, currentYM)
@@ -464,11 +491,24 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
           points={chartPoints}
           series2={chartPoints2}
           series2Label="With Potential"
+          series3={cashCollectedPoints}
+          series3Label="Cash Collected"
           format={selectedCard === "contractMRR" ? "currency" : (CARDS.find(c => c.key === selectedCard)?.fmt ?? "currency")}
           label={selectedCard === "contractMRR" ? "Contracted MRR" : rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
           flowBars={flowBars}
         />
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+          <button
+            onClick={() => setShowCashCollected(v => !v)}
+            style={{
+              padding: "4px 12px", fontSize: 11, fontWeight: 600, borderRadius: 20, cursor: "pointer", border: "1px solid",
+              background: showCashCollected ? "#F0FDFA" : "transparent",
+              borderColor: showCashCollected ? "#0D9488" : "#ECE7DE",
+              color: showCashCollected ? "#0F766E" : "#9C9590",
+            }}
+          >
+            {showCashCollected ? "● Cash Collected" : "○ Cash Collected"}
+          </button>
           <button
             onClick={() => setShowMRRFlow(v => !v)}
             style={{

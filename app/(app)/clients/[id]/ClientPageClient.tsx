@@ -37,6 +37,12 @@ interface AccountMonth {
   actual: number
 }
 
+interface Payment {
+  contractId: string
+  month: string
+  amount: number
+}
+
 interface Goal {
   annualRevenue: number
   profit: number
@@ -51,15 +57,17 @@ interface Props {
   metrics: Metric[]
   initialContracts: Contract[]
   initialAccountMonths: AccountMonth[]
+  initialPayments: Payment[]
   goal: Goal | null
 }
 
 export default function ClientPageClient({
   clientId, clientName, initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccountMonths, goal,
+  metrics: initialMetrics, initialContracts, initialAccountMonths, initialPayments, goal,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
+  const [payments, setPayments] = useState<Payment[]>(initialPayments)
 
   function handleRevenueUpdate(month: string, revenue: number) {
     setMetrics(prev => {
@@ -81,6 +89,7 @@ export default function ClientPageClient({
         metrics={metrics}
         contracts={contracts}
         goal={goal}
+        payments={payments}
         initialStatus={initialStatus}
         initialStartDate={initialStartDate}
         initialEndDate={initialEndDate}
@@ -89,7 +98,9 @@ export default function ClientPageClient({
         <ReconciliationTable
           contracts={contracts}
           initialAccountMonths={initialAccountMonths}
+          initialPayments={initialPayments}
           onRevenueUpdate={handleRevenueUpdate}
+          onPaymentsChange={setPayments}
         />
         <ContractsPanel
           clientId={clientId}
