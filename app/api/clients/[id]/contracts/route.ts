@@ -30,6 +30,7 @@ const schema = z.object({
   contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   status: z.enum(["potential", "active", "finished"]).default("potential"),
   type: z.enum(["retainer", "oneoff"]).default("retainer"),
+  accountId: z.string().nullable().optional(),
 })
 
 export async function POST(
