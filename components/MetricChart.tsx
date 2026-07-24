@@ -193,20 +193,34 @@ export default function MetricChart({ points, format, label, series2, series2Lab
           {hover !== null && (() => {
             const p1 = points[hover]
             const p2 = series2?.[hover]
+            const newRev = flowBars?.newRevenue[hover] ?? 0
+            const churnRev = flowBars?.churnedRevenue[hover] ?? 0
             const anchor = p1 ?? p2
             if (!anchor) return null
             const tx = toX(hover)
             const ty = toY(anchor.value)
             const flip = tx > VW * 0.65
-            const ttW = 90
-            const ttH = (p1 && p2) ? 38 : 22
+
+            const rows: { label: string; value: number; color: string }[] = []
+            if (p1) rows.push({ label: "", value: p1.value, color: "#FF8B6A" })
+            if (p2) rows.push({ label: "", value: p2.value, color: "#93C5FD" })
+            if (newRev) rows.push({ label: "New  ", value: newRev, color: "#4ADE80" })
+            if (churnRev) rows.push({ label: "Churn", value: churnRev, color: "#F87171" })
+
+            const ttW = rows.some(r => r.label) ? 130 : 90
+            const ttH = Math.max(22, rows.length * 17 + 8)
             const ttX = flip ? tx - ttW - 6 : tx + 8
+            const ttY = ty - ttH / 2
+
             return (
               <g>
                 <line x1={tx} y1={PAD.top} x2={tx} y2={PAD.top + plotH} stroke="#D0C9BF" strokeWidth={1} strokeDasharray="3,2" />
-                <rect x={ttX} y={ty - 14} width={ttW} height={ttH} rx={4} fill="#1A1916" />
-                {p1 && <text x={ttX + ttW / 2} y={ty + (p2 ? -1 : 3)} textAnchor="middle" fontSize={11} fill="#FF8B6A" fontWeight="600">{fmt(p1.value, format)}</text>}
-                {p2 && <text x={ttX + ttW / 2} y={ty + (p1 ? 16 : 3)} textAnchor="middle" fontSize={11} fill="#93C5FD" fontWeight="600">{fmt(p2.value, format)}</text>}
+                <rect x={ttX} y={ttY} width={ttW} height={ttH} rx={4} fill="#1A1916" />
+                {rows.map((r, i) => (
+                  <text key={i} x={ttX + 8} y={ttY + 13 + i * 17} fontSize={11} fill={r.color} fontWeight="600">
+                    {r.label}{fmt(r.value, format)}
+                  </text>
+                ))}
               </g>
             )
           })()}
