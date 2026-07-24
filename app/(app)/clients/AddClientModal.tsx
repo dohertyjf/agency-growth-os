@@ -23,22 +23,26 @@ export default function AddClientModal() {
       setError(typeof data.error === "string" ? data.error : "Something went wrong")
       return false
     }
-    router.refresh()
-    return true
+    return data
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (await save()) {
+    const data = await save()
+    if (data) {
       setOpen(false)
       setForm({ name: "", agency: "", email: "", status: "active", startDate: "" })
+      if (data.slug) router.push(`/clients/${data.slug}/dashboard`)
+      else router.refresh()
     }
   }
 
   async function handleAddAnother(e: React.MouseEvent) {
     e.preventDefault()
-    if (await save()) {
+    const data = await save()
+    if (data) {
       setForm({ name: "", agency: "", email: "", status: "active", startDate: "" })
+      router.refresh()
     }
   }
 

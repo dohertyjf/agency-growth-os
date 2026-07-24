@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
+import { toSlug } from "@/lib/slug"
 
 const schema = z.object({
   name: z.string().min(1),
@@ -25,8 +26,15 @@ export async function POST(req: Request) {
   const existing = await prisma.client.findUnique({ where: { email } })
   if (existing) return Response.json({ error: "A client with that email already exists" }, { status: 409 })
 
+  const base = toSlug(name)
+  let slug = base
+  let suffix = 2
+  while (await prisma.client.findFirst({ where: { slug } })) {
+    slug = `${base}-${suffix++}`
+  }
+
   const client = await prisma.client.create({
-    data: { name, agency: agency ?? null, email, status, startDate: startDate ?? null },
+    data: { name, slug, agency: agency ?? null, email, status, startDate: startDate ?? null },
   })
 
   return Response.json(client, { status: 201 })

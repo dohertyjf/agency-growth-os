@@ -17,6 +17,7 @@ interface Metric {
 
 interface Client {
   id: string
+  slug: string | null
   name: string
   agency: string | null
   status: string
@@ -74,6 +75,7 @@ export default function ClientsGrid({ clients, now }: Props) {
               <ClientCard
                 key={client.id}
                 id={client.id}
+                slug={client.slug}
                 name={client.name}
                 agency={client.agency}
                 status={client.status}

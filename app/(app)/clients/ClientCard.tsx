@@ -5,6 +5,7 @@ import { useState } from "react"
 
 interface Props {
   id: string
+  slug: string | null
   name: string
   agency: string | null
   status: string
@@ -12,10 +13,11 @@ interface Props {
   latestRevenue: number | null
 }
 
-export default function ClientCard({ id, name, agency, status, mrr, latestRevenue }: Props) {
+export default function ClientCard({ id, slug, name, agency, status, mrr, latestRevenue }: Props) {
   const [hovered, setHovered] = useState(false)
+  const href = slug ? `/clients/${slug}/dashboard` : `/clients/${id}/dashboard`
   return (
-    <Link href={`/clients/${id}`} style={{ textDecoration: "none" }}>
+    <Link href={href} style={{ textDecoration: "none" }}>
       <div
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}

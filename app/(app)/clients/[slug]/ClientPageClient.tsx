@@ -58,9 +58,13 @@ interface Goal {
   profit: number
 }
 
+type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress"
+
 interface Props {
   clientId: string
+  clientSlug: string
   clientName: string
+  currentTab: Tab
   initialStatus: "potential" | "active" | "paused"
   initialStartDate: string | null
   initialEndDate: string | null
@@ -72,20 +76,19 @@ interface Props {
   goal: Goal | null
 }
 
-type Tab = "overview" | "accounts" | "projects" | "reconciliation"
-
 const TABS: { key: Tab; label: string }[] = [
-  { key: "overview", label: "Overview" },
+  { key: "dashboard", label: "Overview" },
   { key: "accounts", label: "Accounts" },
   { key: "projects", label: "Projects" },
   { key: "reconciliation", label: "Reconciliation" },
+  { key: "progress", label: "Progress" },
 ]
 
 export default function ClientPageClient({
-  clientId, clientName, initialStatus, initialStartDate, initialEndDate,
+  clientId, clientSlug, clientName, currentTab,
+  initialStatus, initialStartDate, initialEndDate,
   metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("overview")
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
@@ -110,31 +113,29 @@ export default function ClientPageClient({
         <AddClientModal />
       </div>
 
-      {/* Tab bar */}
       <div style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE" }}>
         {TABS.map(t => (
-          <button
+          <Link
             key={t.key}
-            onClick={() => setTab(t.key)}
+            href={`/clients/${clientSlug}/${t.key}`}
             style={{
               padding: "8px 20px",
               fontSize: 13,
               fontWeight: 600,
-              border: "none",
-              borderBottom: tab === t.key ? "2px solid #E9532A" : "2px solid transparent",
+              borderBottom: currentTab === t.key ? "2px solid #E9532A" : "2px solid transparent",
               marginBottom: -2,
-              background: "none",
-              color: tab === t.key ? "#E9532A" : "#9C9590",
-              cursor: "pointer",
+              color: currentTab === t.key ? "#E9532A" : "#9C9590",
+              textDecoration: "none",
+              display: "inline-block",
               transition: "color 0.15s",
             }}
           >
             {t.label}
-          </button>
+          </Link>
         ))}
       </div>
 
-      {tab === "overview" && (
+      {currentTab === "dashboard" && (
         <Dashboard
           clientId={clientId}
           clientName={clientName}
@@ -148,7 +149,7 @@ export default function ClientPageClient({
         />
       )}
 
-      {tab === "accounts" && (
+      {currentTab === "accounts" && (
         <AccountsPanel
           clientId={clientId}
           initialAccounts={accounts}
@@ -158,7 +159,7 @@ export default function ClientPageClient({
         />
       )}
 
-      {tab === "projects" && (
+      {currentTab === "projects" && (
         <ContractsPanel
           clientId={clientId}
           initialContracts={initialContracts}
@@ -167,7 +168,7 @@ export default function ClientPageClient({
         />
       )}
 
-      {tab === "reconciliation" && (
+      {currentTab === "reconciliation" && (
         <ReconciliationTable
           contracts={contracts}
           initialAccountMonths={initialAccountMonths}
@@ -175,6 +176,13 @@ export default function ClientPageClient({
           onRevenueUpdate={handleRevenueUpdate}
           onPaymentsChange={setPayments}
         />
+      )}
+
+      {currentTab === "progress" && (
+        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 40, textAlign: "center", color: "#9C9590" }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Progress</div>
+          <div style={{ fontSize: 13 }}>Coming soon.</div>
+        </div>
       )}
     </div>
   )

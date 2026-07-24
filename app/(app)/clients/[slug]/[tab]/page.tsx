@@ -1,17 +1,25 @@
 import { auth } from "@/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import ClientPageClient from "./ClientPageClient"
+import ClientPageClient from "../ClientPageClient"
 
-export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
+const VALID_TABS = ["dashboard", "accounts", "projects", "reconciliation", "progress"] as const
+type Tab = typeof VALID_TABS[number]
+
+export default async function ClientTabPage({ params }: { params: Promise<{ slug: string; tab: string }> }) {
   const session = await auth()
   if (!session) redirect("/auth/signin")
   if (session.user.role !== "coach") redirect("/dashboard")
 
-  const { id } = await params
+  const { slug, tab } = await params
+  if (!VALID_TABS.includes(tab as Tab)) notFound()
 
-  const [client, metrics, goal, contracts, accountMonths, payments, accounts] = await Promise.all([
-    prisma.client.findUnique({ where: { id } }),
+  const client = await prisma.client.findFirst({ where: { slug } })
+  if (!client) notFound()
+
+  const id = client.id
+
+  const [metrics, goal, contracts, accountMonths, payments, accounts] = await Promise.all([
     prisma.monthlyMetric.findMany({ where: { clientId: id }, orderBy: { month: "asc" } }),
     prisma.goal.findUnique({ where: { clientId: id } }),
     prisma.contract.findMany({ where: { clientId: id }, orderBy: { start: "asc" } }),
@@ -20,12 +28,12 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     prisma.account.findMany({ where: { clientId: id }, orderBy: { name: "asc" } }),
   ])
 
-  if (!client) notFound()
-
   return (
     <ClientPageClient
       clientId={id}
+      clientSlug={slug}
       clientName={client.name}
+      currentTab={tab as Tab}
       initialStatus={client.status as "potential" | "active" | "paused"}
       initialStartDate={client.startDate ?? null}
       initialEndDate={client.endDate ?? null}
