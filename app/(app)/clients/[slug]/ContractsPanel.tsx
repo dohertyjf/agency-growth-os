@@ -424,7 +424,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
             <div>
               <label style={labelStyle}>Type</label>
               <select style={inputStyle} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as ContractTypeField }))}>
-                <option value="retainer">Retainer</option>
+                <option value="retainer">Retainer – End Date</option>
                 <option value="ongoing">Retainer – Ongoing</option>
                 <option value="oneoff">One-off</option>
               </select>
@@ -544,7 +544,7 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
             <div>
               <label style={labelStyle}>Type</label>
               <select style={inputStyle} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as ContractTypeField }))}>
-                <option value="retainer">Retainer</option>
+                <option value="retainer">Retainer – End Date</option>
                 <option value="ongoing">Retainer – Ongoing</option>
                 <option value="oneoff">One-off</option>
               </select>
@@ -746,7 +746,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Type</label>
               <select style={{ ...inputStyle, background: "#FBFAF7" }} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as ContractTypeField }))}>
-                <option value="retainer">Retainer</option>
+                <option value="retainer">Retainer – End Date</option>
                 <option value="ongoing">Retainer – Ongoing</option>
                 <option value="oneoff">One-off</option>
               </select>

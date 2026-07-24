@@ -117,7 +117,7 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
             <div>
               <label style={labelStyle}>Type</label>
               <select style={inputStyle} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as "retainer" | "ongoing" | "oneoff" }))}>
-                <option value="retainer">Retainer (monthly)</option>
+                <option value="retainer">Retainer – End Date</option>
                 <option value="ongoing">Retainer – Ongoing</option>
                 <option value="oneoff">One-off</option>
               </select>
@@ -162,7 +162,7 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
                     <div>
                       <label style={labelStyle}>Type</label>
                       <select style={inputStyle} value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value as "retainer" | "ongoing" | "oneoff" }))}>
-                        <option value="retainer">Retainer (monthly)</option>
+                        <option value="retainer">Retainer – End Date</option>
                         <option value="ongoing">Retainer – Ongoing</option>
                         <option value="oneoff">One-off</option>
                       </select>
@@ -194,7 +194,7 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
                     {p.description && <div style={{ fontSize: 12, color: "#9C9590", marginTop: 2 }}>{p.description}</div>}
                   </div>
                   <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: p.type === "oneoff" ? "#F5F3FF" : "#EFF6FF", color: p.type === "oneoff" ? "#6D28D9" : "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    {p.type === "retainer" ? "Retainer" : p.type === "ongoing" ? "Ongoing" : "One-off"}
+                    {p.type === "retainer" ? "End Date" : p.type === "ongoing" ? "Ongoing" : "One-off"}
                   </span>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", minWidth: 90, textAlign: "right" }}>
                     {fmtCurrency(p.monthly)}{p.type !== "oneoff" ? "/mo" : ""}

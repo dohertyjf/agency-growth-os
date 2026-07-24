@@ -448,7 +448,7 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                       <div>
                         <label style={labelStyle}>Type</label>
                         <select style={{ ...inputStyle, fontSize: 12 }} value={projectForm.type} onChange={e => setProjectForm(f => ({ ...f, type: e.target.value as ContractType }))}>
-                          <option value="retainer">Retainer</option>
+                          <option value="retainer">Retainer – End Date</option>
                           <option value="ongoing">Retainer – Ongoing</option>
                           <option value="oneoff">One-off</option>
                         </select>
