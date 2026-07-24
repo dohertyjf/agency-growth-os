@@ -6,6 +6,7 @@ import ContractsPanel from "./ContractsPanel"
 import ReconciliationTable from "./ReconciliationTable"
 import AccountsPanel from "./AccountsPanel"
 import ProductsPanel from "./ProductsPanel"
+import ProgressPanel from "./ProgressPanel"
 
 interface Metric {
   id: string
@@ -66,6 +67,11 @@ interface Product {
   monthly: number
 }
 
+interface RoadmapItem {
+  key: string
+  status: "none" | "red" | "yellow" | "green"
+}
+
 type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress" | "products"
 
 interface Props {
@@ -83,6 +89,7 @@ interface Props {
   initialPayments: Payment[]
   goal: Goal | null
   products: Product[]
+  initialRoadmap: RoadmapItem[]
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -97,7 +104,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, clientSlug, clientName, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -193,10 +200,7 @@ export default function ClientPageClient({
       )}
 
       {currentTab === "progress" && (
-        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 40, textAlign: "center", color: "#9C9590" }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Progress</div>
-          <div style={{ fontSize: 13 }}>Coming soon.</div>
-        </div>
+        <ProgressPanel clientId={clientId} initialItems={initialRoadmap} />
       )}
 
       {currentTab === "products" && (

@@ -19,7 +19,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   const id = client.id
 
-  const [metrics, goal, contracts, accountMonths, payments, accounts, products] = await Promise.all([
+  const [metrics, goal, contracts, accountMonths, payments, accounts, products, roadmapItems] = await Promise.all([
     prisma.monthlyMetric.findMany({ where: { clientId: id }, orderBy: { month: "asc" } }),
     prisma.goal.findUnique({ where: { clientId: id } }),
     prisma.contract.findMany({ where: { clientId: id }, orderBy: { start: "asc" } }),
@@ -27,6 +27,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
     prisma.contractPayment.findMany({ where: { contract: { clientId: id } } }),
     prisma.account.findMany({ where: { clientId: id }, orderBy: { name: "asc" } }),
     prisma.product.findMany({ where: { clientId: id }, orderBy: { createdAt: "asc" } }),
+    prisma.roadmapItem.findMany({ where: { clientId: id } }),
   ])
 
   return (
@@ -45,6 +46,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
       goal={goal}
       products={products.map(p => ({ id: p.id, name: p.name, description: p.description ?? null, type: p.type as "retainer" | "oneoff", monthly: p.monthly }))}
+      initialRoadmap={roadmapItems.map(r => ({ key: r.key, status: r.status as "none" | "red" | "yellow" | "green" }))}
     />
   )
 }
