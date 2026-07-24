@@ -734,7 +734,24 @@ function ContractGantt({ contracts, now, showAll, onToggleShowAll }: { contracts
 
   if (totalMo <= 0) return null
 
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+  const moToLabel = (mo: number) => {
+    const adj = mo - 1
+    const year = Math.floor(adj / 12)
+    const month = (adj % 12) + 1
+    return `${MONTHS[month - 1]} '${String(year).slice(2)}`
+  }
+
+  const step = totalMo <= 12 ? 1 : totalMo <= 24 ? 2 : totalMo <= 48 ? 3 : 6
+  const axisTicks: number[] = []
+  for (let mo = startMo; mo <= endMo; mo++) {
+    if ((mo - startMo) % step === 0) axisTicks.push(mo)
+  }
+
   const ganttColor: Record<string, string> = { active: "#E9532A", potential: "#F5C4B4", finished: "#D1D5DB" }
+  const AXIS_H = 18
+  const BAR_H = 16
+  const ROW_H = 24
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -744,14 +761,21 @@ function ContractGantt({ contracts, now, showAll, onToggleShowAll }: { contracts
           {showAll ? "Active only" : "Show all"}
         </button>
       </div>
-      <div style={{ position: "relative", height: contracts.length * 24 + 8 }}>
+      <div style={{ position: "relative", height: AXIS_H + contracts.length * ROW_H + 8 }}>
+        {/* Month axis */}
+        {axisTicks.map(mo => (
+          <div key={mo} style={{ position: "absolute", top: 0, left: `${((mo - startMo) / totalMo) * 100}%`, transform: "translateX(-50%)", textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: "#B0A9A0", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", lineHeight: 1, marginBottom: 2 }}>{moToLabel(mo)}</div>
+            <div style={{ width: 1, height: 3, background: "#D1CCC5", margin: "0 auto" }} />
+          </div>
+        ))}
         {contracts.map((c, i) => {
           const left = ((toMonths(c.start) - startMo) / totalMo) * 100
           const width = ((toMonths(c.contractedThrough) - toMonths(c.start) + 1) / totalMo) * 100
           return (
             <div key={c.id} style={{
-              position: "absolute", top: i * 24 + 4, left: `${left}%`, width: `${width}%`,
-              height: 16, background: ganttColor[c.status] ?? "#F5C4B4",
+              position: "absolute", top: AXIS_H + i * ROW_H + 4, left: `${left}%`, width: `${width}%`,
+              height: BAR_H, background: ganttColor[c.status] ?? "#F5C4B4",
               borderRadius: 4, opacity: 0.85, display: "flex", alignItems: "center",
               paddingLeft: 6, overflow: "hidden",
             }}>
@@ -762,7 +786,7 @@ function ContractGantt({ contracts, now, showAll, onToggleShowAll }: { contracts
         <div style={{
           position: "absolute", top: 0,
           left: `${((toMonths(now) - startMo) / totalMo) * 100}%`,
-          width: 1, height: contracts.length * 24 + 8, background: "#1A1916", opacity: 0.2,
+          width: 1, height: AXIS_H + contracts.length * ROW_H + 8, background: "#1A1916", opacity: 0.2,
         }} />
       </div>
     </div>
