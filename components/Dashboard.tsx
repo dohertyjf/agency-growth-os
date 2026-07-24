@@ -149,6 +149,14 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
     ))
   }
 
+  function handleBulkMetricImport(imported: typeof rawMetrics) {
+    setRawMetrics(prev => {
+      const byMonth = new Map(prev.map(m => [m.month, m]))
+      imported.forEach(m => byMonth.set(m.month, m))
+      return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
+    })
+  }
+
   async function handleEditSave(e: React.FormEvent) {
     e.preventDefault()
     setEditSaving(true)
@@ -539,6 +547,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
           clientId={clientId}
           months={[...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).slice(-range)}
           onUpdate={handleMetricUpdate}
+          onBulkImport={handleBulkMetricImport}
         />
       </div>
     </div>
