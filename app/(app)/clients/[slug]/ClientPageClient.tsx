@@ -156,6 +156,7 @@ export default function ClientPageClient({
           contracts={contracts}
           onAccountsChange={setAccounts}
           onContractAccountChange={handleContractAccountChange}
+          onContractCreated={contract => setContracts(prev => [...prev, contract])}
         />
       )}
 

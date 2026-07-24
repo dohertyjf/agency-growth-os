@@ -12,8 +12,16 @@ interface Account {
 interface Contract {
   id: string
   name: string
+  monthly: number
+  start: string
+  contractedThrough: string
+  status: string
+  type: string
   accountId?: string | null
 }
+
+type ContractStatus = "potential" | "active" | "finished"
+type ContractType = "retainer" | "oneoff"
 
 interface Props {
   clientId: string
@@ -21,7 +29,11 @@ interface Props {
   contracts: Contract[]
   onAccountsChange: (accounts: Account[]) => void
   onContractAccountChange: (contractId: string, accountId: string | null) => void
+  onContractCreated?: (contract: Contract) => void
 }
+
+const now = new Date().toISOString().slice(0, 7)
+const defaultProjectForm = { name: "", type: "retainer" as ContractType, monthly: "", status: "active" as ContractStatus, start: now, contractedThrough: "" }
 
 const inputStyle: React.CSSProperties = {
   padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6,
@@ -150,7 +162,7 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
   )
 }
 
-export default function AccountsPanel({ clientId, initialAccounts, contracts, onAccountsChange, onContractAccountChange }: Props) {
+export default function AccountsPanel({ clientId, initialAccounts, contracts, onAccountsChange, onContractAccountChange, onContractCreated }: Props) {
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -160,6 +172,9 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, on
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: "", contactName: "", contactEmail: "" })
   const [editSaving, setEditSaving] = useState(false)
+  const [addingProjectForAccount, setAddingProjectForAccount] = useState<string | null>(null)
+  const [projectForm, setProjectForm] = useState(defaultProjectForm)
+  const [projectSaving, setProjectSaving] = useState(false)
 
   function updateAccounts(next: Account[]) {
     setAccounts(next)
@@ -225,6 +240,30 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, on
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
     await fetch(`/api/clients/${clientId}/accounts/${accountId}`, { method: "DELETE" })
     updateAccounts(accounts.filter(a => a.id !== accountId))
+  }
+
+  async function handleAddProject(e: React.FormEvent, accountId: string) {
+    e.preventDefault()
+    setProjectSaving(true)
+    const res = await fetch(`/api/clients/${clientId}/contracts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: projectForm.name.trim(),
+        type: projectForm.type,
+        monthly: parseFloat(projectForm.monthly),
+        status: projectForm.status,
+        start: projectForm.start,
+        contractedThrough: projectForm.type === "oneoff" ? projectForm.start : projectForm.contractedThrough,
+        accountId,
+      }),
+    })
+    setProjectSaving(false)
+    if (!res.ok) return
+    const contract: Contract = await res.json()
+    onContractCreated?.(contract)
+    setAddingProjectForAccount(null)
+    setProjectForm(defaultProjectForm)
   }
 
   const byAccount = new Map<string | null, Contract[]>()
@@ -357,6 +396,10 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, on
                   <div style={{ fontSize: 11, color: "#9C9590" }}>
                     {accountContracts.length} project{accountContracts.length !== 1 ? "s" : ""}
                   </div>
+                  <button onClick={() => { setAddingProjectForAccount(a => a === account.id ? null : account.id); setProjectForm(defaultProjectForm) }}
+                    style={{ background: "none", border: "1px solid #E9532A", borderRadius: 4, fontSize: 11, color: "#E9532A", cursor: "pointer", padding: "2px 8px", fontWeight: 600 }}>
+                    + Project
+                  </button>
                   <button onClick={() => startEdit(account)}
                     style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#6B6760", cursor: "pointer", padding: "2px 8px" }}>
                     Edit
@@ -366,6 +409,57 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, on
                     ×
                   </button>
                 </div>
+                )}
+                {!isEditing && addingProjectForAccount === account.id && (
+                  <form onSubmit={e => handleAddProject(e, account.id)} style={{ padding: "10px 14px", borderTop: "1px solid #F5F1EC", background: "#FDFCFA", display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 8 }}>
+                      <div>
+                        <label style={labelStyle}>Project Name</label>
+                        <input style={{ ...inputStyle, fontSize: 12 }} value={projectForm.name} onChange={e => setProjectForm(f => ({ ...f, name: e.target.value }))} required autoFocus placeholder="Retainer" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Type</label>
+                        <select style={{ ...inputStyle, fontSize: 12 }} value={projectForm.type} onChange={e => setProjectForm(f => ({ ...f, type: e.target.value as ContractType }))}>
+                          <option value="retainer">Retainer</option>
+                          <option value="oneoff">One-off</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={labelStyle}>{projectForm.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
+                        <input style={{ ...inputStyle, fontSize: 12 }} type="number" value={projectForm.monthly} onChange={e => setProjectForm(f => ({ ...f, monthly: e.target.value }))} required placeholder="2500" min={0} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Status</label>
+                        <select style={{ ...inputStyle, fontSize: 12 }} value={projectForm.status} onChange={e => setProjectForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
+                          <option value="potential">Potential</option>
+                          <option value="active">Active</option>
+                          <option value="finished">Finished</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                      <div>
+                        <label style={labelStyle}>{projectForm.type === "oneoff" ? "Month" : "Start"}</label>
+                        <input style={{ ...inputStyle, fontSize: 12, width: 140 }} type="month" value={projectForm.start} onChange={e => setProjectForm(f => ({ ...f, start: e.target.value, ...(f.type === "oneoff" ? { contractedThrough: e.target.value } : {}) }))} required />
+                      </div>
+                      {projectForm.type === "retainer" && (
+                        <div>
+                          <label style={labelStyle}>Through</label>
+                          <input style={{ ...inputStyle, fontSize: 12, width: 140 }} type="month" value={projectForm.contractedThrough} onChange={e => setProjectForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+                        <button type="button" onClick={() => setAddingProjectForAccount(null)}
+                          style={{ padding: "6px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 12, cursor: "pointer", color: "#6B6760" }}>
+                          Cancel
+                        </button>
+                        <button type="submit" disabled={projectSaving}
+                          style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          {projectSaving ? "Saving…" : "Add Project"}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
                 )}
                 {!isEditing && accountContracts.length > 0 && (
                   <div style={{ padding: "6px 14px 10px" }}>
