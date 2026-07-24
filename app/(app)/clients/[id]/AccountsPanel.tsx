@@ -157,6 +157,9 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, on
   const [form, setForm] = useState({ name: "", contactName: "", contactEmail: "" })
   const [saving, setSaving] = useState(false)
   const [assigningContract, setAssigningContract] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ name: "", contactName: "", contactEmail: "" })
+  const [editSaving, setEditSaving] = useState(false)
 
   function updateAccounts(next: Account[]) {
     setAccounts(next)
@@ -192,6 +195,36 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, on
     })
     onContractAccountChange(contractId, accountId)
     setAssigningContract(null)
+  }
+
+  function startEdit(account: Account) {
+    setEditingId(account.id)
+    setEditForm({ name: account.name, contactName: account.contactName ?? "", contactEmail: account.contactEmail ?? "" })
+  }
+
+  async function handleEditSave(e: React.FormEvent, accountId: string) {
+    e.preventDefault()
+    setEditSaving(true)
+    const res = await fetch(`/api/clients/${clientId}/accounts/${accountId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editForm.name.trim(),
+        contactName: editForm.contactName.trim() || null,
+        contactEmail: editForm.contactEmail.trim() || null,
+      }),
+    })
+    setEditSaving(false)
+    if (!res.ok) return
+    const updated: Account = await res.json()
+    updateAccounts(accounts.map(a => a.id === accountId ? updated : a))
+    setEditingId(null)
+  }
+
+  async function handleDelete(accountId: string, name: string) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+    await fetch(`/api/clients/${clientId}/accounts/${accountId}`, { method: "DELETE" })
+    updateAccounts(accounts.filter(a => a.id !== accountId))
   }
 
   const byAccount = new Map<string | null, Contract[]>()
@@ -277,8 +310,37 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, on
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {accounts.map(account => {
             const accountContracts = byAccount.get(account.id) ?? []
+            const isEditing = editingId === account.id
             return (
               <div key={account.id} style={{ border: "1px solid #F5F1EC", borderRadius: 8, overflow: "hidden" }}>
+                {isEditing ? (
+                  <form onSubmit={e => handleEditSave(e, account.id)} style={{ padding: "10px 14px", background: "#FBFAF7", display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                      <div>
+                        <label style={labelStyle}>Account Name</label>
+                        <input style={{ ...inputStyle, fontSize: 12 }} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} required autoFocus />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Contact Name</label>
+                        <input style={{ ...inputStyle, fontSize: 12 }} value={editForm.contactName} onChange={e => setEditForm(f => ({ ...f, contactName: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Contact Email</label>
+                        <input style={{ ...inputStyle, fontSize: 12 }} type="email" value={editForm.contactEmail} onChange={e => setEditForm(f => ({ ...f, contactEmail: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button type="button" onClick={() => setEditingId(null)}
+                        style={{ padding: "4px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 12, cursor: "pointer", color: "#6B6760" }}>
+                        Cancel
+                      </button>
+                      <button type="submit" disabled={editSaving}
+                        style={{ padding: "4px 12px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        {editSaving ? "Saving…" : "Save"}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#FBFAF7" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>{account.name}</div>
@@ -295,8 +357,17 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, on
                   <div style={{ fontSize: 11, color: "#9C9590" }}>
                     {accountContracts.length} project{accountContracts.length !== 1 ? "s" : ""}
                   </div>
+                  <button onClick={() => startEdit(account)}
+                    style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#6B6760", cursor: "pointer", padding: "2px 8px" }}>
+                    Edit
+                  </button>
+                  <button onClick={() => handleDelete(account.id, account.name)}
+                    style={{ background: "none", border: "none", color: "#9C9590", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px" }}>
+                    ×
+                  </button>
                 </div>
-                {accountContracts.length > 0 && (
+                )}
+                {!isEditing && accountContracts.length > 0 && (
                   <div style={{ padding: "6px 14px 10px" }}>
                     {accountContracts.map(c => (
                       <div key={c.id} style={{ fontSize: 12, color: "#6B6760", padding: "4px 0", borderBottom: "1px solid #F5F1EC", display: "flex", alignItems: "center", gap: 8 }}>
