@@ -9,6 +9,7 @@ const schema = z.object({
   contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   status: z.enum(["potential", "active", "finished"]).optional(),
   type: z.enum(["retainer", "oneoff"]).optional(),
+  accountId: z.string().nullable().optional(),
 })
 
 async function authorizeContract(session: import("next-auth").Session | null, contractId: string) {

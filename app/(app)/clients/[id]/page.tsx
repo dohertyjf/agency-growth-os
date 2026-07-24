@@ -10,13 +10,14 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
   const { id } = await params
 
-  const [client, metrics, goal, contracts, accountMonths, payments] = await Promise.all([
+  const [client, metrics, goal, contracts, accountMonths, payments, accounts] = await Promise.all([
     prisma.client.findUnique({ where: { id } }),
     prisma.monthlyMetric.findMany({ where: { clientId: id }, orderBy: { month: "asc" } }),
     prisma.goal.findUnique({ where: { clientId: id } }),
     prisma.contract.findMany({ where: { clientId: id }, orderBy: { start: "asc" } }),
     prisma.accountMonth.findMany({ where: { contract: { clientId: id } } }),
     prisma.contractPayment.findMany({ where: { contract: { clientId: id } } }),
+    prisma.account.findMany({ where: { clientId: id }, orderBy: { name: "asc" } }),
   ])
 
   if (!client) notFound()
@@ -29,7 +30,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
       initialStartDate={client.startDate ?? null}
       initialEndDate={client.endDate ?? null}
       metrics={metrics}
-      initialContracts={contracts}
+      initialContracts={contracts.map(c => ({ ...c, accountId: c.accountId ?? null }))}
+      initialAccounts={accounts.map(a => ({ id: a.id, name: a.name, notes: a.notes }))}
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
       goal={goal}

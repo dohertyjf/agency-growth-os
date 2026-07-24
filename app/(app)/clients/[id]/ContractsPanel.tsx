@@ -10,11 +10,18 @@ interface Contract {
   contractedThrough: string
   status: string
   type: string
+  accountId?: string | null
+}
+
+interface Account {
+  id: string
+  name: string
 }
 
 interface Props {
   clientId: string
   initialContracts: Contract[]
+  accounts?: Account[]
   onContractsChange?: (contracts: Contract[]) => void
 }
 
@@ -232,9 +239,10 @@ interface EditForm {
   contractedThrough: string
   status: ContractStatus
   type: ContractTypeField
+  accountId: string | null
 }
 
-function DuplicateModal({ contract, clientId, onClose, onSave }: { contract: Contract; clientId: string; onClose: () => void; onSave: (c: Contract) => void }) {
+function DuplicateModal({ contract, clientId, accounts, onClose, onSave }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void }) {
   const [form, setForm] = useState<EditForm>({
     name: "",
     monthly: String(contract.monthly),
@@ -242,6 +250,7 @@ function DuplicateModal({ contract, clientId, onClose, onSave }: { contract: Con
     contractedThrough: contract.contractedThrough,
     status: "potential" as ContractStatus,
     type: (contract.type as ContractTypeField) ?? "retainer",
+    accountId: contract.accountId ?? null,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -253,12 +262,12 @@ function DuplicateModal({ contract, clientId, onClose, onSave }: { contract: Con
     const res = await fetch(`/api/clients/${clientId}/contracts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, monthly: parseFloat(form.monthly) }),
+      body: JSON.stringify({ ...form, monthly: parseFloat(form.monthly), accountId: form.accountId || undefined }),
     })
     setSaving(false)
     if (!res.ok) { setError("Failed to save"); return }
     const created = await res.json()
-    onSave(created.contract ?? created)
+    onSave({ ...(created.contract ?? created), accountId: form.accountId })
     onClose()
   }
 
@@ -269,7 +278,7 @@ function DuplicateModal({ contract, clientId, onClose, onSave }: { contract: Con
     >
       <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 460, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
         <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>
-          Duplicate Account
+          Duplicate Project
         </h2>
         <p style={{ fontSize: 12, color: "#9C9590", margin: "0 0 20px" }}>Copied from <strong style={{ color: "#6B6760" }}>{contract.name}</strong> — enter a new name to save.</p>
         <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -290,9 +299,18 @@ function DuplicateModal({ contract, clientId, onClose, onSave }: { contract: Con
               </select>
             </div>
           </div>
+          {accounts && accounts.length > 0 && (
+            <div>
+              <label style={labelStyle}>Client Account</label>
+              <select style={inputStyle} value={form.accountId ?? ""} onChange={e => setForm(f => ({ ...f, accountId: e.target.value || null }))}>
+                <option value="">— Unassigned —</option>
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
-            <label style={labelStyle}>Account Name</label>
-            <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="New client name" autoFocus />
+            <label style={labelStyle}>Project Name</label>
+            <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="New project name" autoFocus />
           </div>
           <div>
             <label style={labelStyle}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
@@ -332,7 +350,7 @@ function DuplicateModal({ contract, clientId, onClose, onSave }: { contract: Con
   )
 }
 
-function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose: () => void; onSave: (c: Contract) => void }) {
+function EditModal({ contract, accounts, onClose, onSave }: { contract: Contract; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void }) {
   const [form, setForm] = useState<EditForm>({
     name: contract.name,
     monthly: String(contract.monthly),
@@ -340,6 +358,7 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
     contractedThrough: contract.contractedThrough,
     status: contract.status as ContractStatus,
     type: (contract.type as ContractTypeField) ?? "retainer",
+    accountId: contract.accountId ?? null,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -351,12 +370,12 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
     const res = await fetch(`/api/contracts/${contract.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, monthly: parseFloat(form.monthly) }),
+      body: JSON.stringify({ ...form, monthly: parseFloat(form.monthly), accountId: form.accountId }),
     })
     setSaving(false)
     if (!res.ok) { setError("Failed to save"); return }
     const updated = await res.json()
-    onSave(updated)
+    onSave({ ...updated, accountId: form.accountId })
     onClose()
   }
 
@@ -367,7 +386,7 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
     >
       <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 460, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
         <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 20px", color: "#1A1916" }}>
-          Edit Account
+          Edit Project
         </h2>
         <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -387,8 +406,17 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
               </select>
             </div>
           </div>
+          {accounts && accounts.length > 0 && (
+            <div>
+              <label style={labelStyle}>Client Account</label>
+              <select style={inputStyle} value={form.accountId ?? ""} onChange={e => setForm(f => ({ ...f, accountId: e.target.value || null }))}>
+                <option value="">— Unassigned —</option>
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
-            <label style={labelStyle}>Account Name</label>
+            <label style={labelStyle}>Project Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
           <div>
@@ -429,13 +457,13 @@ function EditModal({ contract, onClose, onSave }: { contract: Contract; onClose:
   )
 }
 
-export default function ContractsPanel({ clientId, initialContracts, onContractsChange }: Props) {
+export default function ContractsPanel({ clientId, initialContracts, accounts, onContractsChange }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [adding, setAdding] = useState(false)
   const [bulkImporting, setBulkImporting] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [duplicatingContract, setDuplicatingContract] = useState<Contract | null>(null)
-  const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField })
+  const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null })
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
 
@@ -465,7 +493,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
     const data = await res.json()
     if (res.ok) {
       updateContracts([...contracts, data.contract ?? data])
-      setForm({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential", type: "retainer" })
+      setForm({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential", type: "retainer", accountId: null })
       setAdding(false)
     }
     setSaving(false)
@@ -491,10 +519,10 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       {editingContract && (
-        <EditModal contract={editingContract} onClose={() => setEditingContract(null)} onSave={handleEdited} />
+        <EditModal contract={editingContract} accounts={accounts} onClose={() => setEditingContract(null)} onSave={handleEdited} />
       )}
       {duplicatingContract && (
-        <DuplicateModal contract={duplicatingContract} clientId={clientId} onClose={() => setDuplicatingContract(null)} onSave={handleDuplicated} />
+        <DuplicateModal contract={duplicatingContract} clientId={clientId} accounts={accounts} onClose={() => setDuplicatingContract(null)} onSave={handleDuplicated} />
       )}
       {bulkImporting && (
         <BulkImportModal clientId={clientId} onClose={() => setBulkImporting(false)} onImport={handleBulkImported} />
@@ -502,7 +530,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Accounts</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Projects</div>
           <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
             MRR {fmtCurrency(mrr)} · {fmtCurrency(booked)} booked ahead
           </div>
@@ -518,7 +546,7 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
             onClick={() => setAdding(a => !a)}
             style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
           >
-            + Add Account
+            + Add Project
           </button>
         </div>
       </div>
@@ -527,8 +555,8 @@ export default function ContractsPanel({ clientId, initialContracts, onContracts
         <form onSubmit={handleAdd} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: 16, marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
             <div>
-              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Account Name</label>
-              <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Acme Corp" autoFocus />
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Project Name</label>
+              <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Jim McDannald Retainer" autoFocus />
             </div>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Type</label>

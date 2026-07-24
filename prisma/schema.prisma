@@ -52,8 +52,19 @@ model Client {
   goal      Goal?
   metrics   MonthlyMetric[]
   contracts Contract[]
+  accounts  Account[]
   calls     Call[]
   createdAt DateTime        @default(now())
+}
+
+model Account {
+  id        String     @id @default(cuid())
+  clientId  String
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name      String
+  notes     String?
+  createdAt DateTime   @default(now())
+  contracts Contract[]
 }
 
 model MonthlyMetric {
@@ -92,6 +103,8 @@ model Contract {
   contractedThrough String
   status            ContractStatus @default(active)
   type              ContractType   @default(retainer)
+  accountId         String?
+  account           Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
   createdAt         DateTime       @default(now())
   accountMonths     AccountMonth[]
   payments          ContractPayment[]

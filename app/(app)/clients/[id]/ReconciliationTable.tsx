@@ -53,6 +53,12 @@ function monthLabel(ym: string): string {
 
 const now = new Date().toISOString().slice(0, 7)
 
+function ymAdd(ym: string, months: number): string {
+  const [y, m] = ym.split("-").map(Number)
+  const total = y * 12 + m - 1 + months
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`
+}
+
 export default function ReconciliationTable({ contracts, initialAccountMonths, initialPayments, onRevenueUpdate, onPaymentsChange }: Props) {
   const [accountMonths, setAccountMonths] = useState<AccountMonth[]>(initialAccountMonths)
   const [payments, setPayments] = useState<Payment[]>(initialPayments)
@@ -60,25 +66,25 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
   const [editingPayment, setEditingPayment] = useState<{ contractId: string; month: string } | null>(null)
   const [saving, setSaving] = useState<string | null>(null)
   const [savingPayment, setSavingPayment] = useState<string | null>(null)
+  const [range, setRange] = useState<3 | 6 | 12 | "all">("all")
 
   const activeContracts = contracts.filter(c => c.status === "active" || c.status === "finished")
   if (activeContracts.length === 0) return null
 
-  const allStarts = activeContracts.map(c => c.start)
   const allEnds = activeContracts.map(c => c.contractedThrough)
-  const rangeStart = allStarts.reduce((a, b) => a < b ? a : b)
   const rangeEnd = [now, ...allEnds].reduce((a, b) => a > b ? a : b)
 
-  // Extend range one month back to capture prepayments
-  const [rsy, rsm] = rangeStart.split("-").map(Number)
-  const prevMonth = rsm === 1
-    ? `${rsy - 1}-12`
-    : `${rsy}-${String(rsm - 1).padStart(2, "0")}`
-  // Only extend if there are payments before rangeStart
-  const hasEarlyPayment = payments.some(p => p.month < rangeStart)
-  const effectiveStart = hasEarlyPayment ? prevMonth : rangeStart
+  const windowStart = range === "all"
+    ? activeContracts.map(c => c.start).reduce((a, b) => a < b ? a : b)
+    : ymAdd(now, -(range - 1))
 
-  const months = monthsBetween(effectiveStart, rangeEnd)
+  // Extend one month back if there are early cash payments
+  const hasEarlyPayment = payments.some(p => p.month < windowStart)
+  const effectiveStart = hasEarlyPayment ? ymAdd(windowStart, -1) : windowStart
+
+  const allMonths = monthsBetween(effectiveStart, rangeEnd)
+  // Only show months where at least one contract is active
+  const months = allMonths.filter(m => activeContracts.some(c => contractActiveInMonth(c, m)))
 
   function getActual(contractId: string, month: string) {
     return accountMonths.find(am => am.contractId === contractId && am.month === month)
@@ -155,9 +161,21 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 4 }}>Monthly Reconciliation</div>
-      <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 14 }}>
-        Forecast in muted · click a cell to enter the actual billed amount · teal row = cash received
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Monthly Reconciliation</div>
+          <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
+            Forecast in muted · click to enter actual · teal row = cash received
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2 }}>
+          {([3, 6, 12, "all"] as const).map(n => (
+            <button key={n} onClick={() => setRange(n)}
+              style={{ padding: "3px 10px", fontSize: 11, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: range === n ? "#fff" : "transparent", color: range === n ? "#1A1916" : "#9C9590", boxShadow: range === n ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+              {n === "all" ? "All" : `${n}mo`}
+            </button>
+          ))}
+        </div>
       </div>
       <div style={{ overflowX: "auto", border: "1px solid #ECE7DE", borderRadius: 10 }}>
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: "max-content" }}>
