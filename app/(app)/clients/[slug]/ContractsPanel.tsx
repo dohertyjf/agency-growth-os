@@ -23,6 +23,7 @@ interface Props {
   initialContracts: Contract[]
   accounts?: Account[]
   onContractsChange?: (contracts: Contract[]) => void
+  onAccountCreated?: (account: Account) => void
 }
 
 type ContractStatus = "potential" | "active" | "finished"
@@ -48,6 +49,126 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
 type ContractTypeField = "retainer" | "oneoff"
+
+// ── Account combobox ─────────────────────────────────────────────────────────
+
+function AccountCombobox({ accounts, value, onChange, clientId, onAccountCreated }: {
+  accounts: Account[]
+  value: string | null
+  onChange: (id: string | null) => void
+  clientId: string
+  onAccountCreated: (account: Account) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  const selected = accounts.find(a => a.id === value)
+  const filtered = accounts.filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
+
+  async function handleCreate() {
+    if (!newName.trim()) return
+    setSaving(true)
+    const res = await fetch(`/api/clients/${clientId}/accounts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName.trim() }),
+    })
+    setSaving(false)
+    if (!res.ok) return
+    const account: Account = await res.json()
+    onAccountCreated(account)
+    onChange(account.id)
+    setCreating(false)
+    setNewName("")
+    setOpen(false)
+    setSearch("")
+  }
+
+  function close() { setOpen(false); setSearch(""); setCreating(false); setNewName("") }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{ ...inputStyle, textAlign: "left", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+      >
+        <span style={{ color: selected ? "#1A1916" : "#9C9590", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {selected ? selected.name : "— No account —"}
+        </span>
+        <span style={{ color: "#9C9590", fontSize: 10, flexShrink: 0, marginLeft: 4 }}>▾</span>
+      </button>
+
+      {open && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 99 }} onClick={close} />
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, background: "#fff", border: "1px solid #ECE7DE", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", marginTop: 2, maxHeight: 280, overflowY: "auto" }}>
+            {/* Search */}
+            <div style={{ padding: "8px 10px", borderBottom: "1px solid #F5F1EC", position: "sticky", top: 0, background: "#fff" }}>
+              <input
+                autoFocus
+                placeholder="Search accounts…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => e.key === "Escape" && close()}
+                style={{ width: "100%", border: "none", outline: "none", fontSize: 12, color: "#1A1916", background: "transparent" }}
+              />
+            </div>
+
+            {/* Add new */}
+            {!creating ? (
+              <button type="button" onClick={() => setCreating(true)}
+                style={{ width: "100%", padding: "8px 12px", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid #F5F1EC", fontSize: 12, color: "#E9532A", fontWeight: 600, cursor: "pointer" }}>
+                + Add new account
+              </button>
+            ) : (
+              <div style={{ padding: "8px 10px", borderBottom: "1px solid #F5F1EC", display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  autoFocus
+                  placeholder="Account name"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleCreate() } if (e.key === "Escape") { setCreating(false); setNewName("") } }}
+                  style={{ flex: 1, padding: "4px 8px", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 12, outline: "none" }}
+                />
+                <button type="button" onClick={handleCreate} disabled={saving || !newName.trim()}
+                  style={{ padding: "4px 10px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: "pointer", opacity: saving || !newName.trim() ? 0.5 : 1 }}>
+                  {saving ? "…" : "Create"}
+                </button>
+                <button type="button" onClick={() => { setCreating(false); setNewName("") }}
+                  style={{ padding: "4px 8px", background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, cursor: "pointer", color: "#6B6760" }}>
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* None */}
+            <button type="button" onClick={() => { onChange(null); close() }}
+              style={{ width: "100%", padding: "7px 12px", textAlign: "left", background: value === null ? "#FBFAF7" : "none", border: "none", borderBottom: "1px solid #F5F1EC", fontSize: 12, color: "#9C9590", cursor: "pointer" }}>
+              — No account —
+            </button>
+
+            {/* Accounts */}
+            {filtered.map(a => (
+              <button key={a.id} type="button" onClick={() => { onChange(a.id); close() }}
+                style={{ width: "100%", padding: "7px 12px", textAlign: "left", background: value === a.id ? "#FFF5F2" : "none", border: "none", borderBottom: "1px solid #F5F1EC", fontSize: 12, color: "#1A1916", fontWeight: value === a.id ? 600 : 400, cursor: "pointer" }}>
+                {a.name}
+              </button>
+            ))}
+            {filtered.length === 0 && !creating && (
+              <div style={{ padding: "10px 12px", fontSize: 12, color: "#9C9590" }}>
+                {search ? "No matching accounts" : "No accounts yet"}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 // ── Bulk import ───────────────────────────────────────────────────────────────
 
@@ -242,7 +363,7 @@ interface EditForm {
   accountId: string | null
 }
 
-function DuplicateModal({ contract, clientId, accounts, onClose, onSave }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void }) {
+function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
   const [form, setForm] = useState<EditForm>({
     name: "",
     monthly: String(contract.monthly),
@@ -299,15 +420,16 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave }: { con
               </select>
             </div>
           </div>
-          {accounts && accounts.length > 0 && (
-            <div>
-              <label style={labelStyle}>Client Account</label>
-              <select style={inputStyle} value={form.accountId ?? ""} onChange={e => setForm(f => ({ ...f, accountId: e.target.value || null }))}>
-                <option value="">— Unassigned —</option>
-                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </div>
-          )}
+          <div>
+            <label style={labelStyle}>Client Account</label>
+            <AccountCombobox
+              accounts={accounts ?? []}
+              value={form.accountId}
+              onChange={id => setForm(f => ({ ...f, accountId: id }))}
+              clientId={clientId}
+              onAccountCreated={a => { onAccountCreated(a); setForm(f => ({ ...f, accountId: a.id })) }}
+            />
+          </div>
           <div>
             <label style={labelStyle}>Project Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="New project name" autoFocus />
@@ -350,7 +472,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave }: { con
   )
 }
 
-function EditModal({ contract, accounts, onClose, onSave }: { contract: Contract; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void }) {
+function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
   const [form, setForm] = useState<EditForm>({
     name: contract.name,
     monthly: String(contract.monthly),
@@ -406,15 +528,16 @@ function EditModal({ contract, accounts, onClose, onSave }: { contract: Contract
               </select>
             </div>
           </div>
-          {accounts && accounts.length > 0 && (
-            <div>
-              <label style={labelStyle}>Client Account</label>
-              <select style={inputStyle} value={form.accountId ?? ""} onChange={e => setForm(f => ({ ...f, accountId: e.target.value || null }))}>
-                <option value="">— Unassigned —</option>
-                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </div>
-          )}
+          <div>
+            <label style={labelStyle}>Client Account</label>
+            <AccountCombobox
+              accounts={accounts ?? []}
+              value={form.accountId}
+              onChange={id => setForm(f => ({ ...f, accountId: id }))}
+              clientId={clientId}
+              onAccountCreated={a => { onAccountCreated(a); setForm(f => ({ ...f, accountId: a.id })) }}
+            />
+          </div>
           <div>
             <label style={labelStyle}>Project Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
@@ -457,8 +580,9 @@ function EditModal({ contract, accounts, onClose, onSave }: { contract: Contract
   )
 }
 
-export default function ContractsPanel({ clientId, initialContracts, accounts, onContractsChange }: Props) {
+export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
+  const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
   const [adding, setAdding] = useState(false)
   const [bulkImporting, setBulkImporting] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
@@ -467,6 +591,11 @@ export default function ContractsPanel({ clientId, initialContracts, accounts, o
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [showAllGantt, setShowAllGantt] = useState(false)
+
+  function handleAccountCreated(account: Account) {
+    setLocalAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))
+    onAccountCreatedProp?.(account)
+  }
 
   function updateContracts(next: Contract[]) {
     setContracts(next)
@@ -520,10 +649,10 @@ export default function ContractsPanel({ clientId, initialContracts, accounts, o
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       {editingContract && (
-        <EditModal contract={editingContract} accounts={accounts} onClose={() => setEditingContract(null)} onSave={handleEdited} />
+        <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
       )}
       {duplicatingContract && (
-        <DuplicateModal contract={duplicatingContract} clientId={clientId} accounts={accounts} onClose={() => setDuplicatingContract(null)} onSave={handleDuplicated} />
+        <DuplicateModal contract={duplicatingContract} clientId={clientId} accounts={localAccounts} onClose={() => setDuplicatingContract(null)} onSave={handleDuplicated} onAccountCreated={handleAccountCreated} />
       )}
       {bulkImporting && (
         <BulkImportModal clientId={clientId} onClose={() => setBulkImporting(false)} onImport={handleBulkImported} />
@@ -582,23 +711,35 @@ export default function ContractsPanel({ clientId, initialContracts, accounts, o
               Save
             </button>
           </div>
-          {form.type === "oneoff" ? (
-            <div style={{ maxWidth: 200 }}>
-              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Month Paid</label>
-              <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
+          <div style={{ display: "grid", gridTemplateColumns: form.type === "oneoff" ? "1fr 1fr 2fr" : "1fr 1fr 1fr 1fr", gap: 8 }}>
+            <div>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Account</label>
+              <AccountCombobox
+                accounts={localAccounts}
+                value={form.accountId}
+                onChange={id => setForm(f => ({ ...f, accountId: id }))}
+                clientId={clientId}
+                onAccountCreated={handleAccountCreated}
+              />
             </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 3fr", gap: 8 }}>
+            {form.type === "oneoff" ? (
               <div>
-                <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Start</label>
-                <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
+                <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Month Paid</label>
+                <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
               </div>
-              <div>
-                <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Through</label>
-                <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
-              </div>
-            </div>
-          )}
+            ) : (
+              <>
+                <div>
+                  <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Start</label>
+                  <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Through</label>
+                  <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                </div>
+              </>
+            )}
+          </div>
         </form>
       )}
 
