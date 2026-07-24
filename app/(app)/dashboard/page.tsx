@@ -24,6 +24,7 @@ export default async function DashboardPage() {
   return (
     <Dashboard
       clientId={clientId}
+      clientSlug={client.slug ?? ""}
       clientName={client.name}
       metrics={metrics}
       contracts={contracts}

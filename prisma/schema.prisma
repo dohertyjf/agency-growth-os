@@ -92,11 +92,14 @@ model MonthlyMetric {
 }
 
 model Goal {
-  id            String @id @default(cuid())
-  clientId      String @unique
-  client        Client @relation(fields: [clientId], references: [id])
-  annualRevenue Float  @default(0)
-  profit        Float  @default(0)
+  id             String @id @default(cuid())
+  clientId       String @unique
+  client         Client @relation(fields: [clientId], references: [id])
+  annualRevenue  Float  @default(0)
+  profit         Float  @default(0)
+  monthlyRevenue Float  @default(0)
+  netProfitPct   Float  @default(0)
+  closeRatePct   Float  @default(0)
 }
 
 model Contract {

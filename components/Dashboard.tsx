@@ -38,6 +38,9 @@ interface Contract {
 interface Goal {
   annualRevenue: number
   profit: number
+  monthlyRevenue: number
+  netProfitPct: number
+  closeRatePct: number
 }
 
 interface Payment {
@@ -50,6 +53,7 @@ type ClientStatus = "potential" | "active" | "paused"
 
 interface Props {
   clientId: string
+  clientSlug: string
   clientName: string
   metrics: Metric[]
   contracts: Contract[]
@@ -103,7 +107,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate }: Props) {
+export default function Dashboard({ clientId, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate }: Props) {
   const router = useRouter()
   const [range, setRange] = useState<3 | 6 | 12>(3)
   const [selectedCard, setSelectedCard] = useState<CardKey>("contractMRR")
@@ -124,10 +128,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   const [payments, setPayments] = useState<Payment[]>(paymentsProp ?? [])
   const [newMonth, setNewMonth] = useState("")
   const [addingMonthSaving, setAddingMonthSaving] = useState(false)
-  const [currentGoal, setCurrentGoal] = useState(goal)
-  const [editingGoal, setEditingGoal] = useState(false)
-  const [goalForm, setGoalForm] = useState({ annualRevenue: String(goal?.annualRevenue ?? ""), profit: String(goal?.profit ?? "") })
-  const [goalSaving, setGoalSaving] = useState(false)
+  const [currentGoal] = useState(goal)
   // Pin metric cards to current month (or most recent past month with data)
   const [cardMonth, setCardMonth] = useState(() => {
     const now = new Date().toISOString().slice(0, 7)
@@ -168,23 +169,6 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
 
   function handlePaymentsChange(updated: Payment[]) {
     setPayments(updated)
-  }
-
-  async function handleGoalSave(e: React.FormEvent) {
-    e.preventDefault()
-    const annualRevenue = parseFloat(goalForm.annualRevenue) || 0
-    const profit = parseFloat(goalForm.profit) || 0
-    setGoalSaving(true)
-    const res = await fetch(`/api/clients/${clientId}/goal`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ annualRevenue, profit }),
-    })
-    setGoalSaving(false)
-    if (res.ok) {
-      setCurrentGoal({ annualRevenue, profit })
-      setEditingGoal(false)
-    }
   }
 
   function handleBulkMetricImport(imported: typeof rawMetrics) {
@@ -383,10 +367,17 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   // Goals
   const mrr = currentMRR(contractRows, currentYM)
   const booked = bookedAhead(contractRows, currentYM)
-  const mrrTarget = currentGoal ? mrrGoal(currentGoal.annualRevenue) : 0
-  const mrrPct = currentGoal ? goalProgress(mrr, mrrTarget) : 0
-  const npPct = currentGoal && latest
-    ? goalProgress(latest.netProfit, currentGoal.profit / 12)
+  const mrrTarget = currentGoal
+    ? (currentGoal.monthlyRevenue > 0 ? currentGoal.monthlyRevenue : mrrGoal(currentGoal.annualRevenue))
+    : 0
+  const mrrPct = currentGoal && mrrTarget > 0 ? goalProgress(mrr, mrrTarget) : 0
+  const monthlyProfitTarget = currentGoal
+    ? (currentGoal.netProfitPct > 0 && mrrTarget > 0
+      ? mrrTarget * (currentGoal.netProfitPct / 100)
+      : currentGoal.profit / 12)
+    : 0
+  const npPct = currentGoal && latest && monthlyProfitTarget > 0
+    ? goalProgress(latest.netProfit, monthlyProfitTarget)
     : 0
   const activeContracts = contracts.filter(c => c.status === "active")
   const avgContractSize = activeContracts.length
@@ -603,38 +594,15 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#9C9590", letterSpacing: "0.05em", textTransform: "uppercase" }}>Goals</div>
-          {!editingGoal && (
-            <button onClick={() => { setGoalForm({ annualRevenue: String(currentGoal?.annualRevenue ?? ""), profit: String(currentGoal?.profit ?? "") }); setEditingGoal(true) }}
-              style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>
-              {currentGoal ? "Edit" : "Set goals"}
-            </button>
-          )}
+          <a href={`/clients/${clientSlug}/goals`}
+            style={{ fontSize: 11, color: "#9C9590", textDecoration: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px" }}>
+            {currentGoal && mrrTarget > 0 ? "Edit goals" : "Set goals"}
+          </a>
         </div>
-        {editingGoal ? (
-          <form onSubmit={handleGoalSave} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 10, alignItems: "flex-end" }}>
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Annual Revenue Goal ($)</label>
-              <input style={{ padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none" }}
-                type="number" min={0} value={goalForm.annualRevenue} onChange={e => setGoalForm(f => ({ ...f, annualRevenue: e.target.value }))} autoFocus placeholder="e.g. 500000" />
-            </div>
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Annual Profit Goal ($)</label>
-              <input style={{ padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none" }}
-                type="number" min={0} value={goalForm.profit} onChange={e => setGoalForm(f => ({ ...f, profit: e.target.value }))} placeholder="e.g. 150000" />
-            </div>
-            <button type="submit" disabled={goalSaving}
-              style={{ padding: "7px 16px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-              {goalSaving ? "Saving…" : "Save"}
-            </button>
-            <button type="button" onClick={() => setEditingGoal(false)}
-              style={{ padding: "7px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
-              Cancel
-            </button>
-          </form>
-        ) : currentGoal ? (
+        {currentGoal && mrrTarget > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24 }}>
             <GoalItem label="Monthly Revenue" current={mrr} target={mrrTarget} pct={mrrPct} fmt="currency" />
-            <GoalItem label="Net Profit / Mo" current={latest?.netProfit ?? 0} target={currentGoal.profit / 12} pct={npPct} fmt="currency" />
+            <GoalItem label="Net Profit / Mo" current={latest?.netProfit ?? 0} target={monthlyProfitTarget} pct={npPct} fmt="currency" />
             <div>
               <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 4 }}>Booked ahead</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(booked)}</div>
@@ -643,7 +611,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
           </div>
         ) : (
           <div style={{ fontSize: 13, color: "#9C9590" }}>
-            No goals set yet. Click "Set goals" to track progress toward a revenue and profit target.
+            No goals set yet. <a href={`/clients/${clientSlug}/goals`} style={{ color: "#E9532A", textDecoration: "none" }}>Set goals →</a>
           </div>
         )}
       </div>

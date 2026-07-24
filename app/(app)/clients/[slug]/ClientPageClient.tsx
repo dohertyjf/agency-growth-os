@@ -7,6 +7,7 @@ import ReconciliationTable from "./ReconciliationTable"
 import AccountsPanel from "./AccountsPanel"
 import ProductsPanel from "./ProductsPanel"
 import ProgressPanel from "./ProgressPanel"
+import GoalsPanel from "./GoalsPanel"
 
 interface Metric {
   id: string
@@ -57,6 +58,9 @@ interface Payment {
 interface Goal {
   annualRevenue: number
   profit: number
+  monthlyRevenue: number
+  netProfitPct: number
+  closeRatePct: number
 }
 
 interface Product {
@@ -72,7 +76,7 @@ interface RoadmapItem {
   status: "none" | "red" | "yellow" | "green"
 }
 
-type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress" | "products"
+type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress" | "products" | "goals"
 
 interface Props {
   clientId: string
@@ -100,6 +104,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "reconciliation", label: "Reconciliation" },
   { key: "progress", label: "Progress" },
   { key: "products", label: "Products" },
+  { key: "goals", label: "Goals & Constants" },
 ]
 
 export default function ClientPageClient({
@@ -161,6 +166,7 @@ export default function ClientPageClient({
       {currentTab === "dashboard" && (
         <Dashboard
           clientId={clientId}
+          clientSlug={clientSlug}
           clientName={clientName}
           metrics={metrics}
           contracts={contracts}
@@ -214,6 +220,13 @@ export default function ClientPageClient({
           clientId={clientId}
           initialProducts={clientProducts}
           onProductsChange={setClientProducts}
+        />
+      )}
+
+      {currentTab === "goals" && (
+        <GoalsPanel
+          clientId={clientId}
+          initialGoal={goal}
         />
       )}
     </div>
