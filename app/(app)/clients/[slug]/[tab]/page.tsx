@@ -19,13 +19,14 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   const id = client.id
 
-  const [metrics, goal, contracts, accountMonths, payments, accounts] = await Promise.all([
+  const [metrics, goal, contracts, accountMonths, payments, accounts, products] = await Promise.all([
     prisma.monthlyMetric.findMany({ where: { clientId: id }, orderBy: { month: "asc" } }),
     prisma.goal.findUnique({ where: { clientId: id } }),
     prisma.contract.findMany({ where: { clientId: id }, orderBy: { start: "asc" } }),
     prisma.accountMonth.findMany({ where: { contract: { clientId: id } } }),
     prisma.contractPayment.findMany({ where: { contract: { clientId: id } } }),
     prisma.account.findMany({ where: { clientId: id }, orderBy: { name: "asc" } }),
+    prisma.product.findMany({ orderBy: { createdAt: "asc" } }),
   ])
 
   return (
@@ -43,6 +44,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
       goal={goal}
+      products={products.map(p => ({ id: p.id, name: p.name, type: p.type, monthly: p.monthly }))}
     />
   )
 }

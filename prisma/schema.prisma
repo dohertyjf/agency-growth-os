@@ -171,6 +171,15 @@ model IntakeSubmission {
   createdAt DateTime @default(now())
 }
 
+model Product {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  type        ContractType @default(retainer)
+  monthly     Float
+  createdAt   DateTime     @default(now())
+}
+
 model InviteToken {
   id        String   @id @default(cuid())
   email     String

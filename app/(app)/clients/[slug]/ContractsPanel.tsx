@@ -18,10 +18,18 @@ interface Account {
   name: string
 }
 
+interface Product {
+  id: string
+  name: string
+  type: string
+  monthly: number
+}
+
 interface Props {
   clientId: string
   initialContracts: Contract[]
   accounts?: Account[]
+  products?: Product[]
   onContractsChange?: (contracts: Contract[]) => void
   onAccountCreated?: (account: Account) => void
 }
@@ -580,7 +588,7 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
   )
 }
 
-export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
+export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
   const [adding, setAdding] = useState(false)
@@ -683,6 +691,22 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
 
       {adding && (
         <form onSubmit={handleAdd} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: 16, marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          {products && products.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 10, borderBottom: "1px solid #ECE7DE" }}>
+              <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, whiteSpace: "nowrap" }}>Start from product:</span>
+              <select
+                style={{ fontSize: 12, border: "1px solid #ECE7DE", borderRadius: 6, padding: "4px 8px", color: "#1A1916", background: "#fff", outline: "none", cursor: "pointer" }}
+                value=""
+                onChange={e => {
+                  const p = products.find(p => p.id === e.target.value)
+                  if (p) setForm(f => ({ ...f, name: p.name, type: p.type as ContractTypeField, monthly: String(p.monthly) }))
+                }}
+              >
+                <option value="">— Select a product —</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Project Name</label>

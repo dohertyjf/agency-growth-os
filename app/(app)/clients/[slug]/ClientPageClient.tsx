@@ -58,6 +58,13 @@ interface Goal {
   profit: number
 }
 
+interface Product {
+  id: string
+  name: string
+  type: string
+  monthly: number
+}
+
 type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress"
 
 interface Props {
@@ -74,6 +81,7 @@ interface Props {
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
   goal: Goal | null
+  products: Product[]
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -87,7 +95,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, clientSlug, clientName, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -154,6 +162,7 @@ export default function ClientPageClient({
           clientId={clientId}
           initialAccounts={accounts}
           contracts={contracts}
+          products={products}
           onAccountsChange={setAccounts}
           onContractAccountChange={handleContractAccountChange}
           onContractCreated={contract => setContracts(prev => [...prev, contract])}
@@ -165,6 +174,7 @@ export default function ClientPageClient({
           clientId={clientId}
           initialContracts={initialContracts}
           accounts={accounts}
+          products={products}
           onContractsChange={updated => setContracts(updated)}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
         />

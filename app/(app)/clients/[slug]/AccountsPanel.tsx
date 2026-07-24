@@ -23,10 +23,18 @@ interface Contract {
 type ContractStatus = "potential" | "active" | "finished"
 type ContractType = "retainer" | "oneoff"
 
+interface Product {
+  id: string
+  name: string
+  type: string
+  monthly: number
+}
+
 interface Props {
   clientId: string
   initialAccounts: Account[]
   contracts: Contract[]
+  products?: Product[]
   onAccountsChange: (accounts: Account[]) => void
   onContractAccountChange: (contractId: string, accountId: string | null) => void
   onContractCreated?: (contract: Contract) => void
@@ -162,7 +170,7 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
   )
 }
 
-export default function AccountsPanel({ clientId, initialAccounts, contracts, onAccountsChange, onContractAccountChange, onContractCreated }: Props) {
+export default function AccountsPanel({ clientId, initialAccounts, contracts, products, onAccountsChange, onContractAccountChange, onContractCreated }: Props) {
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -412,6 +420,22 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, on
                 )}
                 {!isEditing && addingProjectForAccount === account.id && (
                   <form onSubmit={e => handleAddProject(e, account.id)} style={{ padding: "10px 14px", borderTop: "1px solid #F5F1EC", background: "#FDFCFA", display: "flex", flexDirection: "column", gap: 8 }}>
+                    {products && products.length > 0 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 8, borderBottom: "1px solid #F0EDE8" }}>
+                        <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, whiteSpace: "nowrap" }}>Start from product:</span>
+                        <select
+                          style={{ fontSize: 12, border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 8px", color: "#1A1916", background: "#fff", outline: "none", cursor: "pointer" }}
+                          value=""
+                          onChange={e => {
+                            const p = products.find(p => p.id === e.target.value)
+                            if (p) setProjectForm(f => ({ ...f, name: p.name, type: p.type as ContractType, monthly: String(p.monthly) }))
+                          }}
+                        >
+                          <option value="">— Select a product —</option>
+                          {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </div>
+                    )}
                     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 8 }}>
                       <div>
                         <label style={labelStyle}>Project Name</label>
