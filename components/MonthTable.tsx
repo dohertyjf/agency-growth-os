@@ -255,8 +255,8 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
     const newClients = r.newClients ?? 0
     return {
       grossProfit: grossProfit(r.revenue ?? 0, r.salaries ?? 0),
-      netProfit: netProfit(r.revenue ?? 0, r.salaries ?? 0, r.software ?? 0, r.totalExpenses ?? 0),
-      netMargin: netMargin(r.revenue ?? 0, r.salaries ?? 0, r.software ?? 0, r.totalExpenses ?? 0),
+      netProfit: netProfit(r.revenue ?? 0, r.totalExpenses ?? 0),
+      netMargin: netMargin(r.revenue ?? 0, r.totalExpenses ?? 0),
       closeRate: leads > 0 ? (newClients / leads) * 100 : 0,
     }
   }, [data])

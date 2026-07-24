@@ -4,12 +4,11 @@
 export function grossProfit(revenue: number, salaries: number) {
   return revenue - salaries
 }
-export function netProfit(revenue: number, salaries: number, software: number, totalExpenses: number) {
-  return revenue - salaries - software - totalExpenses
+export function netProfit(revenue: number, totalExpenses: number) {
+  return revenue - totalExpenses
 }
-export function netMargin(revenue: number, salaries: number, software: number, totalExpenses: number) {
-  const net = revenue - salaries - software - totalExpenses
-  return revenue > 0 ? (net / revenue) * 100 : 0
+export function netMargin(revenue: number, totalExpenses: number) {
+  return revenue > 0 ? ((revenue - totalExpenses) / revenue) * 100 : 0
 }
 export function momDelta(curr: number, prev: number) {
   if (prev === 0) return curr === 0 ? 0 : 100
@@ -135,9 +134,9 @@ export function projectMetric(
   const revs = futureYMs.map(ym => bookedActive(contracts, ym))
 
   if (metric === "revenue") return revs
-  if (metric === "netProfit") return revs.map(r => r - latestSalaries - latestSoftware - latestTotalExpenses)
+  if (metric === "netProfit") return revs.map(r => r - latestTotalExpenses)
   if (metric === "grossProfit") return revs.map(r => r - latestSalaries)
-  if (metric === "netMargin") return revs.map(r => r > 0 ? ((r - latestSalaries - latestSoftware - latestTotalExpenses) / r) * 100 : 0)
+  if (metric === "netMargin") return revs.map(r => r > 0 ? ((r - latestTotalExpenses) / r) * 100 : 0)
   return []
 }
 

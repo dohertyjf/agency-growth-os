@@ -43,9 +43,9 @@ export default async function InsightsPage() {
       }
       const leads = metrics.map(m => m.leads)
       const closeRate = metrics.map(m => m.closeRate)
-      const np = metrics.map(m => netProfit(m.revenue, m.salaries, m.software, m.totalExpenses))
+      const np = metrics.map(m => netProfit(m.revenue, m.totalExpenses))
       const software = metrics.map(m => m.software)
-      const nm = metrics.map(m => netMargin(m.revenue, m.salaries, m.software, m.totalExpenses))
+      const nm = metrics.map(m => netMargin(m.revenue, m.totalExpenses))
       insights.cards = [
         {
           tone: "leverage" as const,
