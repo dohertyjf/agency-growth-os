@@ -3,7 +3,7 @@ import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import MetricCard from "./MetricCard"
 import MetricChart, { ChartPoint } from "./MetricChart"
-import MonthTable from "./MonthTable"
+import MonthTable, { BulkMetricsModal } from "./MonthTable"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
   projectMetric, ymAdd, ymLabel, currentMRR, bookedActive, bookedPotential, bookedAhead,
@@ -109,6 +109,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   const [deleting, setDeleting] = useState(false)
   const [rawMetrics, setRawMetrics] = useState(rawMetricsProp)
   const [addingMonth, setAddingMonth] = useState(false)
+  const [bulkMetricsOpen, setBulkMetricsOpen] = useState(false)
   const [newMonth, setNewMonth] = useState("")
   const [addingMonthSaving, setAddingMonthSaving] = useState(false)
   // Pin metric cards to current month (or most recent past month with data)
@@ -536,10 +537,23 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
               </button>
             </form>
           ) : (
-            <button onClick={() => setAddingMonth(true)}
-              style={{ padding: "5px 14px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#6B6760" }}>
-              + Add Month
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setBulkMetricsOpen(true)}
+                style={{ padding: "5px 14px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#6B6760" }}>
+                Bulk Import
+              </button>
+              <button onClick={() => setAddingMonth(true)}
+                style={{ padding: "5px 14px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#6B6760" }}>
+                + Add Month
+              </button>
+            </div>
+          )}
+          {bulkMetricsOpen && (
+            <BulkMetricsModal
+              clientId={clientId}
+              onClose={() => setBulkMetricsOpen(false)}
+              onImport={rows => { handleBulkMetricImport(rows); setBulkMetricsOpen(false) }}
+            />
           )}
         </div>
         <MonthTable

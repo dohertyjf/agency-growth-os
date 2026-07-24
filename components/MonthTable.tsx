@@ -86,7 +86,7 @@ function fmtPreview(v: number, col: number): string {
   return v === 0 ? "—" : String(Math.round(v))
 }
 
-function BulkMetricsModal({ clientId, onClose, onImport }: {
+export function BulkMetricsModal({ clientId, onClose, onImport }: {
   clientId: string
   onClose: () => void
   onImport: (rows: StoredRow[]) => void
@@ -248,7 +248,6 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
     return m
   })
   const [saving, setSaving] = useState<Record<string, boolean>>({})
-  const [bulkOpen, setBulkOpen] = useState(false)
 
   const getDerived = useCallback((month: string) => {
     const r = data[month] ?? {}
@@ -282,23 +281,8 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
     }
   }
 
-  const bulkButton = (
-    <button
-      onClick={() => setBulkOpen(true)}
-      style={{ padding: "5px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "#6B6760", cursor: "pointer" }}
-    >
-      Bulk Import
-    </button>
-  )
-
   if (!months.length) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {bulkOpen && <BulkMetricsModal clientId={clientId} onClose={() => setBulkOpen(false)} onImport={rows => { onBulkImport?.(rows); setBulkOpen(false) }} />}
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>{bulkButton}</div>
-        <div style={{ color: "#9C9590", fontSize: 14, padding: 16 }}>No monthly data yet.</div>
-      </div>
-    )
+    return <div style={{ color: "#9C9590", fontSize: 14, padding: 16 }}>No monthly data yet.</div>
   }
 
   const thStyle: React.CSSProperties = {
@@ -331,9 +315,6 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-    {bulkOpen && <BulkMetricsModal clientId={clientId} onClose={() => setBulkOpen(false)} onImport={rows => { onBulkImport?.(rows); setBulkOpen(false) }} />}
-    <div style={{ display: "flex", justifyContent: "flex-end" }}>{bulkButton}</div>
     <div style={{ overflowX: "auto", border: "1px solid #ECE7DE", borderRadius: 10, background: "#fff" }}>
       <table style={{ borderCollapse: "collapse", width: "100%", minWidth: "max-content" }}>
         <thead>
@@ -403,7 +384,6 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
           ))}
         </tbody>
       </table>
-    </div>
     </div>
   )
 }
