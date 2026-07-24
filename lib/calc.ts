@@ -72,7 +72,7 @@ export function calcIntake(d: IntakeData): IntakeCalc {
 export interface ContractRow {
   monthly: number
   start: string
-  contractedThrough: string
+  contractedThrough: string | null  // null = ongoing retainer
   status: "active" | "potential"
   type?: "retainer" | "oneoff"
 }
@@ -85,17 +85,18 @@ export function ymDiff(a: string, b: string) {
 
 export function bookedActive(contracts: ContractRow[], ym: string) {
   return contracts
-    .filter(c => c.status !== "potential" && c.start <= ym && c.contractedThrough >= ym)
+    .filter(c => c.status !== "potential" && c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym))
     .reduce((s, c) => s + c.monthly, 0)
 }
 
 export function bookedPotential(contracts: ContractRow[], ym: string) {
   return contracts
-    .filter(c => c.status === "potential" && c.start <= ym && c.contractedThrough >= ym)
+    .filter(c => c.status === "potential" && c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym))
     .reduce((s, c) => s + c.monthly, 0)
 }
 
 export function monthsRemaining(contract: ContractRow, now: string) {
+  if (contract.contractedThrough === null) return Infinity
   return Math.max(0, ymDiff(now, contract.contractedThrough))
 }
 
@@ -103,8 +104,8 @@ export function bookedAhead(contracts: ContractRow[], now: string) {
   return contracts
     .filter(c => c.status !== "potential")
     .reduce((s, c) => {
-      // One-offs count their full amount once if not yet past
-      if (c.type === "oneoff") return s + (c.contractedThrough >= now ? c.monthly : 0)
+      if (c.type === "oneoff") return s + ((c.contractedThrough ?? now) >= now ? c.monthly : 0)
+      if (c.contractedThrough === null) return s  // ongoing — infinite, exclude from booked total
       return s + c.monthly * monthsRemaining(c, now)
     }, 0)
 }

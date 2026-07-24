@@ -27,7 +27,7 @@ const schema = z.object({
   name: z.string().min(1),
   monthly: z.number().min(0),
   start: z.string().regex(/^\d{4}-\d{2}$/),
-  contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
   status: z.enum(["potential", "active", "finished"]).default("potential"),
   type: z.enum(["retainer", "oneoff"]).default("retainer"),
   accountId: z.string().nullable().optional(),
@@ -46,8 +46,8 @@ export async function POST(
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
   const data = parsed.data
-  // One-offs: contractedThrough must equal start
-  const contractedThrough = data.type === "oneoff" ? data.start : (data.contractedThrough ?? data.start)
+  // One-offs: contractedThrough = start; ongoing retainers: null
+  const contractedThrough = data.type === "oneoff" ? data.start : (data.contractedThrough ?? null)
 
   const contract = await prisma.contract.create({
     data: { clientId: id, ...data, contractedThrough },

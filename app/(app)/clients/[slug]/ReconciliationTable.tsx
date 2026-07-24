@@ -7,7 +7,7 @@ interface Contract {
   name: string
   monthly: number
   start: string
-  contractedThrough: string
+  contractedThrough: string | null
   status: string
   type: string
 }
@@ -71,7 +71,7 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
   const activeContracts = contracts.filter(c => c.status === "active" || c.status === "finished")
   if (activeContracts.length === 0) return null
 
-  const allEnds = activeContracts.map(c => c.contractedThrough)
+  const allEnds = activeContracts.map(c => c.contractedThrough ?? now)
   const rangeEnd = [now, ...allEnds].reduce((a, b) => a > b ? a : b)
 
   const windowStart = range === "all"
@@ -95,7 +95,7 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
   }
 
   function contractActiveInMonth(c: Contract, month: string) {
-    return c.start <= month && c.contractedThrough >= month
+    return c.start <= month && (c.contractedThrough === null || c.contractedThrough >= month)
   }
 
   async function handleSave(contractId: string, month: string, rawValue: string) {

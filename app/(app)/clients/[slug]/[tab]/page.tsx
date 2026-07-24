@@ -40,7 +40,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialStartDate={client.startDate ?? null}
       initialEndDate={client.endDate ?? null}
       metrics={metrics}
-      initialContracts={contracts.map(c => ({ ...c, accountId: c.accountId ?? null }))}
+      initialContracts={contracts.map(c => ({ ...c, accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null }))}
       initialAccounts={accounts.map(a => ({ id: a.id, name: a.name, contactName: a.contactName, contactEmail: a.contactEmail, notes: a.notes }))}
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}

@@ -1,13 +1,13 @@
 "use client"
 import { useState } from "react"
-import { fmtCurrency, ymLabel, bookedAhead, currentMRR, type ContractRow } from "@/lib/calc"
+import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, type ContractRow } from "@/lib/calc"
 
 interface Contract {
   id: string
   name: string
   monthly: number
   start: string
-  contractedThrough: string
+  contractedThrough: string | null
   status: string
   type: string
   accountId?: string | null
@@ -56,7 +56,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-type ContractTypeField = "retainer" | "oneoff"
+type ContractTypeField = "retainer" | "ongoing" | "oneoff"
 
 // ── Account combobox ─────────────────────────────────────────────────────────
 
@@ -372,13 +372,14 @@ interface EditForm {
 }
 
 function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
+  const uiType: ContractTypeField = !contract.contractedThrough && contract.type === "retainer" ? "ongoing" : (contract.type as ContractTypeField) ?? "retainer"
   const [form, setForm] = useState<EditForm>({
     name: "",
     monthly: String(contract.monthly),
     start: contract.start,
-    contractedThrough: contract.contractedThrough,
+    contractedThrough: contract.contractedThrough ?? "",
     status: "potential" as ContractStatus,
-    type: (contract.type as ContractTypeField) ?? "retainer",
+    type: uiType,
     accountId: contract.accountId ?? null,
   })
   const [saving, setSaving] = useState(false)
@@ -388,10 +389,18 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
     e.preventDefault()
     setSaving(true)
     setError(null)
+    const isOngoing = form.type === "ongoing"
+    const payload = {
+      ...form,
+      monthly: parseFloat(form.monthly),
+      type: isOngoing ? "retainer" : form.type,
+      contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
+      accountId: form.accountId || undefined,
+    }
     const res = await fetch(`/api/clients/${clientId}/contracts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, monthly: parseFloat(form.monthly), accountId: form.accountId || undefined }),
+      body: JSON.stringify(payload),
     })
     setSaving(false)
     if (!res.ok) { setError("Failed to save"); return }
@@ -416,6 +425,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
               <label style={labelStyle}>Type</label>
               <select style={inputStyle} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as ContractTypeField }))}>
                 <option value="retainer">Retainer</option>
+                <option value="ongoing">Retainer – Ongoing</option>
                 <option value="oneoff">One-off</option>
               </select>
             </div>
@@ -452,15 +462,17 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
               <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" ? "1fr" : "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start</label>
                 <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
               </div>
-              <div>
-                <label style={labelStyle}>Through</label>
-                <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
-              </div>
+              {form.type === "retainer" && (
+                <div>
+                  <label style={labelStyle}>Through</label>
+                  <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                </div>
+              )}
             </div>
           )}
           {error && <div style={{ fontSize: 13, color: "#C2410C" }}>{error}</div>}
@@ -481,13 +493,14 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
 }
 
 function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
+  const uiType: ContractTypeField = !contract.contractedThrough && contract.type === "retainer" ? "ongoing" : (contract.type as ContractTypeField) ?? "retainer"
   const [form, setForm] = useState<EditForm>({
     name: contract.name,
     monthly: String(contract.monthly),
     start: contract.start,
-    contractedThrough: contract.contractedThrough,
+    contractedThrough: contract.contractedThrough ?? "",
     status: contract.status as ContractStatus,
-    type: (contract.type as ContractTypeField) ?? "retainer",
+    type: uiType,
     accountId: contract.accountId ?? null,
   })
   const [saving, setSaving] = useState(false)
@@ -497,10 +510,18 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
     e.preventDefault()
     setSaving(true)
     setError(null)
+    const isOngoing = form.type === "ongoing"
+    const payload = {
+      ...form,
+      monthly: parseFloat(form.monthly),
+      type: isOngoing ? "retainer" : form.type,
+      contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
+      accountId: form.accountId,
+    }
     const res = await fetch(`/api/contracts/${contract.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, monthly: parseFloat(form.monthly), accountId: form.accountId }),
+      body: JSON.stringify(payload),
     })
     setSaving(false)
     if (!res.ok) { setError("Failed to save"); return }
@@ -524,6 +545,7 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
               <label style={labelStyle}>Type</label>
               <select style={inputStyle} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as ContractTypeField }))}>
                 <option value="retainer">Retainer</option>
+                <option value="ongoing">Retainer – Ongoing</option>
                 <option value="oneoff">One-off</option>
               </select>
             </div>
@@ -560,15 +582,17 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
               <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" ? "1fr" : "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start</label>
                 <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
               </div>
-              <div>
-                <label style={labelStyle}>Through</label>
-                <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
-              </div>
+              {form.type === "retainer" && (
+                <div>
+                  <label style={labelStyle}>Through</label>
+                  <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                </div>
+              )}
             </div>
           )}
           {error && <div style={{ fontSize: 13, color: "#C2410C" }}>{error}</div>}
@@ -623,10 +647,17 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
+    const isOngoing = form.type === "ongoing"
+    const payload = {
+      ...form,
+      monthly: parseFloat(form.monthly),
+      type: isOngoing ? "retainer" : form.type,
+      contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
+    }
     const res = await fetch(`/api/clients/${clientId}/contracts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, monthly: parseFloat(form.monthly) }),
+      body: JSON.stringify(payload),
     })
     const data = await res.json()
     if (res.ok) {
@@ -716,6 +747,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Type</label>
               <select style={{ ...inputStyle, background: "#FBFAF7" }} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as ContractTypeField }))}>
                 <option value="retainer">Retainer</option>
+                <option value="ongoing">Retainer – Ongoing</option>
                 <option value="oneoff">One-off</option>
               </select>
             </div>
@@ -735,7 +767,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               Save
             </button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: form.type === "oneoff" ? "1fr 1fr 2fr" : "1fr 1fr 1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: form.type === "retainer" ? "1fr 1fr 1fr 1fr" : "1fr 1fr 2fr", gap: 8 }}>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Account</label>
               <AccountCombobox
@@ -757,10 +789,12 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
                   <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Start</label>
                   <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
                 </div>
-                <div>
-                  <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Through</label>
-                  <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
-                </div>
+                {form.type === "retainer" && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Through</label>
+                    <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -852,7 +886,11 @@ function ContractSection({ title, contracts, onEdit, onDelete, onDuplicate, dimm
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</div>
               <div style={{ fontSize: 11, color: "#9C9590" }}>
-                {isOneoff ? ymLabel(c.start) : `${ymLabel(c.start)} – ${ymLabel(c.contractedThrough)}`}
+                {isOneoff
+                  ? ymLabel(c.start)
+                  : c.contractedThrough
+                  ? `${ymLabel(c.start)} – ${ymLabel(c.contractedThrough)}`
+                  : `${ymLabel(c.start)} – Ongoing`}
               </div>
             </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }}>
@@ -883,10 +921,13 @@ function ContractSection({ title, contracts, onEdit, onDelete, onDuplicate, dimm
 function ContractGantt({ contracts, now, showAll, onToggleShowAll }: { contracts: Contract[]; now: string; showAll: boolean; onToggleShowAll: () => void }) {
   if (!contracts.length) return null
 
-  const allYMs = contracts.flatMap(c => [c.start, c.contractedThrough])
+  const allYMs = contracts.flatMap(c => [c.start, ...(c.contractedThrough ? [c.contractedThrough] : [])])
   allYMs.push(now)
   const minYM = allYMs.reduce((a, b) => a < b ? a : b)
-  const maxYM = allYMs.reduce((a, b) => a > b ? a : b)
+  const hasOngoing = contracts.some(c => !c.contractedThrough)
+  const maxYM = hasOngoing
+    ? ymAdd(allYMs.reduce((a, b) => a > b ? a : b), 6)
+    : allYMs.reduce((a, b) => a > b ? a : b)
 
   const toMonths = (ym: string) => {
     const [y, m] = ym.split("-").map(Number)
@@ -935,16 +976,19 @@ function ContractGantt({ contracts, now, showAll, onToggleShowAll }: { contracts
           </div>
         ))}
         {contracts.map((c, i) => {
+          const isOngoing = !c.contractedThrough
+          const effectiveThrough = c.contractedThrough ?? maxYM
           const left = ((toMonths(c.start) - startMo) / totalMo) * 100
-          const width = ((toMonths(c.contractedThrough) - toMonths(c.start) + 1) / totalMo) * 100
+          const width = ((toMonths(effectiveThrough) - toMonths(c.start) + 1) / totalMo) * 100
           return (
             <div key={c.id} style={{
               position: "absolute", top: AXIS_H + i * ROW_H + 4, left: `${left}%`, width: `${width}%`,
               height: BAR_H, background: ganttColor[c.status] ?? "#F5C4B4",
-              borderRadius: 4, opacity: 0.85, display: "flex", alignItems: "center",
+              borderRadius: isOngoing ? "4px 0 0 4px" : 4, opacity: 0.85, display: "flex", alignItems: "center",
               paddingLeft: 6, overflow: "hidden",
             }}>
-              <span style={{ fontSize: 9, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</span>
+              <span style={{ fontSize: 9, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{c.name}</span>
+              {isOngoing && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, paddingRight: 4, flexShrink: 0 }}>→</span>}
             </div>
           )
         })}

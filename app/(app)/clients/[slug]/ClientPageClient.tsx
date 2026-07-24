@@ -28,7 +28,7 @@ interface Contract {
   name: string
   monthly: number
   start: string
-  contractedThrough: string
+  contractedThrough: string | null
   status: string
   type: string
   accountId?: string | null

@@ -15,14 +15,14 @@ interface Contract {
   name: string
   monthly: number
   start: string
-  contractedThrough: string
+  contractedThrough: string | null
   status: string
   type: string
   accountId?: string | null
 }
 
 type ContractStatus = "potential" | "active" | "finished"
-type ContractType = "retainer" | "oneoff"
+type ContractType = "retainer" | "ongoing" | "oneoff"
 
 interface Product {
   id: string
@@ -254,16 +254,17 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
   async function handleAddProject(e: React.FormEvent, accountId: string) {
     e.preventDefault()
     setProjectSaving(true)
+    const isOngoing = projectForm.type === "ongoing"
     const res = await fetch(`/api/clients/${clientId}/contracts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: projectForm.name.trim(),
-        type: projectForm.type,
+        type: isOngoing ? "retainer" : projectForm.type,
         monthly: parseFloat(projectForm.monthly),
         status: projectForm.status,
         start: projectForm.start,
-        contractedThrough: projectForm.type === "oneoff" ? projectForm.start : projectForm.contractedThrough,
+        contractedThrough: isOngoing ? null : projectForm.type === "oneoff" ? projectForm.start : projectForm.contractedThrough || null,
         accountId,
       }),
     })
@@ -448,6 +449,7 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                         <label style={labelStyle}>Type</label>
                         <select style={{ ...inputStyle, fontSize: 12 }} value={projectForm.type} onChange={e => setProjectForm(f => ({ ...f, type: e.target.value as ContractType }))}>
                           <option value="retainer">Retainer</option>
+                          <option value="ongoing">Retainer – Ongoing</option>
                           <option value="oneoff">One-off</option>
                         </select>
                       </div>
@@ -475,6 +477,9 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                           <input style={{ ...inputStyle, fontSize: 12, width: 140 }} type="month" value={projectForm.contractedThrough} onChange={e => setProjectForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
                         </div>
                       )}
+                      {projectForm.type === "ongoing" && (
+                        <div style={{ fontSize: 11, color: "#9C9590", alignSelf: "flex-end", paddingBottom: 8 }}>No end date</div>
+                      )}
                       <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
                         <button type="button" onClick={() => setAddingProjectForAccount(null)}
                           style={{ padding: "6px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 12, cursor: "pointer", color: "#6B6760" }}>
@@ -494,7 +499,11 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                       <div key={c.id} style={{ fontSize: 12, color: "#6B6760", padding: "4px 0", borderBottom: "1px solid #F5F1EC", display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontWeight: 500, color: "#1A1916" }}>{c.name}</span>
                         <span style={{ color: "#9C9590" }}>
-                          {c.type === "oneoff" ? ymLabel(c.start) : `${ymLabel(c.start)} – ${ymLabel(c.contractedThrough)}`}
+                          {c.type === "oneoff"
+                            ? ymLabel(c.start)
+                            : c.contractedThrough
+                            ? `${ymLabel(c.start)} – ${ymLabel(c.contractedThrough)}`
+                            : `${ymLabel(c.start)} – Ongoing`}
                         </span>
                         <span style={{ color: "#9C9590" }}>·</span>
                         <span style={{ fontVariantNumeric: "tabular-nums", color: "#6B6760" }}>

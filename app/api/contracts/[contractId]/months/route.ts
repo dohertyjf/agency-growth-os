@@ -22,7 +22,7 @@ async function recalculateRevenue(clientId: string, month: string) {
   let revenue = 0
   for (const c of contracts) {
     if (c.status !== "active") continue
-    if (c.start > month || c.contractedThrough < month) continue
+    if (c.start > month || (c.contractedThrough !== null && c.contractedThrough < month)) continue
     const am = c.accountMonths[0]
     revenue += am ? am.actual : c.monthly
   }

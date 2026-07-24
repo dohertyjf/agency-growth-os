@@ -29,7 +29,7 @@ interface Contract {
   name: string
   monthly: number
   start: string
-  contractedThrough: string
+  contractedThrough: string | null
   status: string
   type?: string
 }
@@ -333,7 +333,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
                .reduce((s, c) => s + c.monthly, 0)
     )
     const churnedRevenue = months.map(m =>
-      contracts.filter(c => c.contractedThrough === m && c.status !== "potential" && c.type !== "oneoff")
+      contracts.filter(c => c.contractedThrough !== null && c.contractedThrough === m && c.status !== "potential" && c.type !== "oneoff")
                .reduce((s, c) => s + c.monthly, 0)
     )
     void retainers

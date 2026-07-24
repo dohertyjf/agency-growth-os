@@ -105,7 +105,7 @@ model Contract {
   name              String
   monthly           Float
   start             String
-  contractedThrough String
+  contractedThrough String?
   status            ContractStatus @default(active)
   type              ContractType   @default(retainer)
   accountId         String?
