@@ -36,6 +36,8 @@ interface Contract {
 interface Account {
   id: string
   name: string
+  contactName?: string | null
+  contactEmail?: string | null
   notes?: string | null
 }
 

@@ -58,13 +58,15 @@ model Client {
 }
 
 model Account {
-  id        String     @id @default(cuid())
-  clientId  String
-  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  name      String
-  notes     String?
-  createdAt DateTime   @default(now())
-  contracts Contract[]
+  id           String     @id @default(cuid())
+  clientId     String
+  client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name         String
+  contactName  String?
+  contactEmail String?
+  notes        String?
+  createdAt    DateTime   @default(now())
+  contracts    Contract[]
 }
 
 model MonthlyMetric {

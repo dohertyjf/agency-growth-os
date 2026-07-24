@@ -10,6 +10,8 @@ function authorize(session: import("next-auth").Session | null, clientId: string
 
 const rowSchema = z.object({
   name: z.string().min(1),
+  contactName: z.string().optional(),
+  contactEmail: z.string().optional(),
   notes: z.string().optional(),
 })
 

@@ -21,6 +21,8 @@ export async function GET(
 
 const schema = z.object({
   name: z.string().min(1),
+  contactName: z.string().optional(),
+  contactEmail: z.string().email().optional().or(z.literal("")),
   notes: z.string().optional(),
 })
 

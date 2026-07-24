@@ -31,7 +31,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
       initialEndDate={client.endDate ?? null}
       metrics={metrics}
       initialContracts={contracts.map(c => ({ ...c, accountId: c.accountId ?? null }))}
-      initialAccounts={accounts.map(a => ({ id: a.id, name: a.name, notes: a.notes }))}
+      initialAccounts={accounts.map(a => ({ id: a.id, name: a.name, contactName: a.contactName, contactEmail: a.contactEmail, notes: a.notes }))}
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
       goal={goal}
