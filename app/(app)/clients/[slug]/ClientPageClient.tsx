@@ -78,6 +78,7 @@ interface Props {
   clientId: string
   clientSlug: string
   clientName: string
+  clientAgency: string | null
   currentTab: Tab
   initialStatus: "potential" | "active" | "paused"
   initialStartDate: string | null
@@ -102,7 +103,7 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function ClientPageClient({
-  clientId, clientSlug, clientName, currentTab,
+  clientId, clientSlug, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
   metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap,
 }: Props) {
@@ -128,6 +129,11 @@ export default function ClientPageClient({
     <div>
       <div style={{ marginBottom: 20 }}>
         <Link href="/clients" style={{ fontSize: 13, color: "#9C9590", textDecoration: "none" }}>← Clients</Link>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 32, fontWeight: 600, color: "#1A1916", margin: 0, lineHeight: 1.1 }}>{clientName}</h1>
+        {clientAgency && <div style={{ fontSize: 13, color: "#9C9590", marginTop: 4 }}>{clientAgency}</div>}
       </div>
 
       <div style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE" }}>

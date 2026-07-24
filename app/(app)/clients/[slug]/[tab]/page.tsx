@@ -35,6 +35,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       clientId={id}
       clientSlug={slug}
       clientName={client.name}
+      clientAgency={client.agency ?? null}
       currentTab={tab as Tab}
       initialStatus={client.status as "potential" | "active" | "paused"}
       initialStartDate={client.startDate ?? null}
