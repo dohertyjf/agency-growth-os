@@ -218,13 +218,14 @@ export default function MetricChart({ points, format, label, series2, series2Lab
             const flip = tx > VW * 0.65
 
             const rows: { label: string; value: number; color: string }[] = []
-            if (p1) rows.push({ label: p3 ? "MRR  " : "", value: p1.value, color: "#FF8B6A" })
-            if (p2) rows.push({ label: "", value: p2.value, color: "#93C5FD" })
-            if (p3) rows.push({ label: "Cash ", value: p3.value, color: "#2DD4BF" })
-            if (newRev) rows.push({ label: "New  ", value: newRev, color: "#4ADE80" })
+            if (p1) rows.push({ label: hasBothSeries ? "Contracted" : p3 ? "MRR" : "", value: p1.value, color: "#FF8B6A" })
+            if (p2) rows.push({ label: "Potential", value: p2.value, color: "#93C5FD" })
+            if (p3) rows.push({ label: "Cash", value: p3.value, color: "#2DD4BF" })
+            if (newRev) rows.push({ label: "New", value: newRev, color: "#4ADE80" })
             if (churnRev) rows.push({ label: "Churn", value: churnRev, color: "#F87171" })
 
-            const ttW = rows.some(r => r.label) ? 130 : 90
+            const hasLabels = rows.some(r => r.label)
+            const ttW = hasLabels ? 148 : 90
             const ttH = Math.max(22, rows.length * 17 + 8)
             const ttX = flip ? tx - ttW - 6 : tx + 8
             const ttY = ty - ttH / 2
@@ -234,9 +235,16 @@ export default function MetricChart({ points, format, label, series2, series2Lab
                 <line x1={tx} y1={PAD.top} x2={tx} y2={PAD.top + plotH} stroke="#D0C9BF" strokeWidth={1} strokeDasharray="3,2" />
                 <rect x={ttX} y={ttY} width={ttW} height={ttH} rx={4} fill="#1A1916" />
                 {rows.map((r, i) => (
-                  <text key={i} x={ttX + 8} y={ttY + 13 + i * 17} fontSize={11} fill={r.color} fontWeight="600">
-                    {r.label}{fmt(r.value, format)}
-                  </text>
+                  <g key={i}>
+                    {r.label && (
+                      <text x={ttX + 8} y={ttY + 13 + i * 17} fontSize={11} fill={r.color} fontWeight="600" opacity={0.7}>
+                        {r.label}
+                      </text>
+                    )}
+                    <text x={ttX + ttW - 8} y={ttY + 13 + i * 17} fontSize={11} fill={r.color} fontWeight="600" textAnchor="end">
+                      {fmt(r.value, format)}
+                    </text>
+                  </g>
                 ))}
               </g>
             )
