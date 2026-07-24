@@ -110,6 +110,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
   const [rawMetrics, setRawMetrics] = useState(rawMetricsProp)
   const [addingMonth, setAddingMonth] = useState(false)
   const [bulkMetricsOpen, setBulkMetricsOpen] = useState(false)
+  const [tableRange, setTableRange] = useState<3 | 6 | 12 | "all">("all")
   const [newMonth, setNewMonth] = useState("")
   const [addingMonthSaving, setAddingMonthSaving] = useState(false)
   // Pin metric cards to current month (or most recent past month with data)
@@ -516,7 +517,17 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
       {/* Month Table */}
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Monthly Metrics</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Monthly Metrics</div>
+            <div style={{ display: "flex", background: "#F5F1EC", borderRadius: 6, padding: 2, gap: 1 }}>
+              {([3, 6, 12, "all"] as const).map(n => (
+                <button key={n} onClick={() => setTableRange(n)}
+                  style={{ padding: "2px 8px", fontSize: 11, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: tableRange === n ? "#fff" : "transparent", color: tableRange === n ? "#1A1916" : "#9C9590", boxShadow: tableRange === n ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+                  {n === "all" ? "All" : `${n}mo`}
+                </button>
+              ))}
+            </div>
+          </div>
           {addingMonth ? (
             <form onSubmit={handleAddMonth} style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
@@ -559,7 +570,7 @@ export default function Dashboard({ clientId, clientName, metrics: rawMetricsPro
         <MonthTable
           key={rawMetrics.length}
           clientId={clientId}
-          months={[...rawMetrics].sort((a, b) => a.month.localeCompare(b.month))}
+          months={[...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).slice(tableRange === "all" ? 0 : -tableRange)}
           onUpdate={handleMetricUpdate}
           onBulkImport={handleBulkMetricImport}
         />
