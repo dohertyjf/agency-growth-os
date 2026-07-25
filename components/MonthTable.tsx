@@ -266,13 +266,21 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
     const key = `${month}:${field}`
     setSaving(s => ({ ...s, [key]: true }))
     try {
+      const current = data[month] ?? {}
+      const updatedRow = { ...current, [field]: value }
+      const leads = updatedRow.leads ?? 0
+      const newClients = updatedRow.newClients ?? 0
+      const body: Record<string, number> = { [field]: value }
+      if ((field === "leads" || field === "newClients") && leads > 0) {
+        body.closeRate = (newClients / leads) * 100
+      }
       await fetch(`/api/clients/${clientId}/metrics/${month}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [field]: value }),
+        body: JSON.stringify(body),
       })
       setData(prev => {
-        const updated = { ...prev, [month]: { ...(prev[month] ?? {}), [field]: value } }
+        const updated = { ...prev, [month]: { ...(prev[month] ?? {}), ...body } }
         return updated
       })
       onUpdate?.(month, field, value)

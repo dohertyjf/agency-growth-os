@@ -35,8 +35,9 @@ export async function POST(
   if (!parsed.success) return Response.json({ error: "Invalid", details: parsed.error.flatten() }, { status: 422 })
 
   const rows = await Promise.all(
-    parsed.data.map(row =>
-      prisma.monthlyMetric.upsert({
+    parsed.data.map(row => {
+      const closeRate = row.leads > 0 ? (row.newClients / row.leads) * 100 : 0
+      return prisma.monthlyMetric.upsert({
         where: { clientId_month: { clientId: id, month: row.month } },
         update: {
           revenue: row.revenue,
@@ -47,10 +48,11 @@ export async function POST(
           leads: row.leads,
           newClients: row.newClients,
           churn: row.churn,
+          closeRate,
         },
-        create: { clientId: id, ...row, closeRate: 0 },
+        create: { clientId: id, ...row, closeRate },
       })
-    )
+    })
   )
 
   return Response.json(rows, { status: 201 })
