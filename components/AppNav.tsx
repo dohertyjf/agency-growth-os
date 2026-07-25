@@ -79,44 +79,44 @@ export default function AppNav({ role, userName }: Props) {
             ))}
           </div>
 
-          {/* Spacer on mobile so avatar stays right */}
-          <div style={{ flex: 1 }} className="appnav-links" />
+          {/* Right-side group: hamburger (mobile) + avatar */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+            {/* Hamburger — hidden on desktop via CSS */}
+            <button
+              className="appnav-hamburger"
+              onClick={() => setMenuOpen(o => !o)}
+              style={{
+                display: "none", alignItems: "center", justifyContent: "center",
+                background: "none", border: "none", cursor: "pointer",
+                padding: 6, borderRadius: 6, color: "#1A1916",
+              }}
+              aria-label="Menu"
+            >
+              {menuOpen ? (
+                <svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+                  <line x1={4} y1={4} x2={16} y2={16} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                  <line x1={16} y1={4} x2={4} y2={16} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+                  <line x1={3} y1={6} x2={17} y2={6} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                  <line x1={3} y1={10} x2={17} y2={10} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                  <line x1={3} y1={14} x2={17} y2={14} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
 
-          {/* Hamburger — hidden on desktop via CSS */}
-          <button
-            className="appnav-hamburger"
-            onClick={() => setMenuOpen(o => !o)}
-            style={{
-              display: "none", alignItems: "center", justifyContent: "center",
-              background: "none", border: "none", cursor: "pointer",
-              padding: 6, marginRight: 8, borderRadius: 6, color: "#1A1916",
-            }}
-            aria-label="Menu"
-          >
-            {menuOpen ? (
-              <svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-                <line x1={4} y1={4} x2={16} y2={16} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-                <line x1={16} y1={4} x2={4} y2={16} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-              </svg>
-            ) : (
-              <svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-                <line x1={3} y1={6} x2={17} y2={6} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-                <line x1={3} y1={10} x2={17} y2={10} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-                <line x1={3} y1={14} x2={17} y2={14} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
-
-          {/* Avatar / sign out */}
-          <button
-            onClick={() => signOut({ callbackUrl: "/auth/signin" })}
-            title="Sign out"
-            style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 8, flexShrink: 0 }}
-          >
-            <div style={{ width: 30, height: 30, background: "#1A1916", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 700 }}>
-              {initials}
-            </div>
-          </button>
+            {/* Avatar / sign out */}
+            <button
+              onClick={() => signOut({ callbackUrl: "/auth/signin" })}
+              title="Sign out"
+              style={{ display: "flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 8, flexShrink: 0 }}
+            >
+              <div style={{ width: 30, height: 30, background: "#1A1916", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 700 }}>
+                {initials}
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Mobile dropdown — hidden on desktop via CSS */}
