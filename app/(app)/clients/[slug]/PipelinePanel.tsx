@@ -165,13 +165,13 @@ interface DealCardProps {
   onAdvance: (id: string) => void
   onLost: (id: string) => void
   onRevert?: (id: string) => void
+  onEdit: (deal: Contract) => void
   fmt$: (v: number) => string
 }
 
-function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, fmt$ }: DealCardProps) {
+function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, fmt$ }: DealCardProps) {
   const accountName = deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name : null
   const daysSinceCall = daysSince(deal.callDate)
-  const daysInPotential = deal.status === "potential" ? daysSince(deal.callDate) : null
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 10, padding: "14px 16px" }}>
@@ -193,8 +193,16 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, f
             )}
           </div>
         </div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-          {fmt$(deal.monthly)}<span style={{ fontSize: 11, fontWeight: 400, color: "#9C9590" }}>/mo</span>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexShrink: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>
+            {fmt$(deal.monthly)}<span style={{ fontSize: 11, fontWeight: 400, color: "#9C9590" }}>/mo</span>
+          </div>
+          <button
+            onClick={() => onEdit(deal)}
+            style={{ padding: "2px 6px", background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#9C9590", cursor: "pointer", lineHeight: 1.4 }}
+          >
+            Edit
+          </button>
         </div>
       </div>
       <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
@@ -232,10 +240,11 @@ interface DealGroupProps {
   onAdvance: (id: string) => void
   onLost: (id: string) => void
   onRevert?: (id: string) => void
+  onEdit: (deal: Contract) => void
   fmt$: (v: number) => string
 }
 
-function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, fmt$ }: DealGroupProps) {
+function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, fmt$ }: DealGroupProps) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -253,6 +262,7 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
             onAdvance={onAdvance}
             onLost={onLost}
             onRevert={onRevert}
+            onEdit={onEdit}
             fmt$={fmt$}
           />
         ))}
@@ -276,6 +286,42 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     callDate: "",
   })
   const [addSaving, setAddSaving] = useState(false)
+  const [editDeal, setEditDeal] = useState<Contract | null>(null)
+  const [editForm, setEditForm] = useState({ name: "", monthly: "", accountId: "", callDate: "", signedDate: "" })
+  const [editSaving, setEditSaving] = useState(false)
+
+  function openEdit(deal: Contract) {
+    setEditDeal(deal)
+    setEditForm({
+      name: deal.name,
+      monthly: String(deal.monthly),
+      accountId: deal.accountId ?? "",
+      callDate: deal.callDate ?? "",
+      signedDate: deal.signedDate ?? "",
+    })
+  }
+
+  async function handleEditSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editDeal || !editForm.accountId) return
+    setEditSaving(true)
+    const res = await fetch(`/api/contracts/${editDeal.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editForm.name,
+        monthly: parseFloat(editForm.monthly) || 0,
+        accountId: editForm.accountId || null,
+        callDate: editForm.callDate || null,
+        signedDate: editForm.signedDate || null,
+      }),
+    })
+    setEditSaving(false)
+    if (!res.ok) return
+    const updated = await res.json()
+    onContractsChange(contracts.map(c => c.id === editDeal.id ? { ...c, ...updated } : c))
+    setEditDeal(null)
+  }
 
   function handleAccountCreated(account: Account) {
     setLocalAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))
@@ -381,6 +427,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           advanceLabel="→ Potential"
           onAdvance={id => updateContract(id, { status: "potential" })}
           onLost={id => updateContract(id, { status: "lost" })}
+          onEdit={openEdit}
           fmt$={fmt$}
         />
 
@@ -393,6 +440,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           onAdvance={id => updateContract(id, { status: "active", signedDate: today })}
           onLost={id => updateContract(id, { status: "lost" })}
           onRevert={id => updateContract(id, { status: "opportunity" })}
+          onEdit={openEdit}
           fmt$={fmt$}
         />
 
@@ -551,6 +599,70 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                 <button type="submit" disabled={addSaving || !addForm.accountId}
                   style={{ padding: "8px 20px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: addSaving || !addForm.accountId ? 0.5 : 1 }}>
                   {addSaving ? "Adding…" : "Add Deal"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Deal Modal */}
+      {editDeal && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={e => { if (e.target === e.currentTarget) setEditDeal(null) }}
+        >
+          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 440, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
+            <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 20px", color: "#1A1916" }}>
+              Edit Deal
+            </h3>
+            <form onSubmit={handleEditSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={labelStyle}>Deal Name</label>
+                <input style={inputStyle} value={editForm.name}
+                  onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                  required />
+              </div>
+              <div>
+                <label style={labelStyle}>Monthly Value</label>
+                <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff" }}>
+                  <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0 }}>$</span>
+                  <input
+                    style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "7px 10px 7px 4px" }}
+                    type="number" min={0} step={100} value={editForm.monthly}
+                    onChange={e => setEditForm(f => ({ ...f, monthly: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Account <span style={{ color: "#E9532A" }}>*</span></label>
+                <AccountPicker
+                  accounts={localAccounts}
+                  value={editForm.accountId}
+                  onChange={id => setEditForm(f => ({ ...f, accountId: id }))}
+                  clientId={clientId}
+                  onAccountCreated={handleAccountCreated}
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Initial Call Date</label>
+                  <input style={inputStyle} type="date" value={editForm.callDate}
+                    onChange={e => setEditForm(f => ({ ...f, callDate: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Signed Date</label>
+                  <input style={inputStyle} type="date" value={editForm.signedDate}
+                    onChange={e => setEditForm(f => ({ ...f, signedDate: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <button type="button" onClick={() => setEditDeal(null)}
+                  style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={editSaving || !editForm.accountId}
+                  style={{ padding: "8px 20px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: editSaving || !editForm.accountId ? 0.5 : 1 }}>
+                  {editSaving ? "Saving…" : "Save Changes"}
                 </button>
               </div>
             </form>
