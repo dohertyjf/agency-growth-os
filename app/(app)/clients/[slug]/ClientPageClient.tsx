@@ -156,13 +156,13 @@ export default function ClientPageClient({
         {clientAgency && <div style={{ fontSize: 13, color: "#9C9590", marginTop: 4 }}>{clientAgency}</div>}
       </div>
 
-      <div style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE" }}>
+      <div className="tab-strip" style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE", overflowX: "auto", scrollbarWidth: "none" }}>
         {TABS.map(t => (
           <Link
             key={t.key}
             href={`/clients/${clientSlug}/${t.key}`}
             style={{
-              padding: "8px 20px",
+              padding: "8px 14px",
               fontSize: 13,
               fontWeight: 600,
               borderBottom: currentTab === t.key ? "2px solid #E9532A" : "2px solid transparent",
@@ -170,6 +170,8 @@ export default function ClientPageClient({
               color: currentTab === t.key ? "#E9532A" : "#9C9590",
               textDecoration: "none",
               display: "inline-block",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               transition: "color 0.15s",
             }}
           >

@@ -27,3 +27,6 @@ textarea:focus, input:focus {
 [contenteditable]:focus {
   outline: none;
 }
+
+/* Hide scrollbar on tab strips while keeping scroll behaviour */
+.tab-strip::-webkit-scrollbar { display: none; }
