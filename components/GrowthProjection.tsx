@@ -71,7 +71,11 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   }, [metrics, now, lookback])
 
   const defaultLeads = useMemo(() => round1(avg(recentMetrics.map(m => m.leads))), [recentMetrics])
-  const defaultCloseRate = useMemo(() => round1(avg(recentMetrics.map(m => m.closeRate))), [recentMetrics])
+  const defaultCloseRate = useMemo(() => {
+    const totalLeads = recentMetrics.reduce((s, m) => s + m.leads, 0)
+    const totalNewClients = recentMetrics.reduce((s, m) => s + m.newClients, 0)
+    return totalLeads > 0 ? round1((totalNewClients / totalLeads) * 100) : 0
+  }, [recentMetrics])
   const defaultChurn = useMemo(() => round1(avg(recentMetrics.map(m => m.churn))), [recentMetrics])
 
   const [leads, setLeads] = useState(defaultLeads)
