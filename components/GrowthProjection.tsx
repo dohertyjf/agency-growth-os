@@ -29,7 +29,8 @@ function round1(n: number) { return Math.round(n * 10) / 10 }
 
 function projectMRR(
   startMRR: number, leads: number, closeRate: number,
-  avgDeal: number, churnCount: number, months: number
+  avgDeal: number, churnCount: number, months: number,
+  cap?: number
 ): number[] {
   const result: number[] = []
   let mrr = startMRR
@@ -37,20 +38,8 @@ function projectMRR(
     const newMRR = leads * (closeRate / 100) * avgDeal
     const churnedMRR = churnCount * avgDeal
     mrr = Math.max(0, mrr + newMRR - churnedMRR)
+    if (cap !== undefined) mrr = Math.min(mrr, cap)
     result.push(Math.round(mrr))
-  }
-  return result
-}
-
-function projectClients(
-  startClients: number, leads: number, closeRate: number,
-  churnCount: number, months: number
-): number[] {
-  const result: number[] = []
-  let clients = startClients
-  for (let i = 0; i < months; i++) {
-    clients = Math.max(0, clients + leads * (closeRate / 100) - churnCount)
-    result.push(Math.round(clients * 10) / 10)
   }
   return result
 }
@@ -83,6 +72,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   const [avgDeal, setAvgDeal] = useState(Math.round(avgContractSize))
   const [churn, setChurn] = useState(defaultChurn)
   const [hoursPerClient, setHoursPerClient] = useState(round1(avgContractHours))
+  const [billableHours, setBillableHours] = useState(totalCapacityHours || 0)
   const [revenueGoal, setRevenueGoal] = useState(goalMRR ?? 0)
 
   function reset() {
@@ -91,22 +81,20 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
     setAvgDeal(Math.round(avgContractSize))
     setChurn(defaultChurn)
     setHoursPerClient(round1(avgContractHours))
+    setBillableHours(totalCapacityHours || 0)
     setRevenueGoal(goalMRR ?? 0)
   }
 
+  // Capacity ceiling: max clients from billable hours → max MRR
+  const maxClients = hoursPerClient > 0 && billableHours > 0
+    ? Math.floor(billableHours / hoursPerClient)
+    : null
+  const mrrCap = maxClients !== null && avgDeal > 0 ? maxClients * avgDeal : undefined
+
   const projected = useMemo(
-    () => projectMRR(startMRR, leads, closeRate, avgDeal, churn, 12),
-    [startMRR, leads, closeRate, avgDeal, churn]
-  )
-
-  const projectedClients = useMemo(
-    () => projectClients(activeClientCount, leads, closeRate, churn, 12),
-    [activeClientCount, leads, closeRate, churn]
-  )
-
-  const projectedHours = useMemo(
-    () => projectedClients.map(c => Math.round(c * hoursPerClient * 10) / 10),
-    [projectedClients, hoursPerClient]
+    () => projectMRR(startMRR, leads, closeRate, avgDeal, churn, 12, mrrCap),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [startMRR, leads, closeRate, avgDeal, churn, mrrCap]
   )
 
   const monthLabels = useMemo(
@@ -114,12 +102,17 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
     [now]
   )
 
-  const capacityHitMonth = totalCapacityHours > 0 && hoursPerClient > 0
-    ? projectedHours.findIndex(h => h > totalCapacityHours)
+  // Month where projection hits the capacity ceiling
+  const capacityHitMonth = mrrCap !== undefined
+    ? projected.findIndex(v => v >= mrrCap)
     : -1
 
+  const currentHoursUsed = activeClientCount * hoursPerClient
+  const hoursAvailable = billableHours - currentHoursUsed
+  const slotsAvailable = hoursPerClient > 0 ? Math.floor(hoursAvailable / hoursPerClient) : null
+
   // Chart
-  const allVals = [startMRR, ...projected, revenueGoal].filter(v => v > 0)
+  const allVals = [startMRR, ...projected, revenueGoal, mrrCap ?? 0].filter(v => v > 0)
   const maxVal = allVals.length ? Math.max(...allVals) * 1.1 : 1
   const W = 520, H = 140, PL = 0, PR = 0, PT = 12, PB = 20
   const plotW = W - PL - PR
@@ -129,15 +122,12 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
 
   const pathD = projected.map((v, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(v)}`).join(" ")
   const goalY = revenueGoal > 0 ? toY(revenueGoal) : null
+  const capY = mrrCap !== undefined ? toY(mrrCap) : null
 
   const goalHitMonth = revenueGoal > 0 ? projected.findIndex(v => v >= revenueGoal) : -1
 
   const newClientsPerMonth = leads * (closeRate / 100)
   const netMRRChange = newClientsPerMonth * avgDeal - churn * avgDeal
-
-  const currentHoursUsed = activeClientCount * hoursPerClient
-  const hoursAvailable = totalCapacityHours - currentHoursUsed
-  const slotsAvailable = hoursPerClient > 0 ? Math.floor(hoursAvailable / hoursPerClient) : null
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 24 }}>
@@ -164,7 +154,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
       </div>
 
       {/* Inputs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Leads / mo</label>
           <input style={inputStyle} type="number" min={0} step={0.5} value={leads}
@@ -189,6 +179,12 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Hrs / client</label>
           <input style={inputStyle} type="number" min={0} step={0.5} value={hoursPerClient}
             onChange={e => setHoursPerClient(parseFloat(e.target.value) || 0)} />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Billable Hrs</label>
+          <input style={inputStyle} type="number" min={0} step={10} value={billableHours || ""}
+            onChange={e => setBillableHours(parseFloat(e.target.value) || 0)}
+            placeholder="0" />
         </div>
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>MRR Goal $</label>
@@ -226,13 +222,13 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
         )}
       </div>
 
-      {/* Capacity row — only shown when capacity is configured */}
-      {totalCapacityHours > 0 && hoursPerClient > 0 && (
+      {/* Capacity row — only shown when billable hours configured */}
+      {billableHours > 0 && hoursPerClient > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 14, fontSize: 11, padding: "8px 12px", background: "#F5F1EC", borderRadius: 8 }}>
           <span style={{ color: "#6B6760" }}>
             <span style={{ fontWeight: 700, color: "#1A1916" }}>{Math.round(currentHoursUsed)}</span>
             {" of "}
-            <span style={{ fontWeight: 700, color: "#1A1916" }}>{totalCapacityHours}</span>
+            <span style={{ fontWeight: 700, color: "#1A1916" }}>{billableHours}</span>
             {" hrs used now"}
           </span>
           {slotsAvailable !== null && (
@@ -244,20 +240,30 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
               {" at current hrs/client"}
             </span>
           )}
-          {capacityHitMonth >= 0 && (
-            <span style={{ color: "#C2410C", fontWeight: 600 }}>
-              · Capacity full month {capacityHitMonth + 1} ({monthLabels[capacityHitMonth]}) — need to hire or raise prices before then
+          {mrrCap !== undefined && (
+            <span style={{ color: "#6B6760" }}>
+              {"· MRR ceiling "}
+              <span style={{ fontWeight: 700, color: "#1A1916" }}>{fmtCurrency(mrrCap)}</span>
+              {maxClients !== null ? ` (${maxClients} clients)` : ""}
             </span>
-          )}
-          {capacityHitMonth === -1 && projectedClients[11] > 0 && (
-            <span style={{ color: "#6B6760" }}>· Capacity not hit in 12 months</span>
           )}
         </div>
       )}
 
-      {/* MRR Chart */}
+      {/* Chart */}
       <div style={{ overflowX: "auto" }}>
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+          {/* Capacity ceiling line */}
+          {capY !== null && mrrCap !== undefined && (
+            <>
+              <line x1={PL} y1={capY} x2={W - PR} y2={capY}
+                stroke="#6B6760" strokeWidth={1} strokeDasharray="3,3" opacity={0.4} />
+              <text x={4} y={capY - 3} fontSize={9} fill="#6B6760" textAnchor="start" opacity={0.6}>
+                Capacity ceiling {fmtCurrency(mrrCap)}
+              </text>
+            </>
+          )}
+
           {/* Goal line */}
           {goalY !== null && (
             <>
@@ -269,9 +275,6 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
             </>
           )}
 
-          {/* Start MRR dot + label */}
-          <circle cx={PL - 8} cy={toY(startMRR)} r={0} />
-
           {/* Projected path */}
           <path d={pathD} fill="none" stroke="#E9532A" strokeWidth={2} strokeDasharray="5,3" />
 
@@ -280,7 +283,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
             <line
               x1={toX(capacityHitMonth)} y1={PT}
               x2={toX(capacityHitMonth)} y2={PT + plotH}
-              stroke="#C2410C" strokeWidth={1} strokeDasharray="3,2" opacity={0.5}
+              stroke="#6B6760" strokeWidth={1} strokeDasharray="3,2" opacity={0.3}
             />
           )}
 
@@ -288,7 +291,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           {projected.map((v, i) => (
             <g key={i}>
               <circle cx={toX(i)} cy={toY(v)} r={3}
-                fill={capacityHitMonth >= 0 && i >= capacityHitMonth ? "#C2410C" : "#E9532A"}
+                fill={mrrCap !== undefined && v >= mrrCap ? "#6B6760" : "#E9532A"}
                 opacity={0.6} />
               {(i === 0 || i === 2 || i === 5 || i === 8 || i === 11) && (
                 <>
@@ -304,56 +307,6 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           ))}
         </svg>
       </div>
-
-      {/* Hours Chart — only when capacity is configured */}
-      {totalCapacityHours > 0 && hoursPerClient > 0 && (() => {
-        const HW = 520, HH = 100, HPT = 12, HPB = 20
-        const hPlotH = HH - HPT - HPB
-        const hMax = Math.max(totalCapacityHours, ...projectedHours) * 1.15
-        const hToX = (i: number) => (i / 11) * HW
-        const hToY = (v: number) => HPT + hPlotH - (v / hMax) * hPlotH
-        const capY = hToY(totalCapacityHours)
-        const hPathD = projectedHours.map((v, i) => `${i === 0 ? "M" : "L"} ${hToX(i)} ${hToY(v)}`).join(" ")
-        return (
-          <div style={{ marginTop: 12, borderTop: "1px solid #F5F1EC", paddingTop: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", marginBottom: 6 }}>
-              Projected Billable Hours
-              <span style={{ fontWeight: 400, color: "#9C9590", marginLeft: 8 }}>vs {totalCapacityHours} hrs capacity</span>
-            </div>
-            <div style={{ overflowX: "auto" }}>
-              <svg viewBox={`0 0 ${HW} ${HH}`} width="100%" style={{ display: "block" }}>
-                {/* Capacity line */}
-                <line x1={0} y1={capY} x2={HW} y2={capY}
-                  stroke="#C2410C" strokeWidth={1} strokeDasharray="4,3" opacity={0.5} />
-                <text x={HW - 4} y={capY - 3} fontSize={9} fill="#C2410C" textAnchor="end" opacity={0.7}>
-                  Capacity {totalCapacityHours} hrs
-                </text>
-
-                {/* Projected hours path */}
-                <path d={hPathD} fill="none" stroke="#E9532A" strokeWidth={2} strokeDasharray="5,3" />
-
-                {/* Dots + labels */}
-                {projectedHours.map((v, i) => (
-                  <g key={i}>
-                    <circle cx={hToX(i)} cy={hToY(v)} r={3}
-                      fill={v > totalCapacityHours ? "#C2410C" : "#E9532A"} opacity={0.6} />
-                    {(i === 0 || i === 2 || i === 5 || i === 8 || i === 11) && (
-                      <>
-                        <text x={hToX(i)} y={HH - 4} fontSize={9} fill="#9C9590" textAnchor="middle">
-                          {monthLabels[i]}
-                        </text>
-                        <text x={hToX(i)} y={hToY(v) - 5} fontSize={9} fill="#1A1916" textAnchor="middle" fontWeight="600">
-                          {Math.round(v)}h
-                        </text>
-                      </>
-                    )}
-                  </g>
-                ))}
-              </svg>
-            </div>
-          </div>
-        )
-      })()}
     </div>
   )
 }
