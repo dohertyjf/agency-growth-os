@@ -63,11 +63,13 @@ export default function MetricChart({ points, format, label, series2, series2Lab
   const dataMax = Math.max(...allVals)
   const spread = dataMax - dataMin || Math.abs(dataMax) || 1
   const rawYMin = dataMin - spread * 0.12
-  const yMin = format === "currency" ? Math.max(0, rawYMin) : rawYMin
+  // Only clamp to 0 when all data is non-negative — allow negatives to show properly
+  const yMin = dataMin >= 0 ? Math.max(0, rawYMin) : rawYMin
   // When a goal line is present, ensure 30% headroom above it so crossing is visceral
   const goalCeiling = goalValue ? goalValue * 1.3 : 0
   const yMax = Math.max(dataMax + spread * 0.12, goalCeiling)
   const yRange = yMax - yMin
+  const crossesZero = yMin < 0 && yMax > 0
 
   const refPoints = points.length ? points : (series2 ?? [])
 
@@ -137,6 +139,14 @@ export default function MetricChart({ points, format, label, series2, series2Lab
               </text>
             )
           })}
+
+          {/* Zero reference line — only shown when chart crosses zero */}
+          {crossesZero && (
+            <g>
+              <line x1={PAD.left} y1={toY(0)} x2={VW - PAD.right} y2={toY(0)} stroke="#9C9590" strokeWidth={1} strokeDasharray="3,2" opacity={0.5} />
+              <text x={PAD.left - 8} y={toY(0) + 4} textAnchor="end" fontSize={10} fill="#9C9590" opacity={0.7}>$0</text>
+            </g>
+          )}
 
           {/* Goal line */}
           {goalValue != null && goalValue > 0 && (() => {
