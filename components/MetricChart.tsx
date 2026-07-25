@@ -21,6 +21,7 @@ interface Props {
   series3?: ChartPoint[]
   series3Label?: string
   flowBars?: FlowBars
+  goalValue?: number
 }
 
 function fmt(v: number, format: "currency" | "percent" | "number"): string {
@@ -37,7 +38,7 @@ const PAD = { top: 20, right: 24, bottom: 36, left: 60 }
 const VW = 880
 const VH = 240
 
-export default function MetricChart({ points, format, label, series2, series2Label, series3, series3Label, flowBars }: Props) {
+export default function MetricChart({ points, format, label, series2, series2Label, series3, series3Label, flowBars, goalValue }: Props) {
   const [hover, setHover] = useState<number | null>(null)
 
   if (!points.length && !series2?.length) {
@@ -63,7 +64,9 @@ export default function MetricChart({ points, format, label, series2, series2Lab
   const spread = dataMax - dataMin || Math.abs(dataMax) || 1
   const rawYMin = dataMin - spread * 0.12
   const yMin = format === "currency" ? Math.max(0, rawYMin) : rawYMin
-  const yMax = dataMax + spread * 0.12
+  // When a goal line is present, ensure 30% headroom above it so crossing is visceral
+  const goalCeiling = goalValue ? goalValue * 1.3 : 0
+  const yMax = Math.max(dataMax + spread * 0.12, goalCeiling)
   const yRange = yMax - yMin
 
   const refPoints = points.length ? points : (series2 ?? [])
@@ -134,6 +137,19 @@ export default function MetricChart({ points, format, label, series2, series2Lab
               </text>
             )
           })}
+
+          {/* Goal line */}
+          {goalValue != null && goalValue > 0 && (() => {
+            const gy = toY(goalValue)
+            return (
+              <g>
+                <line x1={PAD.left} y1={gy} x2={VW - PAD.right} y2={gy} stroke="#16A34A" strokeWidth={1.5} strokeDasharray="6,4" opacity={0.7} />
+                <text x={VW - PAD.right - 4} y={gy - 5} fontSize={10} fill="#16A34A" textAnchor="end" fontWeight="600" opacity={0.85}>
+                  Goal {fmt(goalValue, format)}
+                </text>
+              </g>
+            )
+          })()}
 
           {/* Flow bars — new (green) and churned (red), drawn behind everything */}
           {flowBars && (() => {
@@ -253,7 +269,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
       </div>
 
       {/* Legend */}
-      {(hasBothSeries || hasProjected || flowBars || hasSeries3) && (
+      {(hasBothSeries || hasProjected || flowBars || hasSeries3 || (goalValue != null && goalValue > 0)) && (
         <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#9C9590", marginTop: 6, flexWrap: "wrap" }}>
           {hasBothSeries ? (
             <>
@@ -282,6 +298,12 @@ export default function MetricChart({ points, format, label, series2, series2Lab
             <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#0D9488" strokeWidth={2} /></svg>
               {series3Label ?? "Cash Collected"}
+            </span>
+          )}
+          {goalValue != null && goalValue > 0 && (
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#16A34A" strokeWidth={1.5} strokeDasharray="6,4" opacity={0.7} /></svg>
+              Revenue Goal
             </span>
           )}
           {flowBars && (
