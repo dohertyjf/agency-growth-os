@@ -1,6 +1,17 @@
 "use client"
-import { useState, useMemo, useRef, useEffect } from "react"
+import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
+
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(false)
+  const check = useCallback(() => setMobile(window.innerWidth < 640), [])
+  useEffect(() => {
+    check()
+    window.addEventListener("resize", check)
+    return () => window.removeEventListener("resize", check)
+  }, [check])
+  return mobile
+}
 
 const CORE_ROLES = ["Delivery", "Sales", "Marketing", "Finance", "Operations"] as const
 type CoreRole = typeof CORE_ROLES[number]
@@ -166,6 +177,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
   const bulkValid = bulkRows.filter(r => !r.error)
   const bulkErrors = bulkRows.filter(r => r.error)
 
+  const isMobile = useIsMobile()
   const internal = people.filter(p => !p.isExternal)
   const external = people.filter(p => p.isExternal)
 
@@ -290,11 +302,13 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
               {internal.length === 0 ? "No team members yet" : `${internal.length} member${internal.length === 1 ? "" : "s"} · ${internalHours} billable hrs/mo`}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setAddMode(addMode === "bulk" ? "none" : "bulk")}
-              style={{ padding: "6px 14px", background: "none", color: "#6B6760", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-              Bulk import
-            </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {!isMobile && (
+              <button onClick={() => setAddMode(addMode === "bulk" ? "none" : "bulk")}
+                style={{ padding: "6px 14px", background: "none", color: "#6B6760", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                Bulk import
+              </button>
+            )}
             <button onClick={() => { setAddMode("internal"); setAddForm(emptyForm) }}
               style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               + Add Member
@@ -348,49 +362,90 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
         )}
 
         {internal.length > 0 ? (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Name", "Title", "Core Roles", "Annual Salary", "Billable hrs/mo", ""].map(h => (
-                  <th key={h} style={{ textAlign: h === "Annual Salary" || h === "Billable hrs/mo" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
+          isMobile ? (
+            <div>
               {internal.map(p => {
                 const status = personStatus(p)
                 const hasDateInfo = p.startDate || p.endDate
+                const roles = parseCoreRoles(p.responsibilities)
                 return (
-                  <tr key={p.id}>
-                    <td style={{ padding: "10px 8px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</span>
-                        {hasDateInfo && <StatusBadge status={status} />}
-                      </div>
-                      {(p.startDate || p.endDate) && (
-                        <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
-                          {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+                  <div key={p.id} style={{ padding: "12px 0", borderBottom: "1px solid #F5F1EC" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1916" }}>{p.name}</span>
+                          {hasDateInfo && <StatusBadge status={status} />}
                         </div>
-                      )}
-                    </td>
-                    <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
-                    <td style={{ padding: "10px 8px" }}>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {parseCoreRoles(p.responsibilities).map(r => <CoreRoleChip key={r} role={r} />)}
-                        {!p.responsibilities && <span style={{ color: "#C0BAB2", fontSize: 13 }}>—</span>}
+                        {p.role && <div style={{ fontSize: 12, color: "#6B6760", marginTop: 2 }}>{p.role}</div>}
+                        {(p.startDate || p.endDate) && (
+                          <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
+                            {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+                          </div>
+                        )}
                       </div>
-                    </td>
-                    <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.annualSalary ? fmt$(p.annualSalary) : <span style={{ color: "#C0BAB2" }}>—</span>}</td>
-                    <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.billableHours} hrs</td>
-                    <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
-                      <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
-                      <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>
-                    </td>
-                  </tr>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "4px 10px", cursor: "pointer" }}>Edit</button>
+                        <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "4px 10px", cursor: "pointer" }}>✕</button>
+                      </div>
+                    </div>
+                    {roles.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+                        {roles.map(r => <CoreRoleChip key={r} role={r} />)}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 12, color: "#6B6760", fontVariantNumeric: "tabular-nums" }}>
+                      {p.annualSalary > 0 && <span><strong style={{ color: "#1A1916" }}>{fmt$(p.annualSalary)}</strong>/yr</span>}
+                      {p.billableHours > 0 && <span>{p.billableHours} hrs/mo</span>}
+                    </div>
+                  </div>
                 )
               })}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {["Name", "Title", "Core Roles", "Annual Salary", "Billable hrs/mo", ""].map(h => (
+                    <th key={h} style={{ textAlign: h === "Annual Salary" || h === "Billable hrs/mo" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {internal.map(p => {
+                  const status = personStatus(p)
+                  const hasDateInfo = p.startDate || p.endDate
+                  return (
+                    <tr key={p.id}>
+                      <td style={{ padding: "10px 8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</span>
+                          {hasDateInfo && <StatusBadge status={status} />}
+                        </div>
+                        {(p.startDate || p.endDate) && (
+                          <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
+                            {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
+                      <td style={{ padding: "10px 8px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {parseCoreRoles(p.responsibilities).map(r => <CoreRoleChip key={r} role={r} />)}
+                          {!p.responsibilities && <span style={{ color: "#C0BAB2", fontSize: 13 }}>—</span>}
+                        </div>
+                      </td>
+                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.annualSalary ? fmt$(p.annualSalary) : <span style={{ color: "#C0BAB2" }}>—</span>}</td>
+                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.billableHours} hrs</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                        <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
+                        <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )
         ) : addMode !== "bulk" && (
           <div style={{ fontSize: 13, color: "#9C9590", padding: "12px 0" }}>
             Add the people doing delivery work — yourself included — with how many hours per month each can commit to clients.
@@ -438,47 +493,84 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
         </div>
 
         {external.length > 0 ? (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Name", "Role", "Description", "Annual Cost", ""].map(h => (
-                  <th key={h} style={{ textAlign: h === "Annual Cost" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
+          isMobile ? (
+            <div>
               {external.map(p => {
                 const status = personStatus(p)
                 const hasDateInfo = p.startDate || p.endDate
                 return (
-                  <tr key={p.id}>
-                    <td style={{ padding: "10px 8px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</span>
-                        {hasDateInfo && <StatusBadge status={status} />}
-                      </div>
-                      {(p.startDate || p.endDate) && (
-                        <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
-                          {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+                  <div key={p.id} style={{ padding: "12px 0", borderBottom: "1px solid #F5F1EC" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1916" }}>{p.name}</span>
+                          {hasDateInfo && <StatusBadge status={status} />}
                         </div>
-                      )}
-                    </td>
-                    <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
-                    <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760", maxWidth: 280 }}>
-                      {p.responsibilities
-                        ? <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.responsibilities}</span>
-                        : <span style={{ color: "#C0BAB2" }}>—</span>}
-                    </td>
-                    <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.annualSalary ? fmt$(p.annualSalary) + "/yr" : <span style={{ color: "#C0BAB2" }}>—</span>}</td>
-                    <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
-                      <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
-                      <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>
-                    </td>
-                  </tr>
+                        {p.role && <div style={{ fontSize: 12, color: "#6B6760", marginTop: 2 }}>{p.role}</div>}
+                        {(p.startDate || p.endDate) && (
+                          <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
+                            {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "4px 10px", cursor: "pointer" }}>Edit</button>
+                        <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "4px 10px", cursor: "pointer" }}>✕</button>
+                      </div>
+                    </div>
+                    {p.responsibilities && (
+                      <div style={{ fontSize: 12, color: "#6B6760", marginTop: 6 }}>{p.responsibilities}</div>
+                    )}
+                    {p.annualSalary > 0 && (
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1916", marginTop: 6, fontVariantNumeric: "tabular-nums" }}>{fmt$(p.annualSalary)}/yr</div>
+                    )}
+                  </div>
                 )
               })}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {["Name", "Role", "Description", "Annual Cost", ""].map(h => (
+                    <th key={h} style={{ textAlign: h === "Annual Cost" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {external.map(p => {
+                  const status = personStatus(p)
+                  const hasDateInfo = p.startDate || p.endDate
+                  return (
+                    <tr key={p.id}>
+                      <td style={{ padding: "10px 8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</span>
+                          {hasDateInfo && <StatusBadge status={status} />}
+                        </div>
+                        {(p.startDate || p.endDate) && (
+                          <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
+                            {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
+                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760", maxWidth: 280 }}>
+                        {p.responsibilities
+                          ? <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.responsibilities}</span>
+                          : <span style={{ color: "#C0BAB2" }}>—</span>}
+                      </td>
+                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.annualSalary ? fmt$(p.annualSalary) + "/yr" : <span style={{ color: "#C0BAB2" }}>—</span>}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                        <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
+                        <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )
         ) : (
           <div style={{ fontSize: 13, color: "#9C9590", padding: "12px 0" }}>
             Add coaches, fractional hires, and recurring contractors whose costs a buyer would need to replace.
