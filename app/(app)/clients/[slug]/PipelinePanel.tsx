@@ -151,6 +151,18 @@ function fmtDate(d: string | null): string {
   return `${months[+m - 1]} ${+day}, ${y}`
 }
 
+function fmtYM(ym: string): string {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+  const [y, m] = ym.split("-")
+  return `${months[+m - 1]} '${y.slice(2)}`
+}
+
+function dealMeta(deal: Contract): string {
+  if (deal.type === "oneoff") return `One-off · ${fmtYM(deal.start)}`
+  if (deal.contractedThrough) return `Retainer · ${fmtYM(deal.start)} – ${fmtYM(deal.contractedThrough)}`
+  return `Retainer · ${fmtYM(deal.start)} – Ongoing`
+}
+
 const inputStyle: React.CSSProperties = {
   padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6,
   fontSize: 13, background: "#fff", color: "#1A1916",
@@ -181,6 +193,7 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, o
           {accountName && (
             <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>{accountName}</div>
           )}
+          <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>{dealMeta(deal)}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6, fontSize: 11, color: "#9C9590" }}>
             {deal.callDate && (
               <span>
@@ -280,17 +293,28 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   const fmt$ = useFmtCurrency()
   const [localAccounts, setLocalAccounts] = useState<Account[]>(initialAccounts)
   const [addOpen, setAddOpen] = useState(false)
+  const initYM = new Date().toISOString().slice(0, 7)
   const [addForm, setAddForm] = useState({
     name: "", monthly: "", accountId: "",
     stage: "opportunity" as "opportunity" | "potential",
     callDate: "",
+    type: "retainer" as "retainer" | "ongoing" | "oneoff",
+    start: initYM,
+    contractedThrough: "",
   })
   const [addSaving, setAddSaving] = useState(false)
   const [editDeal, setEditDeal] = useState<Contract | null>(null)
-  const [editForm, setEditForm] = useState({ name: "", monthly: "", accountId: "", callDate: "", signedDate: "" })
+  const [editForm, setEditForm] = useState({
+    name: "", monthly: "", accountId: "", callDate: "", signedDate: "",
+    type: "retainer" as "retainer" | "ongoing" | "oneoff",
+    start: "",
+    contractedThrough: "",
+  })
   const [editSaving, setEditSaving] = useState(false)
 
   function openEdit(deal: Contract) {
+    const uiType: "retainer" | "ongoing" | "oneoff" =
+      !deal.contractedThrough && deal.type === "retainer" ? "ongoing" : deal.type as "retainer" | "ongoing" | "oneoff"
     setEditDeal(deal)
     setEditForm({
       name: deal.name,
@@ -298,6 +322,9 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       accountId: deal.accountId ?? "",
       callDate: deal.callDate ?? "",
       signedDate: deal.signedDate ?? "",
+      type: uiType,
+      start: deal.start,
+      contractedThrough: deal.contractedThrough ?? "",
     })
   }
 
@@ -305,6 +332,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     e.preventDefault()
     if (!editDeal || !editForm.accountId) return
     setEditSaving(true)
+    const isOngoing = editForm.type === "ongoing"
     const res = await fetch(`/api/contracts/${editDeal.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -314,6 +342,9 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         accountId: editForm.accountId || null,
         callDate: editForm.callDate || null,
         signedDate: editForm.signedDate || null,
+        type: isOngoing ? "retainer" : editForm.type,
+        start: editForm.start,
+        contractedThrough: isOngoing ? null : editForm.type === "oneoff" ? editForm.start : editForm.contractedThrough || null,
       }),
     })
     setEditSaving(false)
@@ -374,15 +405,17 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     e.preventDefault()
     if (!addForm.accountId) return
     setAddSaving(true)
+    const isOngoing = addForm.type === "ongoing"
     const res = await fetch(`/api/clients/${clientId}/contracts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: addForm.name,
         monthly: parseFloat(addForm.monthly) || 0,
-        start: nowYM,
+        start: addForm.start || nowYM,
         status: addForm.stage,
-        type: "retainer",
+        type: isOngoing ? "retainer" : addForm.type,
+        contractedThrough: isOngoing ? null : addForm.type === "oneoff" ? (addForm.start || nowYM) : addForm.contractedThrough || null,
         accountId: addForm.accountId || null,
         callDate: addForm.callDate || null,
       }),
@@ -391,7 +424,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       const created = await res.json()
       onContractsChange([...contracts, { ...created, callDate: created.callDate ?? null, signedDate: created.signedDate ?? null, kickoffDate: created.kickoffDate ?? null }])
       setAddOpen(false)
-      setAddForm({ name: "", monthly: "", accountId: "", stage: "opportunity", callDate: "" })
+      setAddForm({ name: "", monthly: "", accountId: "", stage: "opportunity", callDate: "", type: "retainer", start: nowYM, contractedThrough: "" })
     }
     setAddSaving(false)
   }
@@ -576,6 +609,29 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
+                  <label style={labelStyle}>Type</label>
+                  <select style={inputStyle} value={addForm.type}
+                    onChange={e => setAddForm(f => ({ ...f, type: e.target.value as "retainer" | "ongoing" | "oneoff" }))}>
+                    <option value="retainer">Retainer – End Date</option>
+                    <option value="ongoing">Retainer – Ongoing</option>
+                    <option value="oneoff">One-off</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>{addForm.type === "oneoff" ? "Month" : "Start"}</label>
+                  <input style={inputStyle} type="month" value={addForm.start}
+                    onChange={e => setAddForm(f => ({ ...f, start: e.target.value }))} required />
+                </div>
+              </div>
+              {addForm.type === "retainer" && (
+                <div>
+                  <label style={labelStyle}>End Date</label>
+                  <input style={inputStyle} type="month" value={addForm.contractedThrough}
+                    onChange={e => setAddForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                </div>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
                   <label style={labelStyle}>Account <span style={{ color: "#E9532A" }}>*</span></label>
                   <AccountPicker
                     accounts={localAccounts}
@@ -623,15 +679,40 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                   onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
                   required />
               </div>
-              <div>
-                <label style={labelStyle}>Monthly Value</label>
-                <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff" }}>
-                  <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0 }}>$</span>
-                  <input
-                    style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "7px 10px 7px 4px" }}
-                    type="number" min={0} step={100} value={editForm.monthly}
-                    onChange={e => setEditForm(f => ({ ...f, monthly: e.target.value }))} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Monthly Value</label>
+                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff" }}>
+                    <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0 }}>$</span>
+                    <input
+                      style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "7px 10px 7px 4px" }}
+                      type="number" min={0} step={100} value={editForm.monthly}
+                      onChange={e => setEditForm(f => ({ ...f, monthly: e.target.value }))} />
+                  </div>
                 </div>
+                <div>
+                  <label style={labelStyle}>Type</label>
+                  <select style={inputStyle} value={editForm.type}
+                    onChange={e => setEditForm(f => ({ ...f, type: e.target.value as "retainer" | "ongoing" | "oneoff" }))}>
+                    <option value="retainer">Retainer – End Date</option>
+                    <option value="ongoing">Retainer – Ongoing</option>
+                    <option value="oneoff">One-off</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: editForm.type === "retainer" ? "1fr 1fr" : "1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>{editForm.type === "oneoff" ? "Month" : "Start"}</label>
+                  <input style={inputStyle} type="month" value={editForm.start}
+                    onChange={e => setEditForm(f => ({ ...f, start: e.target.value }))} required />
+                </div>
+                {editForm.type === "retainer" && (
+                  <div>
+                    <label style={labelStyle}>End Date</label>
+                    <input style={inputStyle} type="month" value={editForm.contractedThrough}
+                      onChange={e => setEditForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                  </div>
+                )}
               </div>
               <div>
                 <label style={labelStyle}>Account <span style={{ color: "#E9532A" }}>*</span></label>
