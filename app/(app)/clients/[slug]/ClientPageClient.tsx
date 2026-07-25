@@ -224,6 +224,7 @@ export default function ClientPageClient({
           contracts={contracts}
           accounts={accounts}
           onContractsChange={setContracts}
+          onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
         />
       )}
 

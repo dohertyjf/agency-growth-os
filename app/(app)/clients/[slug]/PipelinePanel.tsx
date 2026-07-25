@@ -24,6 +24,113 @@ interface Props {
   contracts: Contract[]
   accounts: Account[]
   onContractsChange: (contracts: Contract[]) => void
+  onAccountCreated?: (account: Account) => void
+}
+
+function AccountPicker({ accounts, value, onChange, clientId, onAccountCreated }: {
+  accounts: Account[]
+  value: string
+  onChange: (id: string) => void
+  clientId: string
+  onAccountCreated: (account: Account) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  const selected = accounts.find(a => a.id === value)
+  const filtered = accounts.filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
+
+  function close() { setOpen(false); setSearch(""); setCreating(false); setNewName("") }
+
+  async function handleCreate() {
+    if (!newName.trim()) return
+    setSaving(true)
+    const res = await fetch(`/api/clients/${clientId}/accounts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName.trim() }),
+    })
+    setSaving(false)
+    if (!res.ok) return
+    const account: Account = await res.json()
+    onAccountCreated(account)
+    onChange(account.id)
+    close()
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          padding: "7px 10px", border: `1px solid ${!value ? "#F59E0B" : "#ECE7DE"}`, borderRadius: 6,
+          fontSize: 13, background: "#fff", color: "#1A1916", width: "100%", boxSizing: "border-box",
+          fontFamily: "inherit", outline: "none", textAlign: "left", cursor: "pointer",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}
+      >
+        <span style={{ color: selected ? "#1A1916" : "#9C9590" }}>{selected ? selected.name : "Select account…"}</span>
+        <span style={{ color: "#9C9590", fontSize: 10, flexShrink: 0, marginLeft: 4 }}>▾</span>
+      </button>
+      {open && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 99 }} onClick={close} />
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, background: "#fff", border: "1px solid #ECE7DE", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", marginTop: 2, maxHeight: 240, overflowY: "auto" }}>
+            <div style={{ padding: "8px 10px", borderBottom: "1px solid #F5F1EC", position: "sticky", top: 0, background: "#fff" }}>
+              <input
+                autoFocus
+                placeholder="Search accounts…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => e.key === "Escape" && close()}
+                style={{ width: "100%", border: "none", outline: "none", fontSize: 12, color: "#1A1916", background: "transparent" }}
+              />
+            </div>
+            {!creating ? (
+              <button type="button" onClick={() => setCreating(true)}
+                style={{ width: "100%", padding: "8px 12px", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid #F5F1EC", fontSize: 12, color: "#E9532A", fontWeight: 600, cursor: "pointer" }}>
+                + New account
+              </button>
+            ) : (
+              <div style={{ padding: "8px 10px", borderBottom: "1px solid #F5F1EC", display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  autoFocus
+                  placeholder="Account name"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleCreate() } if (e.key === "Escape") { setCreating(false); setNewName("") } }}
+                  style={{ flex: 1, padding: "4px 8px", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 12, outline: "none" }}
+                />
+                <button type="button" onClick={handleCreate} disabled={saving || !newName.trim()}
+                  style={{ padding: "4px 10px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: "pointer", opacity: saving || !newName.trim() ? 0.5 : 1 }}>
+                  {saving ? "…" : "Create"}
+                </button>
+                <button type="button" onClick={() => { setCreating(false); setNewName("") }}
+                  style={{ padding: "4px 8px", background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, cursor: "pointer", color: "#6B6760" }}>
+                  ✕
+                </button>
+              </div>
+            )}
+            {filtered.map(a => (
+              <button key={a.id} type="button" onClick={() => { onChange(a.id); close() }}
+                style={{ width: "100%", padding: "7px 12px", textAlign: "left", background: value === a.id ? "#FFF5F2" : "none", border: "none", borderBottom: "1px solid #F5F1EC", fontSize: 12, color: "#1A1916", fontWeight: value === a.id ? 600 : 400, cursor: "pointer" }}>
+                {a.name}
+              </button>
+            ))}
+            {filtered.length === 0 && !creating && (
+              <div style={{ padding: "10px 12px", fontSize: 12, color: "#9C9590" }}>
+                {search ? "No matching accounts" : "No accounts yet"}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 function daysSince(d: string | null): number | null {
@@ -159,8 +266,9 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
   )
 }
 
-export default function PipelinePanel({ clientId, contracts, accounts, onContractsChange }: Props) {
+export default function PipelinePanel({ clientId, contracts, accounts: initialAccounts, onContractsChange, onAccountCreated }: Props) {
   const fmt$ = useFmtCurrency()
+  const [localAccounts, setLocalAccounts] = useState<Account[]>(initialAccounts)
   const [addOpen, setAddOpen] = useState(false)
   const [addForm, setAddForm] = useState({
     name: "", monthly: "", accountId: "",
@@ -168,6 +276,11 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
     callDate: "",
   })
   const [addSaving, setAddSaving] = useState(false)
+
+  function handleAccountCreated(account: Account) {
+    setLocalAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))
+    onAccountCreated?.(account)
+  }
 
   const today = new Date().toISOString().slice(0, 10)
   const nowYM = today.slice(0, 7)
@@ -213,6 +326,7 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
 
   async function handleAddDeal(e: React.FormEvent) {
     e.preventDefault()
+    if (!addForm.accountId) return
     setAddSaving(true)
     const res = await fetch(`/api/clients/${clientId}/contracts`, {
       method: "POST",
@@ -263,7 +377,7 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
           title="Opportunity"
           subtitle="Initial contact made"
           deals={opportunityDeals}
-          accounts={accounts}
+          accounts={localAccounts}
           advanceLabel="→ Potential"
           onAdvance={id => updateContract(id, { status: "potential" })}
           onLost={id => updateContract(id, { status: "lost" })}
@@ -274,7 +388,7 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
           title="Potential"
           subtitle="In negotiation"
           deals={potentialDeals}
-          accounts={accounts}
+          accounts={localAccounts}
           advanceLabel="✓ Won"
           onAdvance={id => updateContract(id, { status: "active", signedDate: today })}
           onLost={id => updateContract(id, { status: "lost" })}
@@ -414,12 +528,14 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={labelStyle}>Account</label>
-                  <select style={inputStyle} value={addForm.accountId}
-                    onChange={e => setAddForm(f => ({ ...f, accountId: e.target.value }))}>
-                    <option value="">No account</option>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </select>
+                  <label style={labelStyle}>Account <span style={{ color: "#E9532A" }}>*</span></label>
+                  <AccountPicker
+                    accounts={localAccounts}
+                    value={addForm.accountId}
+                    onChange={id => setAddForm(f => ({ ...f, accountId: id }))}
+                    clientId={clientId}
+                    onAccountCreated={handleAccountCreated}
+                  />
                 </div>
                 <div>
                   <label style={labelStyle}>Initial Call Date</label>
@@ -432,8 +548,8 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
                   style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={addSaving}
-                  style={{ padding: "8px 20px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                <button type="submit" disabled={addSaving || !addForm.accountId}
+                  style={{ padding: "8px 20px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: addSaving || !addForm.accountId ? 0.5 : 1 }}>
                   {addSaving ? "Adding…" : "Add Deal"}
                 </button>
               </div>
