@@ -722,7 +722,10 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</div>
               <div style={{ fontSize: 11, color: "#9C9590" }}>
-                {accountName && <span style={{ color: "#6B6760", fontWeight: 500 }}>{accountName} · </span>}
+                {accountName
+                  ? <span style={{ color: "#6B6760", fontWeight: 500 }}>{accountName} · </span>
+                  : <span style={{ color: "#C2410C", fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>Unassigned · </span>
+                }
                 {isOneoff
                   ? ymLabel(c.start)
                   : c.contractedThrough
