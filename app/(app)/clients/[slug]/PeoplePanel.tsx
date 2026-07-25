@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 
 const ROLES = ["Delivery", "Sales", "Marketing", "Finance", "Operations"] as const
 type Role = typeof ROLES[number]
@@ -571,14 +571,17 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
   )
 }
 
-function genMonths(nowYM: string, count: number): string[] {
-  const [y, m] = nowYM.split("-").map(Number)
-  return Array.from({ length: count }, (_, i) => {
-    const total = (y * 12 + (m - 1)) - i
-    const ny = Math.floor(total / 12)
-    const nm = (total % 12) + 1
-    return `${ny}-${String(nm).padStart(2, "0")}`
-  })
+function ymNext(ym: string): string {
+  const [y, m] = ym.split("-").map(Number)
+  const total = y * 12 + (m - 1) + 1
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`
+}
+
+function genMonthsRange(from: string, to: string): string[] {
+  const months: string[] = []
+  let cur = from
+  while (cur <= to) { months.push(cur); cur = ymNext(cur) }
+  return months
 }
 
 function fmtYM(ym: string): string {
@@ -594,7 +597,23 @@ function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange
   onSalaryMonthChange: (sm: PersonSalaryMonth) => void
 }) {
   const nowYM = new Date().toISOString().slice(0, 7)
-  const months = genMonths(nowYM, 13)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Table spans from earliest start date to current month (or latest end date if all terminated)
+  const toYM = (d: string | null) => d ? d.slice(0, 7) : null
+  const startYMs = people.map(p => toYM(p.startDate)).filter(Boolean) as string[]
+  const endYMs = people.map(p => toYM(p.endDate)).filter(Boolean) as string[]
+  const tableStart = startYMs.length > 0
+    ? startYMs.reduce((a, b) => a < b ? a : b)
+    : nowYM
+  const tableEnd = [nowYM, ...endYMs].reduce((a, b) => a > b ? a : b)
+
+  const months = genMonthsRange(tableStart, tableEnd)
+
+  // Scroll to right (most recent) on mount and when range changes
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth
+  }, [tableStart, tableEnd])
 
   const salaryMap = new Map<string, number>()
   salaryMonths.forEach(sm => salaryMap.set(`${sm.personId}:${sm.month}`, sm.monthlySalary))
@@ -605,6 +624,15 @@ function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange
 
   function baseMonthlySalary(p: Person) {
     return p.annualSalary > 0 ? Math.round(p.annualSalary / 12) : 0
+  }
+
+  // A person is active in a given month if it falls within their employment window
+  function isActive(p: Person, mo: string) {
+    const start = toYM(p.startDate)
+    const end = toYM(p.endDate)
+    if (start && mo < start) return false
+    if (end && mo > end) return false
+    return true
   }
 
   function cellValue(personId: string, month: string, p: Person) {
@@ -638,11 +666,11 @@ function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange
       <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 14 }}>
         Grey values derive from annual salary. Click a cell to set an override — e.g. after a raise taking effect next month.
       </div>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", minWidth: "100%" }}>
+      <div ref={scrollRef} style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 16px 4px 0", borderBottom: "1px solid #ECE7DE", minWidth: 140, whiteSpace: "nowrap" }}>
+              <th style={{ textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 16px 4px 0", borderBottom: "1px solid #ECE7DE", minWidth: 140, whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>
                 Person
               </th>
               {months.map(mo => (
@@ -655,15 +683,16 @@ function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange
           <tbody>
             {people.map(p => (
               <tr key={p.id}>
-                <td style={{ padding: "8px 16px 8px 0", fontSize: 13, fontWeight: 500, color: "#1A1916", borderBottom: "1px solid #F5F1EC", whiteSpace: "nowrap" }}>
+                <td style={{ padding: "8px 16px 8px 0", fontSize: 13, fontWeight: 500, color: "#1A1916", borderBottom: "1px solid #F5F1EC", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>
                   {p.name}
                 </td>
                 {months.map(mo => {
+                  const active = isActive(p, mo)
                   const { value, isOverride } = cellValue(p.id, mo, p)
                   const isEditing = editingCell?.personId === p.id && editingCell.month === mo
                   return (
-                    <td key={mo} style={{ padding: "4px 4px", textAlign: "right", borderBottom: "1px solid #F5F1EC", minWidth: 86 }}>
-                      {isEditing ? (
+                    <td key={mo} style={{ padding: "4px 4px", textAlign: "right", borderBottom: "1px solid #F5F1EC", minWidth: 86, background: active ? undefined : "#FAFAF8" }}>
+                      {active && isEditing ? (
                         <input
                           autoFocus
                           value={editValue}
@@ -679,16 +708,16 @@ function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange
                       ) : (
                         <button
                           type="button"
-                          onClick={() => openCell(p.id, mo, value)}
+                          onClick={() => active && openCell(p.id, mo, value)}
                           style={{
-                            background: "none", border: "none", cursor: "pointer", padding: "3px 8px",
-                            fontSize: 12, fontVariantNumeric: "tabular-nums", borderRadius: 4,
-                            color: isOverride ? "#1A1916" : "#C0BAB2",
+                            background: "none", border: "none", cursor: active ? "pointer" : "default",
+                            padding: "3px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums", borderRadius: 4,
+                            color: !active ? "#ECE7DE" : isOverride ? "#1A1916" : "#C0BAB2",
                             fontWeight: isOverride ? 600 : 400,
                             width: "100%", textAlign: "right",
                           }}
                         >
-                          {value > 0 ? ("$" + value.toLocaleString()) : "—"}
+                          {active && value > 0 ? ("$" + value.toLocaleString()) : "—"}
                         </button>
                       )}
                     </td>
