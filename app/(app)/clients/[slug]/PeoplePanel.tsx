@@ -1,17 +1,16 @@
 "use client"
-import { useState, useMemo, useRef, useEffect, useCallback } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
 
-function useIsMobile(): boolean {
-  const [mobile, setMobile] = useState(false)
-  const check = useCallback(() => setMobile(window.innerWidth < 640), [])
-  useEffect(() => {
-    check()
-    window.addEventListener("resize", check)
-    return () => window.removeEventListener("resize", check)
-  }, [check])
-  return mobile
-}
+const PEOPLE_STYLES = `
+  .pm-cards { display: none; }
+  .pm-bulk-btn { display: inline-block; }
+  @media (max-width: 639px) {
+    .pm-cards { display: block; }
+    .pm-table-wrap { display: none; }
+    .pm-bulk-btn { display: none; }
+  }
+`
 
 const CORE_ROLES = ["Delivery", "Sales", "Marketing", "Finance", "Operations"] as const
 type CoreRole = typeof CORE_ROLES[number]
@@ -177,7 +176,6 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
   const bulkValid = bulkRows.filter(r => !r.error)
   const bulkErrors = bulkRows.filter(r => r.error)
 
-  const isMobile = useIsMobile()
   const internal = people.filter(p => !p.isExternal)
   const external = people.filter(p => p.isExternal)
 
@@ -292,6 +290,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <style>{PEOPLE_STYLES}</style>
 
       {/* Internal Team */}
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
@@ -303,12 +302,10 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {!isMobile && (
-              <button onClick={() => setAddMode(addMode === "bulk" ? "none" : "bulk")}
-                style={{ padding: "6px 14px", background: "none", color: "#6B6760", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                Bulk import
-              </button>
-            )}
+            <button className="pm-bulk-btn" onClick={() => setAddMode(addMode === "bulk" ? "none" : "bulk")}
+              style={{ padding: "6px 14px", background: "none", color: "#6B6760", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              Bulk import
+            </button>
             <button onClick={() => { setAddMode("internal"); setAddForm(emptyForm) }}
               style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               + Add Member
@@ -362,8 +359,9 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
         )}
 
         {internal.length > 0 ? (
-          isMobile ? (
-            <div>
+          <>
+            {/* Mobile card view */}
+            <div className="pm-cards">
               {internal.map(p => {
                 const status = personStatus(p)
                 const hasDateInfo = p.startDate || p.endDate
@@ -401,51 +399,53 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                 )
               })}
             </div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  {["Name", "Title", "Core Roles", "Annual Salary", "Billable hrs/mo", ""].map(h => (
-                    <th key={h} style={{ textAlign: h === "Annual Salary" || h === "Billable hrs/mo" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {internal.map(p => {
-                  const status = personStatus(p)
-                  const hasDateInfo = p.startDate || p.endDate
-                  return (
-                    <tr key={p.id}>
-                      <td style={{ padding: "10px 8px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</span>
-                          {hasDateInfo && <StatusBadge status={status} />}
-                        </div>
-                        {(p.startDate || p.endDate) && (
-                          <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
-                            {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+            {/* Desktop table view */}
+            <div className="pm-table-wrap">
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    {["Name", "Title", "Core Roles", "Annual Salary", "Billable hrs/mo", ""].map(h => (
+                      <th key={h} style={{ textAlign: h === "Annual Salary" || h === "Billable hrs/mo" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {internal.map(p => {
+                    const status = personStatus(p)
+                    const hasDateInfo = p.startDate || p.endDate
+                    return (
+                      <tr key={p.id}>
+                        <td style={{ padding: "10px 8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</span>
+                            {hasDateInfo && <StatusBadge status={status} />}
                           </div>
-                        )}
-                      </td>
-                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
-                      <td style={{ padding: "10px 8px" }}>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                          {parseCoreRoles(p.responsibilities).map(r => <CoreRoleChip key={r} role={r} />)}
-                          {!p.responsibilities && <span style={{ color: "#C0BAB2", fontSize: 13 }}>—</span>}
-                        </div>
-                      </td>
-                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.annualSalary ? fmt$(p.annualSalary) : <span style={{ color: "#C0BAB2" }}>—</span>}</td>
-                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.billableHours} hrs</td>
-                      <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
-                        <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
-                        <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )
+                          {(p.startDate || p.endDate) && (
+                            <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
+                              {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
+                        <td style={{ padding: "10px 8px" }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {parseCoreRoles(p.responsibilities).map(r => <CoreRoleChip key={r} role={r} />)}
+                            {!p.responsibilities && <span style={{ color: "#C0BAB2", fontSize: 13 }}>—</span>}
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.annualSalary ? fmt$(p.annualSalary) : <span style={{ color: "#C0BAB2" }}>—</span>}</td>
+                        <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.billableHours} hrs</td>
+                        <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                          <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
+                          <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : addMode !== "bulk" && (
           <div style={{ fontSize: 13, color: "#9C9590", padding: "12px 0" }}>
             Add the people doing delivery work — yourself included — with how many hours per month each can commit to clients.
@@ -493,8 +493,9 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
         </div>
 
         {external.length > 0 ? (
-          isMobile ? (
-            <div>
+          <>
+            {/* Mobile card view */}
+            <div className="pm-cards">
               {external.map(p => {
                 const status = personStatus(p)
                 const hasDateInfo = p.startDate || p.endDate
@@ -528,49 +529,51 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                 )
               })}
             </div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  {["Name", "Role", "Description", "Annual Cost", ""].map(h => (
-                    <th key={h} style={{ textAlign: h === "Annual Cost" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {external.map(p => {
-                  const status = personStatus(p)
-                  const hasDateInfo = p.startDate || p.endDate
-                  return (
-                    <tr key={p.id}>
-                      <td style={{ padding: "10px 8px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</span>
-                          {hasDateInfo && <StatusBadge status={status} />}
-                        </div>
-                        {(p.startDate || p.endDate) && (
-                          <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
-                            {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+            {/* Desktop table view */}
+            <div className="pm-table-wrap">
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    {["Name", "Role", "Description", "Annual Cost", ""].map(h => (
+                      <th key={h} style={{ textAlign: h === "Annual Cost" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {external.map(p => {
+                    const status = personStatus(p)
+                    const hasDateInfo = p.startDate || p.endDate
+                    return (
+                      <tr key={p.id}>
+                        <td style={{ padding: "10px 8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</span>
+                            {hasDateInfo && <StatusBadge status={status} />}
                           </div>
-                        )}
-                      </td>
-                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
-                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760", maxWidth: 280 }}>
-                        {p.responsibilities
-                          ? <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.responsibilities}</span>
-                          : <span style={{ color: "#C0BAB2" }}>—</span>}
-                      </td>
-                      <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.annualSalary ? fmt$(p.annualSalary) + "/yr" : <span style={{ color: "#C0BAB2" }}>—</span>}</td>
-                      <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
-                        <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
-                        <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )
+                          {(p.startDate || p.endDate) && (
+                            <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
+                              {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
+                        <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760", maxWidth: 280 }}>
+                          {p.responsibilities
+                            ? <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.responsibilities}</span>
+                            : <span style={{ color: "#C0BAB2" }}>—</span>}
+                        </td>
+                        <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.annualSalary ? fmt$(p.annualSalary) + "/yr" : <span style={{ color: "#C0BAB2" }}>—</span>}</td>
+                        <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                          <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
+                          <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <div style={{ fontSize: 13, color: "#9C9590", padding: "12px 0" }}>
             Add coaches, fractional hires, and recurring contractors whose costs a buyer would need to replace.
