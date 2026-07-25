@@ -648,6 +648,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
             <ContractSection
               title="Active"
               contracts={byStatus.active}
+              accounts={localAccounts}
               onEdit={setEditingContract}
               onDelete={handleDelete}
               onDuplicate={setDuplicatingContract}
@@ -659,6 +660,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
             <ContractSection
               title="Pipeline"
               contracts={byStatus.potential}
+              accounts={localAccounts}
               onEdit={setEditingContract}
               onDelete={handleDelete}
               onDuplicate={setDuplicatingContract}
@@ -679,6 +681,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
                 <ContractSection
                   title=""
                   contracts={byStatus.finished}
+                  accounts={localAccounts}
                   onEdit={setEditingContract}
                   onDelete={handleDelete}
                   onDuplicate={setDuplicatingContract}
@@ -693,9 +696,10 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   )
 }
 
-function ContractSection({ title, contracts, onEdit, onDelete, onDuplicate, dimmed }: {
+function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDuplicate, dimmed }: {
   title: string
   contracts: Contract[]
+  accounts: Account[]
   onEdit: (c: Contract) => void
   onDelete: (id: string) => void
   onDuplicate: (c: Contract) => void
@@ -712,11 +716,13 @@ function ContractSection({ title, contracts, onEdit, onDelete, onDuplicate, dimm
         const s = (c.status as ContractStatus) in STATUS_COLORS ? c.status as ContractStatus : "potential"
         const colors = STATUS_COLORS[s]
         const isOneoff = c.type === "oneoff"
+        const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name : null
         return (
           <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #F5F1EC", opacity: dimmed ? 0.6 : 1 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</div>
               <div style={{ fontSize: 11, color: "#9C9590" }}>
+                {accountName && <span style={{ color: "#6B6760", fontWeight: 500 }}>{accountName} · </span>}
                 {isOneoff
                   ? ymLabel(c.start)
                   : c.contractedThrough
