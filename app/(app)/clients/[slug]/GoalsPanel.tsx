@@ -103,7 +103,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
               <FieldLabel>Monthly Revenue Goal</FieldLabel>
               <div style={{ position: "relative" }}>
                 <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>$</span>
-                <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step={100}
+                <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step="any"
                   value={monthly} onChange={e => setMonthly(e.target.value)} placeholder="50000" />
               </div>
             </div>
@@ -111,7 +111,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
               <FieldLabel hint="auto">Annual Revenue Goal</FieldLabel>
               <div style={{ position: "relative" }}>
                 <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>$</span>
-                <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step={1000}
+                <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step="any"
                   value={annualNum || ""}
                   onChange={e => handleAnnualChange(e.target.value)}
                   placeholder={monthlyNum ? String(annualNum) : "600000"} />
@@ -141,7 +141,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
               <FieldLabel hint="auto">Monthly Net Profit $</FieldLabel>
               <div style={{ position: "relative" }}>
                 <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>$</span>
-                <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step={100}
+                <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step="any"
                   value={monthlyNetProfit ? String(Math.round(monthlyNetProfit)) : ""}
                   onChange={e => handleMonthlyNetProfitChange(e.target.value)}
                   placeholder={monthlyNum && netProfitPctNum ? String(Math.round(monthlyNetProfit)) : "12500"} />
