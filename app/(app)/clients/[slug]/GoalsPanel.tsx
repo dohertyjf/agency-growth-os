@@ -91,14 +91,39 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
     }
   }
 
+  const hasAny = monthlyNum > 0 || netProfitPctNum > 0 || closeRatePctNum > 0
+
   return (
     <form onSubmit={handleSave}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+        {/* Summary — always at top */}
+        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
+          <SectionLabel>Summary</SectionLabel>
+          {hasAny ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {monthlyNum > 0 && (
+                <Derived label="Monthly Revenue Goal" value={fmtCurrency(monthlyNum) + "/mo · " + fmtCurrency(annualNum) + "/yr"} />
+              )}
+              {netProfitPctNum > 0 && (
+                <Derived
+                  label="Net Profit Target"
+                  value={netProfitPctNum + "%" + (monthlyNum > 0 ? " · " + fmtCurrency(monthlyNetProfit) + "/mo" : "")}
+                />
+              )}
+              {closeRatePctNum > 0 && (
+                <Derived label="Close Rate Target" value={closeRatePctNum + "%"} />
+              )}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: "#9C9590" }}>Set your goals below and they'll appear here.</div>
+          )}
+        </div>
 
         {/* Revenue */}
         <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
           <SectionLabel>Revenue</SectionLabel>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, maxWidth: 480 }}>
             <div>
               <FieldLabel>Monthly Revenue Goal</FieldLabel>
               <div style={{ position: "relative" }}>
@@ -128,7 +153,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
         {/* Profitability */}
         <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
           <SectionLabel>Profitability</SectionLabel>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, maxWidth: 480 }}>
             <div>
               <FieldLabel>Net Profit Target</FieldLabel>
               <div style={{ position: "relative" }}>
@@ -158,7 +183,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
         {/* Sales */}
         <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
           <SectionLabel>Sales</SectionLabel>
-          <div style={{ maxWidth: 200 }}>
+          <div style={{ maxWidth: 220 }}>
             <FieldLabel>Close Rate Target</FieldLabel>
             <div style={{ position: "relative" }}>
               <input style={{ ...inputStyle, paddingRight: 22 }} type="number" min={0} max={100} step={1}
@@ -168,36 +193,15 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
           </div>
         </div>
 
-        {/* Summary */}
-        {(monthlyNum > 0 || netProfitPctNum > 0 || closeRatePctNum > 0) && (
-          <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
-            <SectionLabel>Summary</SectionLabel>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {monthlyNum > 0 && (
-                <Derived label="Monthly Revenue Goal" value={fmtCurrency(monthlyNum) + "/mo · " + fmtCurrency(annualNum) + "/yr"} />
-              )}
-              {netProfitPctNum > 0 && (
-                <Derived
-                  label="Net Profit Target"
-                  value={netProfitPctNum + "%" + (monthlyNum > 0 ? " · " + fmtCurrency(monthlyNetProfit) + "/mo" : "")}
-                />
-              )}
-              {closeRatePctNum > 0 && (
-                <Derived label="Close Rate Target" value={closeRatePctNum + "%"} />
-              )}
-            </div>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button type="submit" disabled={saving}
+            style={{ padding: "9px 24px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            {saving ? "Saving…" : "Save Goals"}
+          </button>
+          {saved && <span style={{ fontSize: 13, color: "#1F7A4D", fontWeight: 600 }}>Saved</span>}
+          {error && <span style={{ fontSize: 13, color: "#C2410C" }}>{error}</span>}
+        </div>
 
-      </div>
-
-      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 12 }}>
-        <button type="submit" disabled={saving}
-          style={{ padding: "9px 24px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-          {saving ? "Saving…" : "Save Goals"}
-        </button>
-        {saved && <span style={{ fontSize: 13, color: "#1F7A4D", fontWeight: 600 }}>Saved</span>}
-        {error && <span style={{ fontSize: 13, color: "#C2410C" }}>{error}</span>}
       </div>
     </form>
   )
