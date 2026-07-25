@@ -390,6 +390,22 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
     ? activeContracts.reduce((s, c) => s + (c.hoursPerMonth ?? 0), 0) / activeContracts.length
     : 0
 
+  // Avg Client Monthly Value: reported revenue / active contracts (falls back to contract MRR)
+  const revenueForACMV = (latest?.revenue ?? 0) > 0 ? latest!.revenue : currentMRR(contractRows, nowYM)
+  const acmv = activeClientCount > 0 ? revenueForACMV / activeClientCount : 0
+
+  // Avg Client Lifetime Value: ACMV × avg contract duration in months
+  function monthsBetween(a: string, b: string) {
+    const [ay, am] = a.split("-").map(Number)
+    const [by, bm] = b.split("-").map(Number)
+    return Math.max(1, (by - ay) * 12 + (bm - am) + 1)
+  }
+  const billableContracts = contracts.filter(c => c.type !== "oneoff")
+  const avgDurationMonths = billableContracts.length
+    ? billableContracts.reduce((s, c) => s + monthsBetween(c.start, c.contractedThrough ?? nowYM), 0) / billableContracts.length
+    : 0
+  const acltv = acmv * avgDurationMonths
+
   return (
     <div>
       {/* Edit Client Modal */}
@@ -595,6 +611,20 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
             />
           )
         })}
+        {acmv > 0 && (
+          <InsightCard
+            label="Avg Client / Mo"
+            value={fmtCurrency(acmv)}
+            sub={`${activeClientCount} active client${activeClientCount === 1 ? "" : "s"}`}
+          />
+        )}
+        {acltv > 0 && (
+          <InsightCard
+            label="Avg Client Lifetime"
+            value={fmtCurrency(acltv)}
+            sub={`~${Math.round(avgDurationMonths)} mo avg length`}
+          />
+        )}
       </div>
 
       {/* Goals Panel */}
@@ -695,6 +725,23 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
           onBulkImport={handleBulkMetricImport}
         />
       </div>
+    </div>
+  )
+}
+
+function InsightCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div style={{
+      flex: "1 1 150px", minWidth: 130,
+      background: "#FBFAF7", border: "1.5px solid #ECE7DE", borderRadius: 10, padding: "14px 16px",
+    }}>
+      <div style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 21, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", lineHeight: 1.2 }}>
+        {value}
+      </div>
+      {sub && <div style={{ fontSize: 11, color: "#9C9590", marginTop: 3 }}>{sub}</div>}
     </div>
   )
 }
