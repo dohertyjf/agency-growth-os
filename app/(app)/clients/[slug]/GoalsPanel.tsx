@@ -46,9 +46,9 @@ function Derived({ label, value }: { label: string; value: string }) {
 }
 
 export default function GoalsPanel({ clientId, initialGoal }: Props) {
-  const [monthly, setMonthly] = useState(String(initialGoal?.monthlyRevenue || ""))
-  const [netProfitPct, setNetProfitPct] = useState(String(initialGoal?.netProfitPct || ""))
-  const [closeRatePct, setCloseRatePct] = useState(String(initialGoal?.closeRatePct || ""))
+  const [monthly, setMonthly] = useState(initialGoal ? String(initialGoal.monthlyRevenue) : "50000")
+  const [netProfitPct, setNetProfitPct] = useState(initialGoal ? String(initialGoal.netProfitPct) : "25")
+  const [closeRatePct, setCloseRatePct] = useState(initialGoal ? String(initialGoal.closeRatePct) : "50")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)

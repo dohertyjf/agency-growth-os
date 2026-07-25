@@ -537,7 +537,6 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
           format={selectedCard === "contractMRR" ? "currency" : (CARDS.find(c => c.key === selectedCard)?.fmt ?? "currency")}
           label={selectedCard === "contractMRR" ? "Contracted MRR" : rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
           flowBars={flowBars}
-          goalValue={(selectedCard === "contractMRR" || selectedCard === "revenue") && mrrTarget > 0 ? mrrTarget : undefined}
         />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
           <button
