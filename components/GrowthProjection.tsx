@@ -63,11 +63,12 @@ const inputStyle: React.CSSProperties = {
 
 export default function GrowthProjection({ metrics, startMRR, avgContractSize, goalMRR, totalCapacityHours, avgContractHours, activeClientCount }: Props) {
   const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
+  const [lookback, setLookback] = useState<3 | 6>(6)
 
   const recentMetrics = useMemo(() => {
-    const past = metrics.filter(m => m.month <= now).slice(-3)
+    const past = metrics.filter(m => m.month <= now).slice(-lookback)
     return past
-  }, [metrics, now])
+  }, [metrics, now, lookback])
 
   const defaultLeads = useMemo(() => round1(avg(recentMetrics.map(m => m.leads))), [recentMetrics])
   const defaultCloseRate = useMemo(() => round1(avg(recentMetrics.map(m => m.closeRate))), [recentMetrics])
@@ -138,12 +139,22 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Growth Projection</div>
           <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
-            Based on last 3 months · adjust inputs to model scenarios
+            Based on last {lookback} months · adjust inputs to model scenarios
           </div>
         </div>
-        <button onClick={reset} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>
-          Reset to data
-        </button>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "flex", background: "#F0EDE8", borderRadius: 6, padding: 2, gap: 1 }}>
+            {([3, 6] as const).map(n => (
+              <button key={n} onClick={() => setLookback(n)}
+                style={{ padding: "3px 10px", fontSize: 11, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: lookback === n ? "#fff" : "transparent", color: lookback === n ? "#1A1916" : "#9C9590", boxShadow: lookback === n ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+                {n}M
+              </button>
+            ))}
+          </div>
+          <button onClick={reset} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>
+            Reset to data
+          </button>
+        </div>
       </div>
 
       {/* Inputs */}
