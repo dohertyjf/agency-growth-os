@@ -362,6 +362,14 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
+      <style>{`
+        @media (max-width: 640px) {
+          .account-form-grid { grid-template-columns: 1fr !important; }
+          .account-project-grid { grid-template-columns: 1fr 1fr !important; }
+          .account-header-row { flex-wrap: wrap !important; gap: 8px !important; }
+          .account-header-actions { margin-left: 0 !important; }
+        }
+      `}</style>
       {bulkOpen && (
         <BulkImportModal
           clientId={clientId}
@@ -392,7 +400,7 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
 
       {adding && (
         <form onSubmit={handleAdd} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: 14, marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <div className="account-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <div>
               <label style={labelStyle}>Account Name</label>
               <input style={{ ...inputStyle, background: "#fff" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Acme Marketing" required autoFocus />
@@ -432,7 +440,7 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
               <div key={account.id} style={{ border: "1px solid #F5F1EC", borderRadius: 8, overflow: "hidden" }}>
                 {isEditing ? (
                   <form onSubmit={e => handleEditSave(e, account.id)} style={{ padding: "10px 14px", background: "#FBFAF7", display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                    <div className="account-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                       <div>
                         <label style={labelStyle}>Account Name</label>
                         <input style={{ ...inputStyle, fontSize: 12 }} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} required autoFocus />
@@ -458,7 +466,7 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                     </div>
                   </form>
                 ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#FBFAF7" }}>
+                <div className="account-header-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#FBFAF7" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>{account.name}</div>
                     {(account.contactName || account.contactEmail) && (
@@ -508,7 +516,7 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                         <span style={{ fontSize: 11, color: "#C2956C" }}>No products yet — add them in the <strong>Products</strong> tab first.</span>
                       )}
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 8 }}>
+                    <div className="account-project-grid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 8 }}>
                       <div>
                         <label style={labelStyle}>Project Name</label>
                         <input style={{ ...inputStyle, fontSize: 12 }} value={projectForm.name} onChange={e => setProjectForm(f => ({ ...f, name: e.target.value }))} required autoFocus placeholder="Retainer" />

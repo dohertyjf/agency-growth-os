@@ -451,6 +451,16 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
   )
 }
 
+const contractsResponsiveStyle = `
+  @media (max-width: 640px) {
+    .contract-row { flex-wrap: wrap !important; gap: 6px 10px !important; }
+    .contract-row-actions { flex: 1 1 100% !important; }
+    .contract-gantt-wrap { overflow-x: auto; }
+    .contract-add-grid { grid-template-columns: 1fr 1fr !important; }
+    .contract-add-grid2 { grid-template-columns: 1fr 1fr !important; }
+  }
+`
+
 export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
@@ -523,6 +533,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
+      <style>{contractsResponsiveStyle}</style>
       {editingContract && (
         <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
       )}
@@ -565,7 +576,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               </select>
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
+          <div className="contract-add-grid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Project Name</label>
               <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Project Name" autoFocus />
@@ -598,7 +609,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               Save
             </button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: form.type === "retainer" ? "1fr 1fr 1fr 1fr" : "1fr 1fr 2fr", gap: 8 }}>
+          <div className="contract-add-grid2" style={{ display: "grid", gridTemplateColumns: form.type === "retainer" ? "1fr 1fr 1fr 1fr" : "1fr 1fr 2fr", gap: 8 }}>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Account</label>
               <AccountCombobox
@@ -636,12 +647,14 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
         <div style={{ color: "#9C9590", fontSize: 13 }}>No contracts yet.</div>
       ) : (
         <>
-          <ContractGantt
-            contracts={showAllGantt ? contracts : contracts.filter(c => c.status !== "finished")}
-            now={now}
-            showAll={showAllGantt}
-            onToggleShowAll={() => setShowAllGantt(v => !v)}
-          />
+          <div className="contract-gantt-wrap">
+            <ContractGantt
+              contracts={showAllGantt ? contracts : contracts.filter(c => c.status !== "finished")}
+              now={now}
+              showAll={showAllGantt}
+              onToggleShowAll={() => setShowAllGantt(v => !v)}
+            />
+          </div>
 
           {/* Active */}
           {byStatus.active.length > 0 && (
@@ -718,10 +731,10 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
         const isOneoff = c.type === "oneoff"
         const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name : null
         return (
-          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #F5F1EC", opacity: dimmed ? 0.6 : 1 }}>
-            <div style={{ flex: 1 }}>
+          <div key={c.id} className="contract-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #F5F1EC", opacity: dimmed ? 0.6 : 1 }}>
+            <div style={{ flex: "1 1 160px", minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</div>
-              <div style={{ fontSize: 11, color: "#9C9590" }}>
+              <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
                 {accountName
                   ? <span style={{ color: "#6B6760", fontWeight: 500 }}>{accountName} · </span>
                   : <span style={{ color: "#C2410C", fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>Unassigned · </span>
@@ -733,24 +746,22 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
                   : `${ymLabel(c.start)} – Ongoing`}
               </div>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }}>
-              {fmtCurrency(c.monthly)}{isOneoff ? "" : "/mo"}
-            </div>
-            {isOneoff && (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: "#EFF6FF", color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
-                One-off
+            <div className="contract-row-actions" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                {fmtCurrency(c.monthly)}{isOneoff ? "" : "/mo"}
+              </div>
+              {isOneoff && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: "#EFF6FF", color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+                  One-off
+                </span>
+              )}
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: colors.bg, color: colors.text, textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+                {STATUS_LABELS[s]}
               </span>
-            )}
-            <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: colors.bg, color: colors.text, textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
-              {STATUS_LABELS[s]}
-            </span>
-            <button onClick={() => onDuplicate(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>
-              Copy
-            </button>
-            <button onClick={() => onEdit(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>
-              Edit
-            </button>
-            <button onClick={() => onDelete(c.id)} style={{ background: "none", border: "none", color: "#9C9590", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
+              <button onClick={() => onDuplicate(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>Copy</button>
+              <button onClick={() => onEdit(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>Edit</button>
+              <button onClick={() => onDelete(c.id)} style={{ background: "none", border: "none", color: "#9C9590", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
+            </div>
           </div>
         )
       })}
