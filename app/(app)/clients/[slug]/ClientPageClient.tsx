@@ -9,6 +9,7 @@ import ProductsPanel from "./ProductsPanel"
 import ProgressPanel from "./ProgressPanel"
 import GoalsPanel from "./GoalsPanel"
 import PeoplePanel from "./PeoplePanel"
+import PipelinePanel from "./PipelinePanel"
 import { CurrencyProvider } from "@/lib/CurrencyContext"
 
 interface Metric {
@@ -36,6 +37,9 @@ interface Contract {
   status: string
   type: string
   accountId?: string | null
+  callDate: string | null
+  signedDate: string | null
+  kickoffDate: string | null
 }
 
 interface Person {
@@ -88,7 +92,7 @@ interface RoadmapItem {
   status: "none" | "red" | "yellow" | "green"
 }
 
-type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "people"
+type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "people"
 
 interface Props {
   clientId: string
@@ -113,6 +117,7 @@ interface Props {
 const TABS: { key: Tab; label: string }[] = [
   { key: "dashboard", label: "Overview" },
   { key: "accounts", label: "Accounts" },
+  { key: "pipeline", label: "Pipeline" },
   { key: "projects", label: "Projects" },
   { key: "people", label: "People" },
   { key: "products", label: "Products" },
@@ -210,6 +215,15 @@ export default function ClientPageClient({
           onAccountsChange={setAccounts}
           onContractAccountChange={handleContractAccountChange}
           onContractCreated={contract => setContracts(prev => [...prev, contract])}
+        />
+      )}
+
+      {currentTab === "pipeline" && (
+        <PipelinePanel
+          clientId={clientId}
+          contracts={contracts}
+          accounts={accounts}
+          onContractsChange={setContracts}
         />
       )}
 

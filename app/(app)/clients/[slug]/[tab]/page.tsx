@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import ClientPageClient from "../ClientPageClient"
 
-const VALID_TABS = ["dashboard", "accounts", "projects", "reconciliation", "progress", "products", "goals", "people"] as const
+const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "products", "goals", "people"] as const
 type Tab = typeof VALID_TABS[number]
 
 export default async function ClientTabPage({ params }: { params: Promise<{ slug: string; tab: string }> }) {
@@ -42,7 +42,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialStartDate={client.startDate ?? null}
       initialEndDate={client.endDate ?? null}
       metrics={metrics}
-      initialContracts={contracts.map(c => ({ ...c, accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null, hoursPerMonth: c.hoursPerMonth }))}
+      initialContracts={contracts.map(c => ({ ...c, accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null, hoursPerMonth: c.hoursPerMonth, callDate: c.callDate ?? null, signedDate: c.signedDate ?? null, kickoffDate: c.kickoffDate ?? null }))}
       initialPeople={people.map(p => ({ id: p.id, name: p.name, role: p.role ?? null, annualSalary: p.annualSalary, billableHours: p.billableHours }))}
       initialAccounts={accounts.map(a => ({ id: a.id, name: a.name, contactName: a.contactName, contactEmail: a.contactEmail, notes: a.notes }))}
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}

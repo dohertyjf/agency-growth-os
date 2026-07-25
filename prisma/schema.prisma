@@ -19,8 +19,10 @@ enum ClientStatus {
 }
 
 enum ContractStatus {
+  opportunity
   potential
   active
+  lost
   finished
 }
 
@@ -117,6 +119,9 @@ model Contract {
   type              ContractType   @default(retainer)
   accountId         String?
   account           Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  callDate          String?
+  signedDate        String?
+  kickoffDate       String?
   createdAt         DateTime       @default(now())
   accountMonths     AccountMonth[]
   payments          ContractPayment[]

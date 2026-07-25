@@ -8,9 +8,12 @@ const schema = z.object({
   hoursPerMonth: z.number().min(0).optional(),
   start: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
-  status: z.enum(["potential", "active", "finished"]).optional(),
+  status: z.enum(["opportunity", "potential", "active", "lost", "finished"]).optional(),
   type: z.enum(["retainer", "oneoff"]).optional(),
   accountId: z.string().nullable().optional(),
+  callDate: z.string().nullable().optional(),
+  signedDate: z.string().nullable().optional(),
+  kickoffDate: z.string().nullable().optional(),
 })
 
 async function authorizeContract(session: import("next-auth").Session | null, contractId: string) {

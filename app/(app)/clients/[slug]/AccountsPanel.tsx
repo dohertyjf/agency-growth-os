@@ -21,6 +21,9 @@ interface Contract {
   status: string
   type: string
   accountId?: string | null
+  callDate: string | null
+  signedDate: string | null
+  kickoffDate: string | null
 }
 
 type ContractStatus = "potential" | "active" | "finished"

@@ -29,9 +29,12 @@ const schema = z.object({
   hoursPerMonth: z.number().min(0).default(0),
   start: z.string().regex(/^\d{4}-\d{2}$/),
   contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
-  status: z.enum(["potential", "active", "finished"]).default("potential"),
+  status: z.enum(["opportunity", "potential", "active", "lost", "finished"]).default("potential"),
   type: z.enum(["retainer", "oneoff"]).default("retainer"),
   accountId: z.string().nullable().optional(),
+  callDate: z.string().nullable().optional(),
+  signedDate: z.string().nullable().optional(),
+  kickoffDate: z.string().nullable().optional(),
 })
 
 export async function POST(
