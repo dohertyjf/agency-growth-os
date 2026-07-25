@@ -13,6 +13,7 @@ async function authorizePerson(session: import("next-auth").Session | null, clie
 const schema = z.object({
   name: z.string().min(1).optional(),
   role: z.string().nullable().optional(),
+  annualSalary: z.number().min(0).optional(),
   billableHours: z.number().min(0).optional(),
 })
 

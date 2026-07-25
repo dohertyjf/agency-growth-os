@@ -127,6 +127,7 @@ model Person {
   client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name          String
   role          String?
+  annualSalary  Float    @default(0)
   billableHours Float    @default(0)
   createdAt     DateTime @default(now())
 }

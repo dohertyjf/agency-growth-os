@@ -41,6 +41,7 @@ interface Person {
   id: string
   name: string
   role: string | null
+  annualSalary: number
   billableHours: number
 }
 

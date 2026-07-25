@@ -23,6 +23,7 @@ export async function GET(
 const schema = z.object({
   name: z.string().min(1),
   role: z.string().optional(),
+  annualSalary: z.number().min(0).default(0),
   billableHours: z.number().min(0),
 })
 
