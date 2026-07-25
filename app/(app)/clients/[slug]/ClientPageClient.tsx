@@ -134,7 +134,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "people", label: "People" },
   { key: "products", label: "Products" },
   { key: "progress", label: "Progress" },
-  { key: "goals", label: "Goals & Constants" },
+  { key: "goals", label: "Settings" },
   { key: "reconciliation", label: "Reconciliation" },
 ]
 

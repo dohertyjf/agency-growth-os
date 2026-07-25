@@ -2,6 +2,12 @@
 import { useState } from "react"
 import { fmtCurrency } from "@/lib/calc"
 
+function currencySymbol(c: string) {
+  if (c === "GBP") return "£"
+  if (c === "EUR") return "€"
+  return "$"
+}
+
 interface Goal {
   monthlyRevenue: number
   netProfitPct: number
@@ -108,12 +114,12 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
           {hasAny ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {monthlyNum > 0 && (
-                <Derived label="Monthly Revenue Goal" value={fmtCurrency(monthlyNum) + "/mo · " + fmtCurrency(annualNum) + "/yr"} />
+                <Derived label="Monthly Revenue Goal" value={fmtCurrency(monthlyNum, currency) + "/mo · " + fmtCurrency(annualNum, currency) + "/yr"} />
               )}
               {netProfitPctNum > 0 && (
                 <Derived
                   label="Net Profit Target"
-                  value={netProfitPctNum + "%" + (monthlyNum > 0 ? " · " + fmtCurrency(monthlyNetProfit) + "/mo" : "")}
+                  value={netProfitPctNum + "%" + (monthlyNum > 0 ? " · " + fmtCurrency(monthlyNetProfit, currency) + "/mo" : "")}
                 />
               )}
               {closeRatePctNum > 0 && (
@@ -122,7 +128,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
               {peoplePctNum > 0 && (
                 <Derived
                   label="People Cost Target"
-                  value={peoplePctNum + "% of revenue" + (monthlyNum > 0 ? " · max " + fmtCurrency(monthlyNum * (peoplePctNum / 100)) + "/mo" : "")}
+                  value={peoplePctNum + "% of revenue" + (monthlyNum > 0 ? " · max " + fmtCurrency(monthlyNum * (peoplePctNum / 100), currency) + "/mo" : "")}
                 />
               )}
             </div>
@@ -138,7 +144,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
             <div>
               <FieldLabel>Monthly Revenue Goal</FieldLabel>
               <div style={{ position: "relative" }}>
-                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>$</span>
+                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>{currencySymbol(currency)}</span>
                 <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step="any"
                   value={monthly} onChange={e => setMonthly(e.target.value)} placeholder="50000" />
               </div>
@@ -146,7 +152,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
             <div>
               <FieldLabel hint="auto">Annual Revenue Goal</FieldLabel>
               <div style={{ position: "relative" }}>
-                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>$</span>
+                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>{currencySymbol(currency)}</span>
                 <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step="any"
                   value={annualNum || ""}
                   onChange={e => handleAnnualChange(e.target.value)}
@@ -156,7 +162,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
           </div>
           {monthlyNum > 0 && (
             <div style={{ marginTop: 12, fontSize: 12, color: "#9C9590" }}>
-              {fmtCurrency(monthlyNum)}/mo → {fmtCurrency(annualNum)}/yr
+              {fmtCurrency(monthlyNum, currency)}/mo → {fmtCurrency(annualNum, currency)}/yr
             </div>
           )}
         </div>
@@ -174,9 +180,9 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
               </div>
             </div>
             <div>
-              <FieldLabel hint="auto">Monthly Net Profit $</FieldLabel>
+              <FieldLabel hint="auto">Monthly Net Profit {currencySymbol(currency)}</FieldLabel>
               <div style={{ position: "relative" }}>
-                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>$</span>
+                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>{currencySymbol(currency)}</span>
                 <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step="any"
                   value={monthlyNetProfit ? String(Math.round(monthlyNetProfit)) : ""}
                   onChange={e => handleMonthlyNetProfitChange(e.target.value)}
@@ -186,7 +192,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
           </div>
           {netProfitPctNum > 0 && monthlyNum > 0 && (
             <div style={{ marginTop: 12, fontSize: 12, color: "#9C9590" }}>
-              {netProfitPctNum}% of {fmtCurrency(monthlyNum)} = {fmtCurrency(monthlyNetProfit)}/mo net profit
+              {netProfitPctNum}% of {fmtCurrency(monthlyNum, currency)} = {fmtCurrency(monthlyNetProfit, currency)}/mo net profit
             </div>
           )}
         </div>
@@ -216,7 +222,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
             </div>
             {peoplePctNum > 0 && monthlyNum > 0 && (
               <div style={{ marginTop: 8, fontSize: 12, color: "#9C9590" }}>
-                Max {fmtCurrency(monthlyNum * (peoplePctNum / 100))}/mo in people costs at your revenue goal
+                Max {fmtCurrency(monthlyNum * (peoplePctNum / 100), currency)}/mo in people costs at your revenue goal
               </div>
             )}
           </div>
@@ -242,7 +248,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button type="submit" disabled={saving}
             style={{ padding: "9px 24px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-            {saving ? "Saving…" : "Save Goals"}
+            {saving ? "Saving…" : "Save Settings"}
           </button>
           {saved && <span style={{ fontSize: 13, color: "#1F7A4D", fontWeight: 600 }}>Saved</span>}
           {error && <span style={{ fontSize: 13, color: "#C2410C" }}>{error}</span>}
