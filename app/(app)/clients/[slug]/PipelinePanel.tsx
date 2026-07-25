@@ -57,10 +57,11 @@ interface DealCardProps {
   advanceLabel: string
   onAdvance: (id: string) => void
   onLost: (id: string) => void
+  onRevert?: (id: string) => void
   fmt$: (v: number) => string
 }
 
-function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, fmt$ }: DealCardProps) {
+function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, fmt$ }: DealCardProps) {
   const accountName = deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name : null
   const daysSinceCall = daysSince(deal.callDate)
   const daysInPotential = deal.status === "potential" ? daysSince(deal.callDate) : null
@@ -90,6 +91,14 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, fmt$ }: Dea
         </div>
       </div>
       <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+        {onRevert && (
+          <button
+            onClick={() => onRevert(deal.id)}
+            style={{ padding: "6px 10px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, color: "#6B6760", cursor: "pointer", fontWeight: 500 }}
+          >
+            ← Opportunity
+          </button>
+        )}
         <button
           onClick={() => onAdvance(deal.id)}
           style={{ flex: 1, padding: "6px 10px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
@@ -115,10 +124,11 @@ interface DealGroupProps {
   advanceLabel: string
   onAdvance: (id: string) => void
   onLost: (id: string) => void
+  onRevert?: (id: string) => void
   fmt$: (v: number) => string
 }
 
-function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, fmt$ }: DealGroupProps) {
+function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, fmt$ }: DealGroupProps) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -135,6 +145,7 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
             advanceLabel={advanceLabel}
             onAdvance={onAdvance}
             onLost={onLost}
+            onRevert={onRevert}
             fmt$={fmt$}
           />
         ))}
@@ -268,6 +279,7 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
           advanceLabel="✓ Won"
           onAdvance={id => updateContract(id, { status: "active", signedDate: today })}
           onLost={id => updateContract(id, { status: "lost" })}
+          onRevert={id => updateContract(id, { status: "opportunity" })}
           fmt$={fmt$}
         />
 
