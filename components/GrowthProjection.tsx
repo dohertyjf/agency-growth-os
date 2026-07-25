@@ -1,7 +1,9 @@
 "use client"
 import { useState, useMemo } from "react"
 import { ymAdd, ymLabel } from "@/lib/calc"
-import { useFmtCurrency } from "@/lib/CurrencyContext"
+import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
+
+function currSym(c: string) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
 
 interface Metric {
   month: string
@@ -54,6 +56,7 @@ const inputStyle: React.CSSProperties = {
 export default function GrowthProjection({ metrics, startMRR, avgContractSize, goalMRR, totalCapacityHours, avgContractHours, activeClientCount }: Props) {
   const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
   const fmt$ = useFmtCurrency()
+  const sym = currSym(useCurrency())
   const [lookback, setLookback] = useState<3 | 6>(6)
 
   const recentMetrics = useMemo(() => {
@@ -115,12 +118,17 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
 
   // Chart
   const allVals = [startMRR, ...projected, revenueGoal, mrrCap ?? 0].filter(v => v > 0)
-  const maxVal = allVals.length ? Math.max(...allVals) * 1.1 : 1
-  const W = 520, H = 140, PL = 0, PR = 0, PT = 12, PB = 20
+  const dataMax = allVals.length ? Math.max(...allVals) : 1
+  const dataMin = allVals.length ? Math.min(...allVals) : 0
+  const spread = dataMax - dataMin || dataMax * 0.15 || 1
+  const maxVal = dataMax + spread * 0.2
+  const yMin = Math.max(0, dataMin - spread * 0.2)
+  const yRange = maxVal - yMin || 1
+  const W = 520, H = 160, PL = 0, PR = 0, PT = 16, PB = 24
   const plotW = W - PL - PR
   const plotH = H - PT - PB
   const toX = (i: number) => PL + (i / 11) * plotW
-  const toY = (v: number) => PT + plotH - (v / maxVal) * plotH
+  const toY = (v: number) => PT + plotH - ((v - yMin) / yRange) * plotH
 
   const pathD = projected.map((v, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(v)}`).join(" ")
   const goalY = revenueGoal > 0 ? toY(revenueGoal) : null
@@ -170,7 +178,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Avg Deal Size</label>
           <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff", width: "100%", boxSizing: "border-box" }}>
-            <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0, userSelect: "none" }}>$</span>
+            <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0, userSelect: "none" }}>{sym}</span>
             <input style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "6px 10px 6px 4px", width: "100%", boxSizing: "border-box" }}
               type="number" min={0} step={100} value={avgDeal}
               onChange={e => setAvgDeal(parseFloat(e.target.value) || 0)} />
@@ -193,7 +201,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
             placeholder="0" />
         </div>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>MRR Goal $</label>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>MRR Goal {sym}</label>
           <input style={inputStyle} type="number" min={0} step={1000} value={revenueGoal || ""}
             onChange={e => setRevenueGoal(parseFloat(e.target.value) || 0)}
             placeholder="50000" />
@@ -264,7 +272,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
             <>
               <line x1={PL} y1={capY} x2={W - PR} y2={capY}
                 stroke="#6B6760" strokeWidth={1} strokeDasharray="3,3" opacity={0.4} />
-              <text x={4} y={capY - 3} fontSize={9} fill="#6B6760" textAnchor="start" opacity={0.6}>
+              <text x={W - PR - 4} y={capY + 10} fontSize={9} fill="#6B6760" textAnchor="end" opacity={0.6}>
                 Capacity ceiling {fmt$(mrrCap)}
               </text>
             </>
@@ -294,23 +302,28 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           )}
 
           {/* Dots + month labels */}
-          {projected.map((v, i) => (
-            <g key={i}>
-              <circle cx={toX(i)} cy={toY(v)} r={3}
-                fill={mrrCap !== undefined && v >= mrrCap ? "#6B6760" : "#E9532A"}
-                opacity={0.6} />
-              {(i === 0 || i === 2 || i === 5 || i === 8 || i === 11) && (
-                <>
+          {projected.map((v, i) => {
+            const atCap = mrrCap !== undefined && v >= mrrCap
+            const showLabel = i === 0 || i === 11
+            const showValue = showLabel && !(atCap && i !== 0)
+            return (
+              <g key={i}>
+                <circle cx={toX(i)} cy={toY(v)} r={3}
+                  fill={atCap ? "#6B6760" : "#E9532A"}
+                  opacity={0.6} />
+                {(i === 0 || i === 3 || i === 6 || i === 9 || i === 11) && (
                   <text x={toX(i)} y={H - 4} fontSize={9} fill="#9C9590" textAnchor="middle">
                     {monthLabels[i]}
                   </text>
-                  <text x={toX(i)} y={toY(v) - 6} fontSize={9} fill="#1A1916" textAnchor="middle" fontWeight="600">
+                )}
+                {showValue && (
+                  <text x={toX(i)} y={toY(v) - 6} fontSize={9} fill="#1A1916" textAnchor={i === 0 ? "start" : "end"} fontWeight="600">
                     {fmt$(v)}
                   </text>
-                </>
-              )}
-            </g>
-          ))}
+                )}
+              </g>
+            )
+          })}
         </svg>
       </div>
     </div>
