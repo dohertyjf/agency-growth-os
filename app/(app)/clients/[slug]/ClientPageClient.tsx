@@ -141,6 +141,7 @@ export default function ClientPageClient({
   const [people, setPeople] = useState<Person[]>(initialPeople)
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
+  const monthlyPayroll = people.reduce((s, p) => s + p.annualSalary, 0) / 12
 
   function handleRevenueUpdate(month: string, revenue: number) {
     setMetrics(prev => {
@@ -205,6 +206,7 @@ export default function ClientPageClient({
           initialStartDate={initialStartDate}
           initialEndDate={initialEndDate}
           totalCapacityHours={totalCapacityHours}
+          monthlyPayroll={monthlyPayroll}
         />
       )}
 
