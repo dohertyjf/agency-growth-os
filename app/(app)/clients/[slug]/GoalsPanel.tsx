@@ -6,6 +6,7 @@ interface Goal {
   monthlyRevenue: number
   netProfitPct: number
   closeRatePct: number
+  currency?: string
 }
 
 interface Props {
@@ -49,6 +50,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
   const [monthly, setMonthly] = useState(initialGoal ? String(initialGoal.monthlyRevenue) : "50000")
   const [netProfitPct, setNetProfitPct] = useState(initialGoal ? String(initialGoal.netProfitPct) : "25")
   const [closeRatePct, setCloseRatePct] = useState(initialGoal ? String(initialGoal.closeRatePct) : "50")
+  const [currency, setCurrency] = useState(initialGoal?.currency ?? "USD")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,7 +81,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
       const res = await fetch(`/api/clients/${clientId}/goal`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ monthlyRevenue: monthlyNum, netProfitPct: netProfitPctNum, closeRatePct: closeRatePctNum }),
+        body: JSON.stringify({ monthlyRevenue: monthlyNum, netProfitPct: netProfitPctNum, closeRatePct: closeRatePctNum, currency }),
       })
       if (!res.ok) throw new Error("Save failed")
       setSaved(true)
@@ -190,6 +192,23 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
                 value={closeRatePct} onChange={e => setCloseRatePct(e.target.value)} placeholder="50" />
               <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>%</span>
             </div>
+          </div>
+        </div>
+
+        {/* Currency */}
+        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
+          <SectionLabel>Display</SectionLabel>
+          <div style={{ maxWidth: 220 }}>
+            <FieldLabel>Default Currency</FieldLabel>
+            <select
+              value={currency}
+              onChange={e => setCurrency(e.target.value)}
+              style={{ ...inputStyle, cursor: "pointer" }}
+            >
+              <option value="USD">USD — US Dollar ($)</option>
+              <option value="GBP">GBP — British Pound (£)</option>
+              <option value="EUR">EUR — Euro (€)</option>
+            </select>
           </div>
         </div>
 

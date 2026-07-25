@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { fmtCurrency, ymLabel } from "@/lib/calc"
+import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Account {
   id: string
@@ -118,6 +119,7 @@ function parseBulk(text: string): ParsedRow[] {
 }
 
 function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; onClose: () => void; onImport: (accounts: Account[], contracts: Contract[]) => void }) {
+  const fmtCurrency = useFmtCurrency()
   const [text, setText] = useState("")
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -237,6 +239,7 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
 }
 
 export default function AccountsPanel({ clientId, initialAccounts, contracts, products, onAccountsChange, onContractAccountChange, onContractCreated }: Props) {
+  const fmtCurrency = useFmtCurrency()
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [adding, setAdding] = useState(false)

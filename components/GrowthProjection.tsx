@@ -1,6 +1,7 @@
 "use client"
 import { useState, useMemo } from "react"
-import { fmtCurrency, ymAdd, ymLabel } from "@/lib/calc"
+import { ymAdd, ymLabel } from "@/lib/calc"
+import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Metric {
   month: string
@@ -52,6 +53,7 @@ const inputStyle: React.CSSProperties = {
 
 export default function GrowthProjection({ metrics, startMRR, avgContractSize, goalMRR, totalCapacityHours, avgContractHours, activeClientCount }: Props) {
   const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
+  const fmt$ = useFmtCurrency()
   const [lookback, setLookback] = useState<3 | 6>(6)
 
   const recentMetrics = useMemo(() => {
@@ -166,9 +168,13 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
             onChange={e => setCloseRate(parseFloat(e.target.value) || 0)} />
         </div>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Avg Deal Size $</label>
-          <input style={inputStyle} type="number" min={0} step={100} value={avgDeal}
-            onChange={e => setAvgDeal(parseFloat(e.target.value) || 0)} />
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Avg Deal Size</label>
+          <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff", width: "100%", boxSizing: "border-box" }}>
+            <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0, userSelect: "none" }}>$</span>
+            <input style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "6px 10px 6px 4px", width: "100%", boxSizing: "border-box" }}
+              type="number" min={0} step={100} value={avgDeal}
+              onChange={e => setAvgDeal(parseFloat(e.target.value) || 0)} />
+          </div>
         </div>
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Churn / mo</label>
@@ -198,15 +204,15 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 14, fontSize: 11, color: "#9C9590" }}>
         <span>
           <span style={{ color: "#1A1916", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-            +{fmtCurrency(newClientsPerMonth * avgDeal)}
+            +{fmt$(newClientsPerMonth * avgDeal)}
           </span>
           {" new MRR/mo "}
           <span style={{ color: "#1A1916", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-            −{fmtCurrency(churn * avgDeal)}
+            −{fmt$(churn * avgDeal)}
           </span>
           {" churn/mo → "}
           <span style={{ color: netMRRChange >= 0 ? "#1F7A4D" : "#C2410C", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-            {netMRRChange >= 0 ? "+" : ""}{fmtCurrency(netMRRChange)}/mo net
+            {netMRRChange >= 0 ? "+" : ""}{fmt$(netMRRChange)}/mo net
           </span>
         </span>
         {revenueGoal > 0 && goalHitMonth >= 0 && (
@@ -243,7 +249,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           {mrrCap !== undefined && (
             <span style={{ color: "#6B6760" }}>
               {"· MRR ceiling "}
-              <span style={{ fontWeight: 700, color: "#1A1916" }}>{fmtCurrency(mrrCap)}</span>
+              <span style={{ fontWeight: 700, color: "#1A1916" }}>{fmt$(mrrCap)}</span>
               {maxClients !== null ? ` (${maxClients} clients)` : ""}
             </span>
           )}
@@ -259,7 +265,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
               <line x1={PL} y1={capY} x2={W - PR} y2={capY}
                 stroke="#6B6760" strokeWidth={1} strokeDasharray="3,3" opacity={0.4} />
               <text x={4} y={capY - 3} fontSize={9} fill="#6B6760" textAnchor="start" opacity={0.6}>
-                Capacity ceiling {fmtCurrency(mrrCap)}
+                Capacity ceiling {fmt$(mrrCap)}
               </text>
             </>
           )}
@@ -270,7 +276,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
               <line x1={PL} y1={goalY} x2={W - PR} y2={goalY}
                 stroke="#E9532A" strokeWidth={1} strokeDasharray="4,3" opacity={0.5} />
               <text x={W - PR - 4} y={goalY - 3} fontSize={9} fill="#E9532A" textAnchor="end" opacity={0.7}>
-                Goal {fmtCurrency(revenueGoal)}
+                Goal {fmt$(revenueGoal)}
               </text>
             </>
           )}
@@ -299,7 +305,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
                     {monthLabels[i]}
                   </text>
                   <text x={toX(i)} y={toY(v) - 6} fontSize={9} fill="#1A1916" textAnchor="middle" fontWeight="600">
-                    {fmtCurrency(v)}
+                    {fmt$(v)}
                   </text>
                 </>
               )}

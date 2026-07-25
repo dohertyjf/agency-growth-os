@@ -8,7 +8,7 @@ function authorize(session: import("next-auth").Session | null, clientId: string
   return session.user.clientId === clientId
 }
 
-const EMPTY_GOAL = { annualRevenue: 0, profit: 0, monthlyRevenue: 0, netProfitPct: 0, closeRatePct: 0 }
+const EMPTY_GOAL = { annualRevenue: 0, profit: 0, monthlyRevenue: 0, netProfitPct: 0, closeRatePct: 0, currency: "USD" }
 
 export async function GET(
   _req: Request,
@@ -26,6 +26,7 @@ const schema = z.object({
   monthlyRevenue: z.number().min(0),
   netProfitPct: z.number().min(0).max(100),
   closeRatePct: z.number().min(0).max(100),
+  currency: z.enum(["USD", "GBP", "EUR"]).default("USD"),
 })
 
 export async function PUT(
@@ -40,11 +41,12 @@ export async function PUT(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
-  const { monthlyRevenue, netProfitPct, closeRatePct } = parsed.data
+  const { monthlyRevenue, netProfitPct, closeRatePct, currency } = parsed.data
   const data = {
     monthlyRevenue,
     netProfitPct,
     closeRatePct,
+    currency,
     annualRevenue: monthlyRevenue * 12,
     profit: monthlyRevenue * (netProfitPct / 100) * 12,
   }

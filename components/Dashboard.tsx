@@ -1,5 +1,6 @@
 "use client"
 import { useState, useMemo } from "react"
+import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
 import { useRouter } from "next/navigation"
 import MetricCard from "./MetricCard"
 import MetricChart, { ChartPoint, FlowBars } from "./MetricChart"
@@ -90,8 +91,8 @@ function derivedMetrics(m: Metric) {
   }
 }
 
-function fmtValue(v: number, fmt: "currency" | "percent" | "number"): string {
-  if (fmt === "currency") return fmtCurrency(v)
+function fmtValue(v: number, fmt: "currency" | "percent" | "number", currency = "USD"): string {
+  if (fmt === "currency") return fmtCurrency(v, currency)
   if (fmt === "percent") return fmtPercent(v)
   return String(Math.round(v))
 }
@@ -111,6 +112,8 @@ const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 
 
 export default function Dashboard({ clientId, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0 }: Props) {
   const router = useRouter()
+  const fmt$ = useFmtCurrency()
+  const currency = useCurrency()
   const [range, setRange] = useState<3 | 6 | 12>(3)
   const [selectedCard, setSelectedCard] = useState<CardKey>("contractMRR")
   const [editOpen, setEditOpen] = useState(false)
@@ -587,7 +590,7 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 24 }}>
         <MetricCard
           label="Contracted MRR"
-          value={fmtCurrency(currentMRR(contractRows, nowYM))}
+          value={fmt$(currentMRR(contractRows, nowYM))}
           delta={contractMRRSparkline.length >= 2 ? momDelta(contractMRRSparkline[contractMRRSparkline.length - 1], contractMRRSparkline[contractMRRSparkline.length - 2]) : null}
           sparkline={contractMRRSparkline}
           selected={selectedCard === "contractMRR"}
@@ -602,7 +605,7 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
             <MetricCard
               key={card.key}
               label={card.label}
-              value={fmtValue(val, card.fmt)}
+              value={fmtValue(val, card.fmt, currency)}
               delta={delta}
               sparkline={sparkline}
               selected={selectedCard === card.key}
@@ -613,14 +616,14 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
         {acmv > 0 && (
           <InsightCard
             label="Avg Client / Mo"
-            value={fmtCurrency(acmv)}
+            value={fmt$(acmv)}
             sub={`${activeClientCount} active client${activeClientCount === 1 ? "" : "s"}`}
           />
         )}
         {acltv > 0 && (
           <InsightCard
             label="Avg Client Lifetime"
-            value={fmtCurrency(acltv)}
+            value={fmt$(acltv)}
             sub={`~${Math.round(avgDurationMonths)} mo avg length`}
           />
         )}
@@ -641,7 +644,7 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
             <GoalItem label="Net Profit / Mo" current={latest?.netProfit ?? 0} target={monthlyProfitTarget} pct={npPct} fmt="currency" />
             <div>
               <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 4 }}>Booked ahead</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(booked)}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmt$(booked)}</div>
               <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>in active contracts</div>
             </div>
           </div>
@@ -746,7 +749,8 @@ function InsightCard({ label, value, sub }: { label: string; value: string; sub?
 }
 
 function GoalItem({ label, current, target, pct, fmt }: { label: string; current: number; target: number; pct: number; fmt: "currency" | "percent" | "number" }) {
-  const f = (v: number) => fmt === "currency" ? fmtCurrency(v) : fmtPercent(v)
+  const fmt$ = useFmtCurrency()
+  const f = (v: number) => fmt === "currency" ? fmt$(v) : fmtPercent(v)
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 11, color: "#6B6760" }}>

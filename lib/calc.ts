@@ -163,8 +163,11 @@ export function ymLabel(ym: string): string {
   return `${months[m - 1]} '${String(y).slice(2)}`
 }
 
-export function fmtCurrency(v: number) {
-  return "$" + Math.round(v).toLocaleString()
+const CURRENCY_LOCALE: Record<string, string> = { USD: "en-US", GBP: "en-GB", EUR: "de-DE" }
+
+export function fmtCurrency(v: number, currency = "USD"): string {
+  const locale = CURRENCY_LOCALE[currency] ?? "en-US"
+  return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(Math.round(v))
 }
 export function fmtPercent(v: number) {
   return (Math.round(v * 10) / 10) + "%"

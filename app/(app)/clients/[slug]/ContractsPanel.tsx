@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, type ContractRow } from "@/lib/calc"
+import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Contract {
   id: string
@@ -462,6 +463,7 @@ const contractsResponsiveStyle = `
 `
 
 export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
+  const fmtCurrency = useFmtCurrency()
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
   const [adding, setAdding] = useState(false)
@@ -718,6 +720,7 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
   onDuplicate: (c: Contract) => void
   dimmed?: boolean
 }) {
+  const fmtCurrency = useFmtCurrency()
   return (
     <div style={{ marginTop: title ? 12 : 4 }}>
       {title && (

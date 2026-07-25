@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { fmtCurrency } from "@/lib/calc"
+import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Product {
   id: string
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export default function ProductsPanel({ clientId, initialProducts, onProductsChange }: Props) {
+  const fmtCurrency = useFmtCurrency()
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState<ProductForm>(defaultForm)

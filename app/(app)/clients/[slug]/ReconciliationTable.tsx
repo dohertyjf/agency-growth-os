@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { fmtCurrency } from "@/lib/calc"
+import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Contract {
   id: string
@@ -60,6 +61,7 @@ function ymAdd(ym: string, months: number): string {
 }
 
 export default function ReconciliationTable({ contracts, initialAccountMonths, initialPayments, onRevenueUpdate, onPaymentsChange }: Props) {
+  const fmtCurrency = useFmtCurrency()
   const [accountMonths, setAccountMonths] = useState<AccountMonth[]>(initialAccountMonths)
   const [payments, setPayments] = useState<Payment[]>(initialPayments)
   const [editing, setEditing] = useState<{ contractId: string; month: string } | null>(null)

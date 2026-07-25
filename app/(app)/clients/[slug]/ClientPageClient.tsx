@@ -9,6 +9,7 @@ import ProductsPanel from "./ProductsPanel"
 import ProgressPanel from "./ProgressPanel"
 import GoalsPanel from "./GoalsPanel"
 import PeoplePanel from "./PeoplePanel"
+import { CurrencyProvider } from "@/lib/CurrencyContext"
 
 interface Metric {
   id: string
@@ -71,6 +72,7 @@ interface Goal {
   monthlyRevenue: number
   netProfitPct: number
   closeRatePct: number
+  currency?: string
 }
 
 interface Product {
@@ -145,7 +147,10 @@ export default function ClientPageClient({
     setContracts(prev => prev.map(c => c.id === contractId ? { ...c, accountId } : c))
   }
 
+  const currency = goal?.currency ?? "USD"
+
   return (
+    <CurrencyProvider currency={currency}>
     <div>
       <div style={{ marginBottom: 20 }}>
         <Link href="/clients" style={{ fontSize: 13, color: "#9C9590", textDecoration: "none" }}>← Clients</Link>
@@ -256,5 +261,6 @@ export default function ClientPageClient({
         />
       )}
     </div>
+    </CurrencyProvider>
   )
 }
