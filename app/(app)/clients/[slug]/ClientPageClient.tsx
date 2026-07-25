@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import Link from "next/link"
 import Dashboard from "@/components/Dashboard"
 import ContractsPanel from "./ContractsPanel"
@@ -152,7 +152,26 @@ export default function ClientPageClient({
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
-  const monthlyPayroll = people.reduce((s, p) => s + p.annualSalary, 0) / 12
+
+  // Per-month payroll: for each metric month, sum each active person's salary override
+  // or fall back to annualSalary / 12, respecting start/end dates.
+  const payrollByMonth = useMemo(() => {
+    const overrides = new Map<string, number>()
+    salaryMonths.forEach(sm => overrides.set(`${sm.personId}:${sm.month}`, sm.monthlySalary))
+    const map = new Map<string, number>()
+    metrics.forEach(m => {
+      let total = 0
+      people.forEach(p => {
+        const start = p.startDate ? p.startDate.slice(0, 7) : null
+        const end = p.endDate ? p.endDate.slice(0, 7) : null
+        if (start && m.month < start) return
+        if (end && m.month > end) return
+        total += overrides.get(`${p.id}:${m.month}`) ?? (p.annualSalary > 0 ? p.annualSalary / 12 : 0)
+      })
+      map.set(m.month, total)
+    })
+    return map
+  }, [people, salaryMonths, metrics])
 
   function handleRevenueUpdate(month: string, revenue: number) {
     setMetrics(prev => {
@@ -217,7 +236,7 @@ export default function ClientPageClient({
           initialStartDate={initialStartDate}
           initialEndDate={initialEndDate}
           totalCapacityHours={totalCapacityHours}
-          monthlyPayroll={monthlyPayroll}
+          payrollByMonth={payrollByMonth}
         />
       )}
 

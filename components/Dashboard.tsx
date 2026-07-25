@@ -58,7 +58,7 @@ interface Props {
   clientSlug: string
   clientName: string
   totalCapacityHours?: number
-  monthlyPayroll?: number
+  payrollByMonth?: Map<string, number>
   metrics: Metric[]
   contracts: Contract[]
   goal: Goal | null
@@ -83,14 +83,14 @@ const CARDS: { key: MetricKey; label: string; fmt: "currency" | "percent" | "num
   { key: "peopleCostPct", label: "People Cost %", fmt: "percent" },
 ]
 
-function derivedMetrics(m: Metric, monthlyPayroll = 0) {
+function derivedMetrics(m: Metric, payroll = 0) {
   return {
     ...m,
     grossProfit: grossProfit(m.revenue, m.salaries),
     netProfit: netProfit(m.revenue, m.totalExpenses),
     netMargin: netMargin(m.revenue, m.totalExpenses),
     closeRate: m.leads > 0 ? (m.newClients / m.leads) * 100 : 0,
-    peopleCostPct: monthlyPayroll > 0 && m.revenue > 0 ? (monthlyPayroll / m.revenue) * 100 : 0,
+    peopleCostPct: payroll > 0 && m.revenue > 0 ? (payroll / m.revenue) * 100 : 0,
   }
 }
 
@@ -113,7 +113,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, monthlyPayroll = 0 }: Props) {
+export default function Dashboard({ clientId, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, payrollByMonth }: Props) {
   const router = useRouter()
   const fmt$ = useFmtCurrency()
   const currency = useCurrency()
@@ -204,13 +204,13 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
   // Slice to range (last N months) — used for chart sparklines
   const metrics = useMemo(() => {
     const sorted = [...rawMetrics].sort((a, b) => a.month.localeCompare(b.month))
-    return sorted.slice(-range).map(m => derivedMetrics(m, monthlyPayroll))
-  }, [rawMetrics, range, monthlyPayroll])
+    return sorted.slice(-range).map(m => derivedMetrics(m, payrollByMonth?.get(m.month) ?? 0))
+  }, [rawMetrics, range, payrollByMonth])
 
   // All months sorted+derived — used for card month picker
   const allDerived = useMemo(() =>
-    [...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).map(m => derivedMetrics(m, monthlyPayroll)),
-    [rawMetrics, monthlyPayroll]
+    [...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).map(m => derivedMetrics(m, payrollByMonth?.get(m.month) ?? 0)),
+    [rawMetrics, payrollByMonth]
   )
 
   // Metric card values: use cardMonth (or nearest past month with data)
