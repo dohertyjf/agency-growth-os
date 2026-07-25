@@ -5,6 +5,8 @@ import { z } from "zod"
 const schema = z.array(z.object({
   name: z.string().min(1),
   role: z.string().optional(),
+  responsibilities: z.string().nullable().optional(),
+  isExternal: z.boolean().default(false),
   annualSalary: z.number().min(0).default(0),
   billableHours: z.number().min(0).default(0),
 })).min(1)

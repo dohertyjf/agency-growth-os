@@ -46,6 +46,8 @@ interface Person {
   id: string
   name: string
   role: string | null
+  responsibilities: string | null
+  isExternal: boolean
   annualSalary: number
   billableHours: number
 }

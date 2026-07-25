@@ -1,10 +1,31 @@
 "use client"
 import { useState, useMemo } from "react"
 
+const ROLES = ["Delivery", "Sales", "Marketing", "Finance", "Operations"] as const
+type Role = typeof ROLES[number]
+
+const ROLE_COLORS: Record<Role, { bg: string; text: string }> = {
+  Delivery:   { bg: "#EFF6FF", text: "#1D4ED8" },
+  Sales:      { bg: "#DCFCE7", text: "#166534" },
+  Marketing:  { bg: "#F5F3FF", text: "#5B21B6" },
+  Finance:    { bg: "#FFF7ED", text: "#92400E" },
+  Operations: { bg: "#F3F4F6", text: "#374151" },
+}
+
+function parseRoles(s: string | null): string[] {
+  return s ? s.split(",").filter(Boolean) : []
+}
+
+function stringifyRoles(roles: string[]): string | null {
+  return roles.length ? roles.join(",") : null
+}
+
 interface Person {
   id: string
   name: string
   role: string | null
+  responsibilities: string | null
+  isExternal: boolean
   annualSalary: number
   billableHours: number
 }
@@ -28,6 +49,66 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13, background: "#fff", color: "#1A1916",
   width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none",
 }
+const labelStyle: React.CSSProperties = { fontSize: 11, color: "#9C9590", fontWeight: 600, display: "block", marginBottom: 4 }
+
+function RoleChip({ role }: { role: string }) {
+  const colors = ROLE_COLORS[role as Role] ?? { bg: "#F3F4F6", text: "#374151" }
+  return (
+    <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: colors.bg, color: colors.text, whiteSpace: "nowrap" }}>
+      {role}
+    </span>
+  )
+}
+
+function RolePicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [open, setOpen] = useState(false)
+
+  function toggle(role: string) {
+    onChange(value.includes(role) ? value.filter(r => r !== role) : [...value, role])
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{ ...inputStyle, textAlign: "left", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}
+      >
+        {value.length > 0 ? (
+          <span style={{ display: "flex", flexWrap: "wrap", gap: 4, flex: 1 }}>
+            {value.map(r => <RoleChip key={r} role={r} />)}
+          </span>
+        ) : (
+          <span style={{ color: "#9C9590" }}>Select roles…</span>
+        )}
+        <span style={{ color: "#9C9590", fontSize: 10, flexShrink: 0 }}>▾</span>
+      </button>
+      {open && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 99 }} onClick={() => setOpen(false)} />
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, background: "#fff", border: "1px solid #ECE7DE", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", marginTop: 2 }}>
+            {ROLES.map(role => (
+              <label
+                key={role}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid #F5F1EC" }}
+                onClick={e => { e.preventDefault(); toggle(role) }}
+              >
+                <div style={{
+                  width: 16, height: 16, borderRadius: 4, border: `2px solid ${value.includes(role) ? "#E9532A" : "#ECE7DE"}`,
+                  background: value.includes(role) ? "#E9532A" : "#fff", flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {value.includes(role) && <span style={{ color: "#fff", fontSize: 10, lineHeight: 1 }}>✓</span>}
+                </div>
+                <RoleChip role={role} />
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 function fmtSalary(n: number) {
   if (!n) return "—"
@@ -49,16 +130,17 @@ function parseBulkText(text: string): BulkRow[] {
     })
 }
 
+const emptyAddForm = { name: "", role: "", responsibilities: [] as string[], isExternal: false, annualSalary: "", billableHours: "" }
+
 export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }: Props) {
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [mode, setMode] = useState<"none" | "add" | "bulk">("none")
-  const [addForm, setAddForm] = useState({ name: "", role: "", annualSalary: "", billableHours: "" })
+  const [addForm, setAddForm] = useState(emptyAddForm)
   const [addSaving, setAddSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ name: "", role: "", annualSalary: "", billableHours: "" })
+  const [editForm, setEditForm] = useState({ name: "", role: "", responsibilities: [] as string[], isExternal: false, annualSalary: "", billableHours: "" })
   const [editSaving, setEditSaving] = useState(false)
 
-  // Bulk
   const [bulkText, setBulkText] = useState("")
   const [bulkSaving, setBulkSaving] = useState(false)
   const bulkRows = useMemo(() => bulkText.trim() ? parseBulkText(bulkText) : [], [bulkText])
@@ -79,6 +161,8 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
       body: JSON.stringify({
         name: addForm.name.trim(),
         role: addForm.role.trim() || undefined,
+        responsibilities: stringifyRoles(addForm.responsibilities),
+        isExternal: addForm.isExternal,
         annualSalary: parseFloat(addForm.annualSalary) || 0,
         billableHours: parseFloat(addForm.billableHours) || 0,
       }),
@@ -87,14 +171,21 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
     if (res.ok) {
       const created = await res.json()
       update([...people, created])
-      setAddForm({ name: "", role: "", annualSalary: "", billableHours: "" })
+      setAddForm(emptyAddForm)
       setMode("none")
     }
   }
 
   function startEdit(p: Person) {
     setEditingId(p.id)
-    setEditForm({ name: p.name, role: p.role ?? "", annualSalary: p.annualSalary ? String(p.annualSalary) : "", billableHours: String(p.billableHours) })
+    setEditForm({
+      name: p.name,
+      role: p.role ?? "",
+      responsibilities: parseRoles(p.responsibilities),
+      isExternal: p.isExternal,
+      annualSalary: p.annualSalary ? String(p.annualSalary) : "",
+      billableHours: String(p.billableHours),
+    })
   }
 
   async function handleEditSave(e: React.FormEvent, personId: string) {
@@ -106,6 +197,8 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
       body: JSON.stringify({
         name: editForm.name.trim(),
         role: editForm.role.trim() || null,
+        responsibilities: stringifyRoles(editForm.responsibilities),
+        isExternal: editForm.isExternal,
         annualSalary: parseFloat(editForm.annualSalary) || 0,
         billableHours: parseFloat(editForm.billableHours) || 0,
       }),
@@ -176,27 +269,41 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
 
         {/* Single add form */}
         {mode === "add" && (
-          <form onSubmit={handleAdd} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: 14, marginBottom: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
+          <form onSubmit={handleAdd} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: 14, marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.5fr", gap: 10 }}>
               <div>
-                <label style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, display: "block", marginBottom: 4 }}>Name</label>
+                <label style={labelStyle}>Name</label>
                 <input style={{ ...inputStyle, background: "#FBFAF7" }} value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))} required placeholder="Jane Smith" autoFocus />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, display: "block", marginBottom: 4 }}>Title <span style={{ fontWeight: 400 }}>(optional)</span></label>
-                <input style={{ ...inputStyle, background: "#FBFAF7" }} value={addForm.role} onChange={e => setAddForm(f => ({ ...f, role: e.target.value }))} placeholder="Consultant" />
+                <label style={labelStyle}>Title <span style={{ fontWeight: 400 }}>(optional)</span></label>
+                <input style={{ ...inputStyle, background: "#FBFAF7" }} value={addForm.role} onChange={e => setAddForm(f => ({ ...f, role: e.target.value }))} placeholder="Owner" />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, display: "block", marginBottom: 4 }}>Annual Salary $</label>
+                <label style={labelStyle}>Responsibilities</label>
+                <RolePicker value={addForm.responsibilities} onChange={v => setAddForm(f => ({ ...f, responsibilities: v }))} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto", gap: 10, alignItems: "end" }}>
+              <div>
+                <label style={labelStyle}>Annual Salary $</label>
                 <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" min={0} step={1000} value={addForm.annualSalary} onChange={e => setAddForm(f => ({ ...f, annualSalary: e.target.value }))} placeholder="60000" />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, display: "block", marginBottom: 4 }}>Billable hrs/mo</label>
+                <label style={labelStyle}>Billable hrs/mo</label>
                 <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" min={0} step={1} value={addForm.billableHours} onChange={e => setAddForm(f => ({ ...f, billableHours: e.target.value }))} required placeholder="50" />
               </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6B6760", cursor: "pointer", paddingBottom: 2, whiteSpace: "nowrap" }}>
+                <input type="checkbox" checked={addForm.isExternal} onChange={e => setAddForm(f => ({ ...f, isExternal: e.target.checked }))} />
+                External / Vendor
+              </label>
               <button type="submit" disabled={addSaving}
-                style={{ padding: "7px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", height: 34, alignSelf: "end" }}>
+                style={{ padding: "7px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", height: 34 }}>
                 {addSaving ? "…" : "Save"}
+              </button>
+              <button type="button" onClick={() => { setMode("none"); setAddForm(emptyAddForm) }}
+                style={{ padding: "7px 10px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, cursor: "pointer", color: "#6B6760", height: 34 }}>
+                Cancel
               </button>
             </div>
           </form>
@@ -264,7 +371,7 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Name", "Title", "Annual Salary", "Billable hrs/mo", ""].map(h => (
+                {["Name", "Title", "Responsibilities", "Annual Salary", "Billable hrs/mo", ""].map(h => (
                   <th key={h} style={{ textAlign: h === "Annual Salary" || h === "Billable hrs/mo" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
                 ))}
               </tr>
@@ -273,26 +380,46 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
               {people.map(p => (
                 <tr key={p.id}>
                   {editingId === p.id ? (
-                    <td colSpan={5} style={{ padding: "8px 0" }}>
-                      <form onSubmit={e => handleEditSave(e, p.id)} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr auto auto", gap: 8, alignItems: "end" }}>
-                        <input style={inputStyle} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} required autoFocus />
-                        <input style={inputStyle} value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))} placeholder="Title" />
-                        <input style={inputStyle} type="number" min={0} step={1000} value={editForm.annualSalary} onChange={e => setEditForm(f => ({ ...f, annualSalary: e.target.value }))} placeholder="Annual salary" />
-                        <input style={inputStyle} type="number" min={0} step={1} value={editForm.billableHours} onChange={e => setEditForm(f => ({ ...f, billableHours: e.target.value }))} required />
-                        <button type="submit" disabled={editSaving}
-                          style={{ padding: "7px 12px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                          {editSaving ? "…" : "Save"}
-                        </button>
-                        <button type="button" onClick={() => setEditingId(null)}
-                          style={{ padding: "7px 10px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, cursor: "pointer", color: "#6B6760" }}>
-                          Cancel
-                        </button>
+                    <td colSpan={6} style={{ padding: "8px 0" }}>
+                      <form onSubmit={e => handleEditSave(e, p.id)} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.5fr", gap: 8 }}>
+                          <input style={inputStyle} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} required autoFocus placeholder="Name" />
+                          <input style={inputStyle} value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))} placeholder="Title" />
+                          <RolePicker value={editForm.responsibilities} onChange={v => setEditForm(f => ({ ...f, responsibilities: v }))} />
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+                          <input style={inputStyle} type="number" min={0} step={1000} value={editForm.annualSalary} onChange={e => setEditForm(f => ({ ...f, annualSalary: e.target.value }))} placeholder="Annual salary" />
+                          <input style={inputStyle} type="number" min={0} step={1} value={editForm.billableHours} onChange={e => setEditForm(f => ({ ...f, billableHours: e.target.value }))} required placeholder="Hrs/mo" />
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6B6760", cursor: "pointer", whiteSpace: "nowrap" }}>
+                            <input type="checkbox" checked={editForm.isExternal} onChange={e => setEditForm(f => ({ ...f, isExternal: e.target.checked }))} />
+                            External / Vendor
+                          </label>
+                          <button type="submit" disabled={editSaving}
+                            style={{ padding: "7px 12px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                            {editSaving ? "…" : "Save"}
+                          </button>
+                          <button type="button" onClick={() => setEditingId(null)}
+                            style={{ padding: "7px 10px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, cursor: "pointer", color: "#6B6760" }}>
+                            Cancel
+                          </button>
+                        </div>
                       </form>
                     </td>
                   ) : (
                     <>
                       <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</td>
                       <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
+                      <td style={{ padding: "10px 8px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                          {parseRoles(p.responsibilities).map(r => <RoleChip key={r} role={r} />)}
+                          {p.isExternal && (
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "#FEF9C3", color: "#92400E", whiteSpace: "nowrap" }}>
+                              External
+                            </span>
+                          )}
+                          {!p.responsibilities && !p.isExternal && <span style={{ color: "#C0BAB2", fontSize: 13 }}>—</span>}
+                        </div>
+                      </td>
                       <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtSalary(p.annualSalary)}</td>
                       <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.billableHours} hrs</td>
                       <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
