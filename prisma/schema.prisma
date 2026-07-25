@@ -103,6 +103,7 @@ model Goal {
   monthlyRevenue Float  @default(0)
   netProfitPct   Float  @default(0)
   closeRatePct   Float  @default(0)
+  peoplePct      Float  @default(30)
   currency       String @default("USD")
 }
 
@@ -128,16 +129,30 @@ model Contract {
 }
 
 model Person {
-  id            String   @id @default(cuid())
-  clientId      String
-  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id               String              @id @default(cuid())
+  clientId         String
+  client           Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name             String
   role             String?
   responsibilities String?
-  isExternal       Boolean  @default(false)
-  annualSalary     Float    @default(0)
-  billableHours    Float    @default(0)
+  isExternal       Boolean             @default(false)
+  annualSalary     Float               @default(0)
+  billableHours    Float               @default(0)
+  startDate        String?
+  endDate          String?
+  createdAt        DateTime            @default(now())
+  salaryMonths     PersonSalaryMonth[]
+}
+
+model PersonSalaryMonth {
+  id            String   @id @default(cuid())
+  personId      String
+  person        Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  month         String
+  monthlySalary Float
   createdAt     DateTime @default(now())
+
+  @@unique([personId, month])
 }
 
 model AccountMonth {

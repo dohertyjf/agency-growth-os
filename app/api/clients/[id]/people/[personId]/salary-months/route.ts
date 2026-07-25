@@ -11,17 +11,11 @@ async function authorizePerson(session: import("next-auth").Session | null, clie
 }
 
 const schema = z.object({
-  name: z.string().min(1).optional(),
-  role: z.string().nullable().optional(),
-  responsibilities: z.string().nullable().optional(),
-  isExternal: z.boolean().optional(),
-  annualSalary: z.number().min(0).optional(),
-  billableHours: z.number().min(0).optional(),
-  startDate: z.string().nullable().optional(),
-  endDate: z.string().nullable().optional(),
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+  monthlySalary: z.number().min(0),
 })
 
-export async function PATCH(
+export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string; personId: string }> }
 ) {
@@ -33,18 +27,11 @@ export async function PATCH(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
-  const person = await prisma.person.update({ where: { id: personId }, data: parsed.data })
-  return Response.json(person)
-}
-
-export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string; personId: string }> }
-) {
-  const session = await auth()
-  const { id, personId } = await params
-  if (!await authorizePerson(session, id, personId)) return Response.json({ error: "Forbidden" }, { status: 403 })
-
-  await prisma.person.delete({ where: { id: personId } })
-  return new Response(null, { status: 204 })
+  const { month, monthlySalary } = parsed.data
+  const record = await prisma.personSalaryMonth.upsert({
+    where: { personId_month: { personId, month } },
+    update: { monthlySalary },
+    create: { personId, month, monthlySalary },
+  })
+  return Response.json(record)
 }

@@ -50,6 +50,14 @@ interface Person {
   isExternal: boolean
   annualSalary: number
   billableHours: number
+  startDate: string | null
+  endDate: string | null
+}
+
+interface PersonSalaryMonth {
+  personId: string
+  month: string
+  monthlySalary: number
 }
 
 interface Account {
@@ -78,6 +86,7 @@ interface Goal {
   monthlyRevenue: number
   netProfitPct: number
   closeRatePct: number
+  peoplePct?: number
   currency?: string
 }
 
@@ -114,6 +123,7 @@ interface Props {
   products: Product[]
   initialRoadmap: RoadmapItem[]
   initialPeople: Person[]
+  initialSalaryMonths: PersonSalaryMonth[]
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -131,7 +141,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, clientSlug, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap, initialPeople,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap, initialPeople, initialSalaryMonths,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -139,6 +149,7 @@ export default function ClientPageClient({
   const [payments, setPayments] = useState<Payment[]>(initialPayments)
   const [clientProducts, setClientProducts] = useState<Product[]>(products)
   const [people, setPeople] = useState<Person[]>(initialPeople)
+  const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
   const monthlyPayroll = people.reduce((s, p) => s + p.annualSalary, 0) / 12
@@ -276,7 +287,13 @@ export default function ClientPageClient({
         <PeoplePanel
           clientId={clientId}
           initialPeople={people}
+          initialSalaryMonths={salaryMonths}
           onPeopleChange={setPeople}
+          onSalaryMonthChange={sm => setSalaryMonths(prev => {
+            const idx = prev.findIndex(s => s.personId === sm.personId && s.month === sm.month)
+            if (idx >= 0) return prev.map((s, i) => i === idx ? sm : s)
+            return [...prev, sm]
+          })}
         />
       )}
     </div>

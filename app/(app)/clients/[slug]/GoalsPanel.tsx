@@ -6,6 +6,7 @@ interface Goal {
   monthlyRevenue: number
   netProfitPct: number
   closeRatePct: number
+  peoplePct?: number
   currency?: string
 }
 
@@ -50,6 +51,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
   const [monthly, setMonthly] = useState(initialGoal ? String(initialGoal.monthlyRevenue) : "50000")
   const [netProfitPct, setNetProfitPct] = useState(initialGoal ? String(initialGoal.netProfitPct) : "25")
   const [closeRatePct, setCloseRatePct] = useState(initialGoal ? String(initialGoal.closeRatePct) : "50")
+  const [peoplePct, setPeoplePct] = useState(initialGoal?.peoplePct != null ? String(initialGoal.peoplePct) : "30")
   const [currency, setCurrency] = useState(initialGoal?.currency ?? "USD")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -60,6 +62,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
   const netProfitPctNum = parseFloat(netProfitPct) || 0
   const monthlyNetProfit = monthlyNum * (netProfitPctNum / 100)
   const closeRatePctNum = parseFloat(closeRatePct) || 0
+  const peoplePctNum = parseFloat(peoplePct) || 0
 
   function handleAnnualChange(val: string) {
     const n = parseFloat(val) || 0
@@ -81,7 +84,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
       const res = await fetch(`/api/clients/${clientId}/goal`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ monthlyRevenue: monthlyNum, netProfitPct: netProfitPctNum, closeRatePct: closeRatePctNum, currency }),
+        body: JSON.stringify({ monthlyRevenue: monthlyNum, netProfitPct: netProfitPctNum, closeRatePct: closeRatePctNum, peoplePct: peoplePctNum, currency }),
       })
       if (!res.ok) throw new Error("Save failed")
       setSaved(true)
@@ -93,7 +96,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
     }
   }
 
-  const hasAny = monthlyNum > 0 || netProfitPctNum > 0 || closeRatePctNum > 0
+  const hasAny = monthlyNum > 0 || netProfitPctNum > 0 || closeRatePctNum > 0 || peoplePctNum > 0
 
   return (
     <form onSubmit={handleSave}>
@@ -115,6 +118,12 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
               )}
               {closeRatePctNum > 0 && (
                 <Derived label="Close Rate Target" value={closeRatePctNum + "%"} />
+              )}
+              {peoplePctNum > 0 && (
+                <Derived
+                  label="People Cost Target"
+                  value={peoplePctNum + "% of revenue" + (monthlyNum > 0 ? " · max " + fmtCurrency(monthlyNum * (peoplePctNum / 100)) + "/mo" : "")}
+                />
               )}
             </div>
           ) : (
@@ -192,6 +201,24 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
                 value={closeRatePct} onChange={e => setCloseRatePct(e.target.value)} placeholder="50" />
               <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>%</span>
             </div>
+          </div>
+        </div>
+
+        {/* People */}
+        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
+          <SectionLabel>People</SectionLabel>
+          <div style={{ maxWidth: 220 }}>
+            <FieldLabel>People Cost % Target</FieldLabel>
+            <div style={{ position: "relative" }}>
+              <input style={{ ...inputStyle, paddingRight: 22 }} type="number" min={0} max={100} step={1}
+                value={peoplePct} onChange={e => setPeoplePct(e.target.value)} placeholder="30" />
+              <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>%</span>
+            </div>
+            {peoplePctNum > 0 && monthlyNum > 0 && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#9C9590" }}>
+                Max {fmtCurrency(monthlyNum * (peoplePctNum / 100))}/mo in people costs at your revenue goal
+              </div>
+            )}
           </div>
         </div>
 

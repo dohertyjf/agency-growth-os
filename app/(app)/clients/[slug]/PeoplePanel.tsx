@@ -28,6 +28,14 @@ interface Person {
   isExternal: boolean
   annualSalary: number
   billableHours: number
+  startDate: string | null
+  endDate: string | null
+}
+
+interface PersonSalaryMonth {
+  personId: string
+  month: string
+  monthlySalary: number
 }
 
 interface BulkRow {
@@ -41,7 +49,9 @@ interface BulkRow {
 interface Props {
   clientId: string
   initialPeople: Person[]
+  initialSalaryMonths: PersonSalaryMonth[]
   onPeopleChange?: (people: Person[]) => void
+  onSalaryMonthChange?: (sm: PersonSalaryMonth) => void
 }
 
 const inputStyle: React.CSSProperties = {
@@ -115,6 +125,13 @@ function fmtSalary(n: number) {
   return "$" + Math.round(n).toLocaleString()
 }
 
+function fmtDate(d: string): string {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+  const [y, m, day] = d.split("-")
+  if (day) return `${months[+m - 1]} ${+day}, ${y}`
+  return `${months[+m - 1]} ${y}`
+}
+
 function parseBulkText(text: string): BulkRow[] {
   return text
     .split("\n")
@@ -130,15 +147,16 @@ function parseBulkText(text: string): BulkRow[] {
     })
 }
 
-const emptyAddForm = { name: "", role: "", responsibilities: [] as string[], isExternal: false, annualSalary: "", billableHours: "" }
+const emptyAddForm = { name: "", role: "", responsibilities: [] as string[], isExternal: false, annualSalary: "", billableHours: "", startDate: "", endDate: "" }
 
-export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }: Props) {
+export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, onPeopleChange, onSalaryMonthChange }: Props) {
   const [people, setPeople] = useState<Person[]>(initialPeople)
+  const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
   const [mode, setMode] = useState<"none" | "add" | "bulk">("none")
   const [addForm, setAddForm] = useState(emptyAddForm)
   const [addSaving, setAddSaving] = useState(false)
   const [editingPerson, setEditingPerson] = useState<Person | null>(null)
-  const [editForm, setEditForm] = useState({ name: "", role: "", responsibilities: [] as string[], isExternal: false, annualSalary: "", billableHours: "" })
+  const [editForm, setEditForm] = useState({ name: "", role: "", responsibilities: [] as string[], isExternal: false, annualSalary: "", billableHours: "", startDate: "", endDate: "" })
   const [editSaving, setEditSaving] = useState(false)
 
   const [bulkText, setBulkText] = useState("")
@@ -165,6 +183,8 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
         isExternal: addForm.isExternal,
         annualSalary: parseFloat(addForm.annualSalary) || 0,
         billableHours: parseFloat(addForm.billableHours) || 0,
+        startDate: addForm.startDate || null,
+        endDate: addForm.endDate || null,
       }),
     })
     setAddSaving(false)
@@ -185,6 +205,8 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
       isExternal: p.isExternal,
       annualSalary: p.annualSalary ? String(p.annualSalary) : "",
       billableHours: String(p.billableHours),
+      startDate: p.startDate ?? "",
+      endDate: p.endDate ?? "",
     })
   }
 
@@ -202,6 +224,8 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
         isExternal: editForm.isExternal,
         annualSalary: parseFloat(editForm.annualSalary) || 0,
         billableHours: parseFloat(editForm.billableHours) || 0,
+        startDate: editForm.startDate || null,
+        endDate: editForm.endDate || null,
       }),
     })
     setEditSaving(false)
@@ -237,6 +261,15 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
       setBulkText("")
       setMode("none")
     }
+  }
+
+  function handleSalaryMonthUpdate(sm: PersonSalaryMonth) {
+    setSalaryMonths(prev => {
+      const idx = prev.findIndex(s => s.personId === sm.personId && s.month === sm.month)
+      const next = idx >= 0 ? prev.map((s, i) => i === idx ? sm : s) : [...prev, sm]
+      return next
+    })
+    onSalaryMonthChange?.(sm)
   }
 
   const totalHours = people.reduce((s, p) => s + p.billableHours, 0)
@@ -339,7 +372,14 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
             <tbody>
               {people.map(p => (
                 <tr key={p.id}>
-                  <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</td>
+                  <td style={{ padding: "10px 8px" }}>
+                    <div style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</div>
+                    {(p.startDate || p.endDate) && (
+                      <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 1 }}>
+                        {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760" }}>{p.role ?? <span style={{ color: "#C0BAB2" }}>—</span>}</td>
                   <td style={{ padding: "10px 8px" }}>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
@@ -427,6 +467,16 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
                   <input style={inputStyle} type="number" min={0} step={1} value={addForm.billableHours} onChange={e => setAddForm(f => ({ ...f, billableHours: e.target.value }))} required placeholder="50" />
                 </div>
               </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Start Date <span style={{ fontWeight: 400 }}>(optional)</span></label>
+                  <input style={inputStyle} type="date" value={addForm.startDate} onChange={e => setAddForm(f => ({ ...f, startDate: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={labelStyle}>End Date <span style={{ fontWeight: 400 }}>(optional)</span></label>
+                  <input style={inputStyle} type="date" value={addForm.endDate} onChange={e => setAddForm(f => ({ ...f, endDate: e.target.value }))} />
+                </div>
+              </div>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6B6760", cursor: "pointer" }}>
                 <input type="checkbox" checked={addForm.isExternal} onChange={e => setAddForm(f => ({ ...f, isExternal: e.target.checked }))} />
                 External / Vendor
@@ -444,6 +494,16 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
             </form>
           </div>
         </div>
+      )}
+
+      {/* Monthly Salary Table */}
+      {people.length > 0 && (
+        <PersonSalaryTable
+          people={people}
+          salaryMonths={salaryMonths}
+          clientId={clientId}
+          onSalaryMonthChange={handleSalaryMonthUpdate}
+        />
       )}
 
       {/* Edit Person Modal */}
@@ -479,6 +539,16 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
                   <input style={inputStyle} type="number" min={0} step={1} value={editForm.billableHours} onChange={e => setEditForm(f => ({ ...f, billableHours: e.target.value }))} required placeholder="50" />
                 </div>
               </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Start Date <span style={{ fontWeight: 400 }}>(optional)</span></label>
+                  <input style={inputStyle} type="date" value={editForm.startDate} onChange={e => setEditForm(f => ({ ...f, startDate: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={labelStyle}>End Date <span style={{ fontWeight: 400 }}>(optional)</span></label>
+                  <input style={inputStyle} type="date" value={editForm.endDate} onChange={e => setEditForm(f => ({ ...f, endDate: e.target.value }))} />
+                </div>
+              </div>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6B6760", cursor: "pointer" }}>
                 <input type="checkbox" checked={editForm.isExternal} onChange={e => setEditForm(f => ({ ...f, isExternal: e.target.checked }))} />
                 External / Vendor
@@ -497,6 +567,138 @@ export default function PeoplePanel({ clientId, initialPeople, onPeopleChange }:
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function genMonths(nowYM: string, count: number): string[] {
+  const [y, m] = nowYM.split("-").map(Number)
+  return Array.from({ length: count }, (_, i) => {
+    const total = (y * 12 + (m - 1)) - i
+    const ny = Math.floor(total / 12)
+    const nm = (total % 12) + 1
+    return `${ny}-${String(nm).padStart(2, "0")}`
+  })
+}
+
+function fmtYM(ym: string): string {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+  const [y, m] = ym.split("-")
+  return `${months[+m - 1]} '${y.slice(2)}`
+}
+
+function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange }: {
+  people: Person[]
+  salaryMonths: PersonSalaryMonth[]
+  clientId: string
+  onSalaryMonthChange: (sm: PersonSalaryMonth) => void
+}) {
+  const nowYM = new Date().toISOString().slice(0, 7)
+  const months = genMonths(nowYM, 13)
+
+  const salaryMap = new Map<string, number>()
+  salaryMonths.forEach(sm => salaryMap.set(`${sm.personId}:${sm.month}`, sm.monthlySalary))
+
+  const [editingCell, setEditingCell] = useState<{ personId: string; month: string } | null>(null)
+  const [editValue, setEditValue] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  function baseMonthlySalary(p: Person) {
+    return p.annualSalary > 0 ? Math.round(p.annualSalary / 12) : 0
+  }
+
+  function cellValue(personId: string, month: string, p: Person) {
+    const override = salaryMap.get(`${personId}:${month}`)
+    return { value: override ?? baseMonthlySalary(p), isOverride: override !== undefined }
+  }
+
+  async function saveCell(personId: string, month: string) {
+    const raw = editValue.replace(/[$,\s]/g, "")
+    const val = parseFloat(raw)
+    if (isNaN(val) || val < 0) { setEditingCell(null); return }
+    setSaving(true)
+    const res = await fetch(`/api/clients/${clientId}/people/${personId}/salary-months`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ month, monthlySalary: val }),
+    })
+    setSaving(false)
+    if (res.ok) onSalaryMonthChange({ personId, month, monthlySalary: val })
+    setEditingCell(null)
+  }
+
+  function openCell(personId: string, month: string, currentValue: number) {
+    setEditingCell({ personId, month })
+    setEditValue(currentValue > 0 ? String(currentValue) : "")
+  }
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginTop: 20 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 4 }}>Monthly Salary</div>
+      <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 14 }}>
+        Grey values derive from annual salary. Click a cell to set an override — e.g. after a raise taking effect next month.
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", minWidth: "100%" }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 16px 4px 0", borderBottom: "1px solid #ECE7DE", minWidth: 140, whiteSpace: "nowrap" }}>
+                Person
+              </th>
+              {months.map(mo => (
+                <th key={mo} style={{ textAlign: "right", fontSize: 11, fontWeight: 600, color: mo === nowYM ? "#E9532A" : "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }}>
+                  {fmtYM(mo)}{mo === nowYM ? " ●" : ""}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {people.map(p => (
+              <tr key={p.id}>
+                <td style={{ padding: "8px 16px 8px 0", fontSize: 13, fontWeight: 500, color: "#1A1916", borderBottom: "1px solid #F5F1EC", whiteSpace: "nowrap" }}>
+                  {p.name}
+                </td>
+                {months.map(mo => {
+                  const { value, isOverride } = cellValue(p.id, mo, p)
+                  const isEditing = editingCell?.personId === p.id && editingCell.month === mo
+                  return (
+                    <td key={mo} style={{ padding: "4px 4px", textAlign: "right", borderBottom: "1px solid #F5F1EC", minWidth: 86 }}>
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          value={editValue}
+                          onChange={e => setEditValue(e.target.value)}
+                          onBlur={() => saveCell(p.id, mo)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") { e.preventDefault(); saveCell(p.id, mo) }
+                            if (e.key === "Escape") setEditingCell(null)
+                          }}
+                          disabled={saving}
+                          style={{ width: 78, textAlign: "right", fontSize: 12, border: "1px solid #E9532A", borderRadius: 4, padding: "3px 6px", outline: "none", fontFamily: "inherit", fontVariantNumeric: "tabular-nums" }}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openCell(p.id, mo, value)}
+                          style={{
+                            background: "none", border: "none", cursor: "pointer", padding: "3px 8px",
+                            fontSize: 12, fontVariantNumeric: "tabular-nums", borderRadius: 4,
+                            color: isOverride ? "#1A1916" : "#C0BAB2",
+                            fontWeight: isOverride ? 600 : 400,
+                            width: "100%", textAlign: "right",
+                          }}
+                        >
+                          {value > 0 ? ("$" + value.toLocaleString()) : "—"}
+                        </button>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

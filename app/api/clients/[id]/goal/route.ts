@@ -26,6 +26,7 @@ const schema = z.object({
   monthlyRevenue: z.number().min(0),
   netProfitPct: z.number().min(0).max(100),
   closeRatePct: z.number().min(0).max(100),
+  peoplePct: z.number().min(0).max(100).default(30),
   currency: z.enum(["USD", "GBP", "EUR"]).default("USD"),
 })
 
@@ -41,11 +42,12 @@ export async function PUT(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
-  const { monthlyRevenue, netProfitPct, closeRatePct, currency } = parsed.data
+  const { monthlyRevenue, netProfitPct, closeRatePct, peoplePct, currency } = parsed.data
   const data = {
     monthlyRevenue,
     netProfitPct,
     closeRatePct,
+    peoplePct,
     currency,
     annualRevenue: monthlyRevenue * 12,
     profit: monthlyRevenue * (netProfitPct / 100) * 12,
