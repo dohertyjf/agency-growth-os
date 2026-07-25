@@ -103,7 +103,7 @@ interface RoadmapItem {
   status: "none" | "red" | "yellow" | "green"
 }
 
-type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "people"
+type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "team"
 
 interface Props {
   clientId: string
@@ -131,7 +131,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "accounts", label: "Accounts" },
   { key: "pipeline", label: "Pipeline" },
   { key: "projects", label: "Projects" },
-  { key: "people", label: "People" },
+  { key: "team", label: "Team" },
   { key: "products", label: "Products" },
   { key: "progress", label: "Progress" },
   { key: "goals", label: "Settings" },
@@ -302,7 +302,7 @@ export default function ClientPageClient({
         />
       )}
 
-      {currentTab === "people" && (
+      {currentTab === "team" && (
         <PeoplePanel
           clientId={clientId}
           initialPeople={people}
