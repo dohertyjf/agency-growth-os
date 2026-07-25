@@ -1,6 +1,7 @@
 "use client"
 import { useState, useCallback } from "react"
 import { netProfit, grossProfit, netMargin } from "@/lib/calc"
+import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface StoredRow {
   month: string
@@ -38,7 +39,7 @@ interface ParsedMetricRow {
 }
 
 function parseNum(raw: string): number {
-  const n = parseFloat(raw.replace(/[$,\s%]/g, ""))
+  const n = parseFloat(raw.replace(/[$£€,\s%]/g, ""))
   return isNaN(n) ? 0 : n
 }
 
@@ -80,9 +81,9 @@ function parseMetricsPaste(text: string): ParsedMetricRow[] {
   })
 }
 
-function fmtPreview(v: number, col: number): string {
+function fmtPreview(v: number, col: number, fmt$: (n: number) => string): string {
   // cols 0=month, 1-5=currency, 6-8=number
-  if (col >= 1 && col <= 5) return v === 0 ? "—" : "$" + Math.round(v).toLocaleString()
+  if (col >= 1 && col <= 5) return v === 0 ? "—" : fmt$(Math.round(v))
   return v === 0 ? "—" : String(Math.round(v))
 }
 
@@ -94,6 +95,7 @@ export function BulkMetricsModal({ clientId, onClose, onImport }: {
   const [text, setText] = useState("")
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fmt$ = useFmtCurrency()
 
   const rows = text.trim() ? parseMetricsPaste(text) : []
   const validRows = rows.filter(r => r.errors.length === 0)
@@ -159,7 +161,7 @@ export function BulkMetricsModal({ clientId, onClose, onImport }: {
                       </td>
                       {vals.map((v, ci) => (
                         <td key={ci} style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", color: "#6B6760", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
-                          {fmtPreview(v, ci + 1)}
+                          {fmtPreview(v, ci + 1, fmt$)}
                         </td>
                       ))}
                       <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC" }}>
@@ -223,14 +225,14 @@ const DERIVED_ROWS = [
 
 type EditableKey = typeof EDITABLE_ROWS[number]["key"]
 
-function fmtDisplay(v: number, format: string): string {
-  if (format === "currency") return "$" + Math.round(v).toLocaleString()
+function fmtDisplay(v: number, format: string, fmt$: (n: number) => string): string {
+  if (format === "currency") return fmt$(Math.round(v))
   if (format === "percent") return (Math.round(v * 10) / 10) + "%"
   return String(Math.round(v))
 }
 
 function parseInput(raw: string, format: string): number {
-  const cleaned = raw.replace(/[$,%\s]/g, "").replace(/k$/i, "000")
+  const cleaned = raw.replace(/[$£€,%\s]/g, "").replace(/k$/i, "000")
   const n = parseFloat(cleaned)
   return isNaN(n) ? 0 : n
 }
@@ -242,6 +244,7 @@ function monthLabel(ym: string): string {
 }
 
 export default function MonthTable({ clientId, months, onUpdate, onBulkImport }: Props) {
+  const fmt$ = useFmtCurrency()
   const [data, setData] = useState<Record<string, Record<string, number>>>(() => {
     const m: Record<string, Record<string, number>> = {}
     months.forEach(({ month, ...rest }) => { m[month] = rest })
@@ -343,7 +346,7 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
                 const v = d[row.key as keyof typeof d]
                 return (
                   <td key={m.month} style={{ ...cellStyle, padding: "7px 12px", textAlign: "right", fontSize: 12, color: "#9C9590", fontVariantNumeric: "tabular-nums" }}>
-                    {fmtDisplay(v, row.format)}
+                    {fmtDisplay(v, row.format, fmt$)}
                   </td>
                 )
               })}
@@ -363,7 +366,7 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
                 return (
                   <td key={m.month} style={cellStyle}>
                     <input
-                      defaultValue={fmtDisplay(v, row.format)}
+                      defaultValue={fmtDisplay(v, row.format, fmt$)}
                       key={`${m.month}:${row.key}:${v}`}
                       onBlur={e => handleBlur(m.month, row.key, e.target.value, row.format)}
                       style={{

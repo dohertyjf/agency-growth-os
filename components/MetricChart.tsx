@@ -1,5 +1,12 @@
 "use client"
 import { useState } from "react"
+import { useCurrency } from "@/lib/CurrencyContext"
+
+function currSym(c: string) {
+  if (c === "GBP") return "£"
+  if (c === "EUR") return "€"
+  return "$"
+}
 
 export interface ChartPoint {
   label: string
@@ -24,11 +31,11 @@ interface Props {
   goalValue?: number
 }
 
-function fmt(v: number, format: "currency" | "percent" | "number"): string {
+function fmt(v: number, format: "currency" | "percent" | "number", sym = "$"): string {
   if (format === "currency") {
-    if (Math.abs(v) >= 100000) return "$" + Math.round(v / 1000) + "k"
-    if (Math.abs(v) >= 10000) return "$" + (Math.round(v / 100) / 10) + "k"
-    return "$" + Math.round(v).toLocaleString()
+    if (Math.abs(v) >= 100000) return sym + Math.round(v / 1000) + "k"
+    if (Math.abs(v) >= 10000) return sym + (Math.round(v / 100) / 10) + "k"
+    return sym + Math.round(v).toLocaleString()
   }
   if (format === "percent") return (Math.round(v * 10) / 10) + "%"
   return String(Math.round(v))
@@ -40,6 +47,7 @@ const VH = 240
 
 export default function MetricChart({ points, format, label, series2, series2Label, series3, series3Label, flowBars, goalValue }: Props) {
   const [hover, setHover] = useState<number | null>(null)
+  const sym = currSym(useCurrency())
 
   if (!points.length && !series2?.length) {
     return (
@@ -124,7 +132,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
             <g key={i}>
               <line x1={PAD.left} y1={toY(tick)} x2={VW - PAD.right} y2={toY(tick)} stroke="#ECE7DE" strokeWidth={1} />
               <text x={PAD.left - 8} y={toY(tick) + 4} textAnchor="end" fontSize={10} fill="#9C9590">
-                {fmt(tick, format)}
+                {fmt(tick, format, sym)}
               </text>
             </g>
           ))}
@@ -144,7 +152,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
           {crossesZero && (
             <g>
               <line x1={PAD.left} y1={toY(0)} x2={VW - PAD.right} y2={toY(0)} stroke="#9C9590" strokeWidth={1} strokeDasharray="3,2" opacity={0.5} />
-              <text x={PAD.left - 8} y={toY(0) + 4} textAnchor="end" fontSize={10} fill="#9C9590" opacity={0.7}>$0</text>
+              <text x={PAD.left - 8} y={toY(0) + 4} textAnchor="end" fontSize={10} fill="#9C9590" opacity={0.7}>{sym}0</text>
             </g>
           )}
 
@@ -155,7 +163,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
               <g>
                 <line x1={PAD.left} y1={gy} x2={VW - PAD.right} y2={gy} stroke="#16A34A" strokeWidth={1.5} strokeDasharray="6,4" opacity={0.7} />
                 <text x={VW - PAD.right - 4} y={gy - 5} fontSize={10} fill="#16A34A" textAnchor="end" fontWeight="600" opacity={0.85}>
-                  Goal {fmt(goalValue, format)}
+                  Goal {fmt(goalValue, format, sym)}
                 </text>
               </g>
             )
@@ -268,7 +276,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
                       </text>
                     )}
                     <text x={ttX + ttW - 8} y={ttY + 13 + i * 17} fontSize={11} fill={r.color} fontWeight="600" textAnchor="end">
-                      {fmt(r.value, format)}
+                      {fmt(r.value, format, sym)}
                     </text>
                   </g>
                 ))}
