@@ -15,6 +15,9 @@ interface Props {
   startMRR: number
   avgContractSize: number
   goalMRR: number | null
+  totalCapacityHours: number
+  avgContractHours: number
+  activeClientCount: number
 }
 
 function avg(nums: number[]): number {
@@ -39,13 +42,26 @@ function projectMRR(
   return result
 }
 
+function projectClients(
+  startClients: number, leads: number, closeRate: number,
+  churnCount: number, months: number
+): number[] {
+  const result: number[] = []
+  let clients = startClients
+  for (let i = 0; i < months; i++) {
+    clients = Math.max(0, clients + leads * (closeRate / 100) - churnCount)
+    result.push(Math.round(clients * 10) / 10)
+  }
+  return result
+}
+
 const inputStyle: React.CSSProperties = {
   padding: "6px 10px", border: "1px solid #ECE7DE", borderRadius: 6,
   fontSize: 13, background: "#fff", color: "#1A1916",
   width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none",
 }
 
-export default function GrowthProjection({ metrics, startMRR, avgContractSize, goalMRR }: Props) {
+export default function GrowthProjection({ metrics, startMRR, avgContractSize, goalMRR, totalCapacityHours, avgContractHours, activeClientCount }: Props) {
   const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
 
   const recentMetrics = useMemo(() => {
@@ -61,12 +77,14 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   const [closeRate, setCloseRate] = useState(defaultCloseRate)
   const [avgDeal, setAvgDeal] = useState(Math.round(avgContractSize))
   const [churn, setChurn] = useState(defaultChurn)
+  const [hoursPerClient, setHoursPerClient] = useState(round1(avgContractHours))
 
   function reset() {
     setLeads(defaultLeads)
     setCloseRate(defaultCloseRate)
     setAvgDeal(Math.round(avgContractSize))
     setChurn(defaultChurn)
+    setHoursPerClient(round1(avgContractHours))
   }
 
   const projected = useMemo(
@@ -74,10 +92,24 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
     [startMRR, leads, closeRate, avgDeal, churn]
   )
 
+  const projectedClients = useMemo(
+    () => projectClients(activeClientCount, leads, closeRate, churn, 12),
+    [activeClientCount, leads, closeRate, churn]
+  )
+
+  const projectedHours = useMemo(
+    () => projectedClients.map(c => Math.round(c * hoursPerClient * 10) / 10),
+    [projectedClients, hoursPerClient]
+  )
+
   const monthLabels = useMemo(
     () => Array.from({ length: 12 }, (_, i) => ymLabel(ymAdd(now, i + 1))),
     [now]
   )
+
+  const capacityHitMonth = totalCapacityHours > 0 && hoursPerClient > 0
+    ? projectedHours.findIndex(h => h > totalCapacityHours)
+    : -1
 
   // Chart
   const allVals = [startMRR, ...projected, goalMRR ?? 0].filter(v => v > 0)
@@ -91,11 +123,14 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   const pathD = projected.map((v, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(v)}`).join(" ")
   const goalY = goalMRR ? toY(goalMRR) : null
 
-  // When the goal gets hit
   const goalHitMonth = goalMRR ? projected.findIndex(v => v >= goalMRR) : -1
 
   const newClientsPerMonth = leads * (closeRate / 100)
   const netMRRChange = newClientsPerMonth * avgDeal - churn * avgDeal
+
+  const currentHoursUsed = activeClientCount * hoursPerClient
+  const hoursAvailable = totalCapacityHours - currentHoursUsed
+  const slotsAvailable = hoursPerClient > 0 ? Math.floor(hoursAvailable / hoursPerClient) : null
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 24 }}>
@@ -112,7 +147,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
       </div>
 
       {/* Inputs */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Leads / mo</label>
           <input style={inputStyle} type="number" min={0} step={0.5} value={leads}
@@ -133,10 +168,15 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           <input style={inputStyle} type="number" min={0} step={0.5} value={churn}
             onChange={e => setChurn(parseFloat(e.target.value) || 0)} />
         </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Hrs / client</label>
+          <input style={inputStyle} type="number" min={0} step={0.5} value={hoursPerClient}
+            onChange={e => setHoursPerClient(parseFloat(e.target.value) || 0)} />
+        </div>
       </div>
 
-      {/* Summary */}
-      <div style={{ display: "flex", gap: 20, marginBottom: 14, fontSize: 11, color: "#9C9590" }}>
+      {/* Summary row */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 14, fontSize: 11, color: "#9C9590" }}>
         <span>
           <span style={{ color: "#1A1916", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
             +{fmtCurrency(newClientsPerMonth * avgDeal)}
@@ -154,7 +194,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           <span>
             {"· "}
             <span style={{ color: "#1F7A4D", fontWeight: 600 }}>
-              Goal reached in month {goalHitMonth + 1} ({monthLabels[goalHitMonth]})
+              Goal reached month {goalHitMonth + 1} ({monthLabels[goalHitMonth]})
             </span>
           </span>
         )}
@@ -162,6 +202,35 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           <span style={{ color: "#C2410C" }}>· Goal not reached in 12 months at this rate</span>
         )}
       </div>
+
+      {/* Capacity row — only shown when capacity is configured */}
+      {totalCapacityHours > 0 && hoursPerClient > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 14, fontSize: 11, padding: "8px 12px", background: "#F5F1EC", borderRadius: 8 }}>
+          <span style={{ color: "#6B6760" }}>
+            <span style={{ fontWeight: 700, color: "#1A1916" }}>{Math.round(currentHoursUsed)}</span>
+            {" of "}
+            <span style={{ fontWeight: 700, color: "#1A1916" }}>{totalCapacityHours}</span>
+            {" hrs used now"}
+          </span>
+          {slotsAvailable !== null && (
+            <span style={{ color: "#6B6760" }}>
+              {"· "}
+              <span style={{ fontWeight: 700, color: hoursAvailable > 0 ? "#1F7A4D" : "#C2410C" }}>
+                {slotsAvailable > 0 ? `${slotsAvailable} slot${slotsAvailable === 1 ? "" : "s"} open` : "At capacity"}
+              </span>
+              {" at current hrs/client"}
+            </span>
+          )}
+          {capacityHitMonth >= 0 && (
+            <span style={{ color: "#C2410C", fontWeight: 600 }}>
+              · Capacity full month {capacityHitMonth + 1} ({monthLabels[capacityHitMonth]}) — need to hire or raise prices before then
+            </span>
+          )}
+          {capacityHitMonth === -1 && projectedClients[11] > 0 && (
+            <span style={{ color: "#6B6760" }}>· Capacity not hit in 12 months</span>
+          )}
+        </div>
+      )}
 
       {/* Chart */}
       <div style={{ overflowX: "auto" }}>
@@ -183,10 +252,21 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           {/* Projected path */}
           <path d={pathD} fill="none" stroke="#E9532A" strokeWidth={2} strokeDasharray="5,3" />
 
+          {/* Capacity hit marker */}
+          {capacityHitMonth >= 0 && (
+            <line
+              x1={toX(capacityHitMonth)} y1={PT}
+              x2={toX(capacityHitMonth)} y2={PT + plotH}
+              stroke="#C2410C" strokeWidth={1} strokeDasharray="3,2" opacity={0.5}
+            />
+          )}
+
           {/* Dots + month labels */}
           {projected.map((v, i) => (
             <g key={i}>
-              <circle cx={toX(i)} cy={toY(v)} r={3} fill="#E9532A" opacity={0.6} />
+              <circle cx={toX(i)} cy={toY(v)} r={3}
+                fill={capacityHitMonth >= 0 && i >= capacityHitMonth ? "#C2410C" : "#E9532A"}
+                opacity={0.6} />
               {(i === 0 || i === 2 || i === 5 || i === 8 || i === 11) && (
                 <>
                   <text x={toX(i)} y={H - 4} fontSize={9} fill="#9C9590" textAnchor="middle">

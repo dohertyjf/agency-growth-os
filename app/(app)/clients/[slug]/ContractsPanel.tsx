@@ -6,6 +6,7 @@ interface Contract {
   id: string
   name: string
   monthly: number
+  hoursPerMonth: number
   start: string
   contractedThrough: string | null
   status: string
@@ -185,6 +186,7 @@ function AccountCombobox({ accounts, value, onChange, clientId, onAccountCreated
 interface EditForm {
   name: string
   monthly: string
+  hoursPerMonth: string
   start: string
   contractedThrough: string
   status: ContractStatus
@@ -197,6 +199,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
   const [form, setForm] = useState<EditForm>({
     name: "",
     monthly: String(contract.monthly),
+    hoursPerMonth: String(contract.hoursPerMonth),
     start: contract.start,
     contractedThrough: contract.contractedThrough ?? "",
     status: "potential" as ContractStatus,
@@ -214,6 +217,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
     const payload = {
       ...form,
       monthly: parseFloat(form.monthly),
+      hoursPerMonth: parseFloat(form.hoursPerMonth) || 0,
       type: isOngoing ? "retainer" : form.type,
       contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
       accountId: form.accountId || undefined,
@@ -273,9 +277,15 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
             <label style={labelStyle}>Project Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="New project name" autoFocus />
           </div>
-          <div>
-            <label style={labelStyle}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
-            <input style={inputStyle} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required min={0} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
+              <input style={inputStyle} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required min={0} />
+            </div>
+            <div>
+              <label style={labelStyle}>Hours / mo</label>
+              <input style={inputStyle} type="number" value={form.hoursPerMonth} onChange={e => setForm(f => ({ ...f, hoursPerMonth: e.target.value }))} min={0} step={0.5} placeholder="0" />
+            </div>
           </div>
           {form.type === "oneoff" ? (
             <div>
@@ -318,6 +328,7 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
   const [form, setForm] = useState<EditForm>({
     name: contract.name,
     monthly: String(contract.monthly),
+    hoursPerMonth: String(contract.hoursPerMonth),
     start: contract.start,
     contractedThrough: contract.contractedThrough ?? "",
     status: contract.status as ContractStatus,
@@ -335,6 +346,7 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
     const payload = {
       ...form,
       monthly: parseFloat(form.monthly),
+      hoursPerMonth: parseFloat(form.hoursPerMonth) || 0,
       type: isOngoing ? "retainer" : form.type,
       contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
       accountId: form.accountId,
@@ -393,9 +405,15 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
             <label style={labelStyle}>Project Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
-          <div>
-            <label style={labelStyle}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
-            <input style={inputStyle} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required min={0} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
+              <input style={inputStyle} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required min={0} />
+            </div>
+            <div>
+              <label style={labelStyle}>Hours / mo</label>
+              <input style={inputStyle} type="number" value={form.hoursPerMonth} onChange={e => setForm(f => ({ ...f, hoursPerMonth: e.target.value }))} min={0} step={0.5} placeholder="0" />
+            </div>
           </div>
           {form.type === "oneoff" ? (
             <div>
@@ -440,7 +458,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
 
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [duplicatingContract, setDuplicatingContract] = useState<Contract | null>(null)
-  const [form, setForm] = useState({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null })
+  const [form, setForm] = useState({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null })
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [showAllGantt, setShowAllGantt] = useState(false)
@@ -472,6 +490,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     const payload = {
       ...form,
       monthly: parseFloat(form.monthly),
+      hoursPerMonth: parseFloat(form.hoursPerMonth) || 0,
       type: isOngoing ? "retainer" : form.type,
       contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
     }
@@ -483,7 +502,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     const data = await res.json()
     if (res.ok) {
       updateContracts([...contracts, data.contract ?? data])
-      setForm({ name: "", monthly: "", start: now, contractedThrough: "", status: "potential", type: "retainer", accountId: null })
+      setForm({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential", type: "retainer", accountId: null })
       setAdding(false)
     }
     setSaving(false)
@@ -546,7 +565,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               </select>
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Project Name</label>
               <input style={{ ...inputStyle, background: "#FBFAF7" }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Project Name" autoFocus />
@@ -562,6 +581,10 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
               <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required placeholder="5000" />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Hrs / mo</label>
+              <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" value={form.hoursPerMonth} onChange={e => setForm(f => ({ ...f, hoursPerMonth: e.target.value }))} min={0} step={0.5} placeholder="0" />
             </div>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Status</label>

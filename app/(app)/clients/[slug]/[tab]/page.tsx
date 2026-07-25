@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import ClientPageClient from "../ClientPageClient"
 
-const VALID_TABS = ["dashboard", "accounts", "projects", "reconciliation", "progress", "products", "goals"] as const
+const VALID_TABS = ["dashboard", "accounts", "projects", "reconciliation", "progress", "products", "goals", "people"] as const
 type Tab = typeof VALID_TABS[number]
 
 export default async function ClientTabPage({ params }: { params: Promise<{ slug: string; tab: string }> }) {
@@ -19,7 +19,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   const id = client.id
 
-  const [metrics, goal, contracts, accountMonths, payments, accounts, products, roadmapItems] = await Promise.all([
+  const [metrics, goal, contracts, accountMonths, payments, accounts, products, roadmapItems, people] = await Promise.all([
     prisma.monthlyMetric.findMany({ where: { clientId: id }, orderBy: { month: "asc" } }),
     prisma.goal.findUnique({ where: { clientId: id } }),
     prisma.contract.findMany({ where: { clientId: id }, orderBy: { start: "asc" } }),
@@ -28,6 +28,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
     prisma.account.findMany({ where: { clientId: id }, orderBy: { name: "asc" } }),
     prisma.product.findMany({ where: { clientId: id }, orderBy: { createdAt: "asc" } }),
     prisma.roadmapItem.findMany({ where: { clientId: id } }),
+    prisma.person.findMany({ where: { clientId: id }, orderBy: { createdAt: "asc" } }),
   ])
 
   return (
@@ -41,7 +42,8 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialStartDate={client.startDate ?? null}
       initialEndDate={client.endDate ?? null}
       metrics={metrics}
-      initialContracts={contracts.map(c => ({ ...c, accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null }))}
+      initialContracts={contracts.map(c => ({ ...c, accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null, hoursPerMonth: c.hoursPerMonth }))}
+      initialPeople={people.map(p => ({ id: p.id, name: p.name, role: p.role ?? null, billableHours: p.billableHours }))}
       initialAccounts={accounts.map(a => ({ id: a.id, name: a.name, contactName: a.contactName, contactEmail: a.contactEmail, notes: a.notes }))}
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}

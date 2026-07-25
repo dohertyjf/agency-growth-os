@@ -14,6 +14,7 @@ interface Contract {
   id: string
   name: string
   monthly: number
+  hoursPerMonth: number
   start: string
   contractedThrough: string | null
   status: string

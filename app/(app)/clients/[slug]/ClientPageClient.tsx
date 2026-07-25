@@ -8,6 +8,7 @@ import AccountsPanel from "./AccountsPanel"
 import ProductsPanel from "./ProductsPanel"
 import ProgressPanel from "./ProgressPanel"
 import GoalsPanel from "./GoalsPanel"
+import PeoplePanel from "./PeoplePanel"
 
 interface Metric {
   id: string
@@ -28,11 +29,19 @@ interface Contract {
   id: string
   name: string
   monthly: number
+  hoursPerMonth: number
   start: string
   contractedThrough: string | null
   status: string
   type: string
   accountId?: string | null
+}
+
+interface Person {
+  id: string
+  name: string
+  role: string | null
+  billableHours: number
 }
 
 interface Account {
@@ -76,7 +85,7 @@ interface RoadmapItem {
   status: "none" | "red" | "yellow" | "green"
 }
 
-type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress" | "products" | "goals"
+type Tab = "dashboard" | "accounts" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "people"
 
 interface Props {
   clientId: string
@@ -95,6 +104,7 @@ interface Props {
   goal: Goal | null
   products: Product[]
   initialRoadmap: RoadmapItem[]
+  initialPeople: Person[]
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -105,18 +115,22 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "progress", label: "Progress" },
   { key: "products", label: "Products" },
   { key: "goals", label: "Goals & Constants" },
+  { key: "people", label: "People" },
 ]
 
 export default function ClientPageClient({
   clientId, clientSlug, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap, initialPeople,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
   const [payments, setPayments] = useState<Payment[]>(initialPayments)
   const [clientProducts, setClientProducts] = useState<Product[]>(products)
+  const [people, setPeople] = useState<Person[]>(initialPeople)
+
+  const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
 
   function handleRevenueUpdate(month: string, revenue: number) {
     setMetrics(prev => {
@@ -175,6 +189,7 @@ export default function ClientPageClient({
           initialStatus={initialStatus}
           initialStartDate={initialStartDate}
           initialEndDate={initialEndDate}
+          totalCapacityHours={totalCapacityHours}
         />
       )}
 
@@ -227,6 +242,14 @@ export default function ClientPageClient({
         <GoalsPanel
           clientId={clientId}
           initialGoal={goal}
+        />
+      )}
+
+      {currentTab === "people" && (
+        <PeoplePanel
+          clientId={clientId}
+          initialPeople={people}
+          onPeopleChange={setPeople}
         />
       )}
     </div>

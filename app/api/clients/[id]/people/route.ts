@@ -16,22 +16,14 @@ export async function GET(
   const { id } = await params
   if (!authorize(session, id)) return Response.json({ error: "Forbidden" }, { status: 403 })
 
-  const contracts = await prisma.contract.findMany({
-    where: { clientId: id },
-    orderBy: { monthly: "desc" },
-  })
-  return Response.json(contracts)
+  const people = await prisma.person.findMany({ where: { clientId: id }, orderBy: { createdAt: "asc" } })
+  return Response.json(people)
 }
 
 const schema = z.object({
   name: z.string().min(1),
-  monthly: z.number().min(0),
-  hoursPerMonth: z.number().min(0).default(0),
-  start: z.string().regex(/^\d{4}-\d{2}$/),
-  contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
-  status: z.enum(["potential", "active", "finished"]).default("potential"),
-  type: z.enum(["retainer", "oneoff"]).default("retainer"),
-  accountId: z.string().nullable().optional(),
+  role: z.string().optional(),
+  billableHours: z.number().min(0),
 })
 
 export async function POST(
@@ -46,12 +38,6 @@ export async function POST(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
-  const data = parsed.data
-  // One-offs: contractedThrough = start; ongoing retainers: null
-  const contractedThrough = data.type === "oneoff" ? data.start : (data.contractedThrough ?? null)
-
-  const contract = await prisma.contract.create({
-    data: { clientId: id, ...data, contractedThrough },
-  })
-  return Response.json(contract, { status: 201 })
+  const person = await prisma.person.create({ data: { clientId: id, ...parsed.data } })
+  return Response.json(person, { status: 201 })
 }

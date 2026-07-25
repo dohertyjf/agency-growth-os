@@ -29,6 +29,7 @@ interface Contract {
   id: string
   name: string
   monthly: number
+  hoursPerMonth?: number
   start: string
   contractedThrough: string | null
   status: string
@@ -55,6 +56,7 @@ interface Props {
   clientId: string
   clientSlug: string
   clientName: string
+  totalCapacityHours?: number
   metrics: Metric[]
   contracts: Contract[]
   goal: Goal | null
@@ -107,7 +109,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate }: Props) {
+export default function Dashboard({ clientId, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0 }: Props) {
   const router = useRouter()
   const [range, setRange] = useState<3 | 6 | 12>(3)
   const [selectedCard, setSelectedCard] = useState<CardKey>("contractMRR")
@@ -383,6 +385,10 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
   const avgContractSize = activeContracts.length
     ? activeContracts.reduce((s, c) => s + c.monthly, 0) / activeContracts.length
     : 0
+  const activeClientCount = activeContracts.length
+  const avgContractHours = activeContracts.length
+    ? activeContracts.reduce((s, c) => s + (c.hoursPerMonth ?? 0), 0) / activeContracts.length
+    : 0
 
   return (
     <div>
@@ -623,6 +629,9 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
         startMRR={mrr}
         avgContractSize={avgContractSize}
         goalMRR={currentGoal ? mrrTarget : null}
+        totalCapacityHours={totalCapacityHours}
+        avgContractHours={avgContractHours}
+        activeClientCount={activeClientCount}
       />
 
       {/* Month Table */}
