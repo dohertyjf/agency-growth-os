@@ -307,6 +307,8 @@ export default function ClientPageClient({
           clientId={clientId}
           initialPeople={people}
           initialSalaryMonths={salaryMonths}
+          contracts={contracts}
+          goal={goal}
           onPeopleChange={setPeople}
           onSalaryMonthChange={sm => setSalaryMonths(prev => {
             const idx = prev.findIndex(s => s.personId === sm.personId && s.month === sm.month)

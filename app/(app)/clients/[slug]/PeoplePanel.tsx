@@ -1,6 +1,6 @@
 "use client"
 import { useState, useMemo, useRef, useEffect } from "react"
-import { useFmtCurrency } from "@/lib/CurrencyContext"
+import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
 
 const CORE_ROLES = ["Delivery", "Sales", "Marketing", "Finance", "Operations"] as const
 type CoreRole = typeof CORE_ROLES[number]
@@ -54,10 +54,23 @@ interface PersonSalaryMonth {
   monthlySalary: number
 }
 
+interface Contract {
+  status: string
+  monthly: number
+  hoursPerMonth: number
+}
+
+interface Goal {
+  peoplePct?: number | null
+  closeRatePct?: number
+}
+
 interface Props {
   clientId: string
   initialPeople: Person[]
   initialSalaryMonths: PersonSalaryMonth[]
+  contracts?: Contract[]
+  goal?: Goal | null
   onPeopleChange?: (people: Person[]) => void
   onSalaryMonthChange?: (sm: PersonSalaryMonth) => void
 }
@@ -136,7 +149,7 @@ type AddMode = "none" | "internal" | "external" | "bulk"
 
 const emptyForm = { name: "", role: "", coreRoles: [] as string[], description: "", annualSalary: "", billableHours: "", startDate: "", endDate: "" }
 
-export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, onPeopleChange, onSalaryMonthChange }: Props) {
+export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, contracts = [], goal, onPeopleChange, onSalaryMonthChange }: Props) {
   const fmt$ = useFmtCurrency()
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
@@ -483,6 +496,9 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
         />
       )}
 
+      {/* Hire Modeler */}
+      <HireModeler people={people} contracts={contracts} goal={goal ?? null} />
+
       {/* Add Person Modal */}
       {(addMode === "internal" || addMode === "external") && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -622,6 +638,325 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
               </div>
             </form>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Hire Modeler ───────────────────────────────────────────────────────────────
+
+function currSym(c: string) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
+
+function addMonthsYM(ym: string, n: number): string {
+  const [y, m] = ym.split("-").map(Number)
+  const total = y * 12 + (m - 1) + n
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`
+}
+
+function HireModeler({ people, contracts, goal }: { people: Person[]; contracts: Contract[]; goal: Goal | null }) {
+  const fmt$ = useFmtCurrency()
+  const sym = currSym(useCurrency())
+
+  const [annualCost, setAnnualCost] = useState("")
+  const [billableHrs, setBillableHrs] = useState("")
+
+  const nowYM = new Date().toISOString().slice(0, 7)
+  const nowDate = new Date().toISOString().slice(0, 10)
+
+  // Baseline
+  const activeMRR = contracts.filter(c => c.status === "active").reduce((s, c) => s + c.monthly, 0)
+  const pipelineMRR = contracts.filter(c => c.status === "opportunity" || c.status === "potential").reduce((s, c) => s + c.monthly, 0)
+  const contractedHours = contracts.filter(c => c.status === "active").reduce((s, c) => s + c.hoursPerMonth, 0)
+  const activeClientCount = contracts.filter(c => c.status === "active").length
+  const closeRatePct = goal?.closeRatePct ?? 30
+  const peoplePctTarget = goal?.peoplePct ?? 40
+  const expectedNewMRR = pipelineMRR * (closeRatePct / 100)
+
+  const activePeople = people.filter(p => {
+    if (p.startDate && p.startDate > nowDate) return false
+    if (p.endDate && p.endDate < nowDate) return false
+    return true
+  })
+  const totalCapacity = activePeople.filter(p => !p.isExternal).reduce((s, p) => s + p.billableHours, 0)
+  const currentMonthlyPayroll = activePeople.reduce((s, p) => s + p.annualSalary / 12, 0)
+
+  const hireMonthlyCost = parseFloat(annualCost) > 0 ? parseFloat(annualCost) / 12 : 0
+  const hireBillableHrs = parseFloat(billableHrs) > 0 ? parseFloat(billableHrs) : 0
+  const hasHireInputs = hireMonthlyCost > 0 || hireBillableHrs > 0
+
+  const CAPACITY_THRESHOLD = 75
+  const hoursPerRevUnit = activeMRR > 0 ? contractedHours / activeMRR : 0
+
+  // 12-month projection
+  const projMonths = Array.from({ length: 12 }, (_, i) => addMonthsYM(nowYM, i + 1))
+  const monthLabels = projMonths.map(fmtYM)
+
+  const monthData = projMonths.map((_, i) => {
+    const ramp = Math.min((i + 1) / 6, 1)
+    const revenue = activeMRR + expectedNewMRR * ramp
+    const contracted = activeMRR > 0 ? revenue * hoursPerRevUnit : contractedHours
+    const capUtil = totalCapacity > 0 ? (contracted / totalCapacity) * 100 : 0
+    const peoplePct = revenue > 0 ? ((currentMonthlyPayroll + hireMonthlyCost) / revenue) * 100 : 100
+    const capacityGate = totalCapacity > 0 && contractedHours > 0 && capUtil >= CAPACITY_THRESHOLD
+    const budgetGate = revenue > 0 && peoplePct <= peoplePctTarget
+    return { revenue, capUtil, peoplePct, capacityGate, budgetGate }
+  })
+
+  const currentCapUtil = totalCapacity > 0 && contractedHours > 0 ? (contractedHours / totalCapacity) * 100 : 0
+  const currentPeoplePct = activeMRR > 0 ? (currentMonthlyPayroll / activeMRR) * 100 : 0
+
+  const capacityGateMonth = monthData.findIndex(d => d.capacityGate)
+  const budgetGateMonth = hasHireInputs ? monthData.findIndex(d => d.budgetGate) : -1
+  const bothGatesMonth = hasHireInputs ? monthData.findIndex(d => d.capacityGate && d.budgetGate) : -1
+
+  const revenueGap = hasHireInputs && capacityGateMonth >= 0 && !monthData[capacityGateMonth].budgetGate && (peoplePctTarget ?? 0) > 0
+    ? Math.max(0, (currentMonthlyPayroll + hireMonthlyCost) / (peoplePctTarget / 100) - monthData[capacityGateMonth].revenue)
+    : 0
+
+  // Chart
+  const W = 880, H = 200, PL = 52, PR = 24, PT = 24, PB = 28
+  const plotW = W - PL - PR
+  const plotH = H - PT - PB
+  const YMAX = 120
+  const toX = (i: number) => PL + (i / 11) * plotW
+  const toY = (pct: number) => PT + plotH - Math.min(pct, YMAX) / YMAX * plotH
+  const slotW = plotW / 11
+
+  function regionBand(a: number, b: number) {
+    const x = a === 0 ? PL : toX(a) - slotW / 2
+    const x2 = b === 11 ? W - PR : toX(b) + slotW / 2
+    return { x, width: x2 - x }
+  }
+
+  function getRegions(pred: (d: typeof monthData[0]) => boolean) {
+    const regions: { x: number; width: number }[] = []
+    let start = -1
+    monthData.forEach((d, i) => {
+      if (pred(d)) { if (start < 0) start = i }
+      else { if (start >= 0) { regions.push(regionBand(start, i - 1)); start = -1 } }
+    })
+    if (start >= 0) regions.push(regionBand(start, 11))
+    return regions
+  }
+
+  const hireRegions = hasHireInputs ? getRegions(d => d.capacityGate && d.budgetGate) : []
+  const gapRegions = hasHireInputs ? getRegions(d => d.capacityGate && !d.budgetGate) : []
+  const capLine = monthData.map((d, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(d.capUtil)}`).join(" ")
+  const peopleLine = hasHireInputs && activeMRR > 0
+    ? monthData.map((d, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(d.peoplePct)}`).join(" ")
+    : null
+
+  type MsgType = "good" | "warning" | "info" | "neutral"
+  const msg: { type: MsgType; text: string; sub?: string } | null = hasHireInputs ? (() => {
+    if (bothGatesMonth >= 0) {
+      const capFirst = capacityGateMonth <= budgetGateMonth
+      const same = capacityGateMonth === budgetGateMonth
+      if (capFirst) {
+        return {
+          type: "good" as const,
+          text: same
+            ? `Both gates open in ${monthLabels[bothGatesMonth]} — capacity reaches ${CAPACITY_THRESHOLD}% and the budget supports this hire at the same time.`
+            : `Capacity reaches ${CAPACITY_THRESHOLD}% in ${monthLabels[capacityGateMonth]}. Budget supports the hire from ${monthLabels[budgetGateMonth]}. Hiring window opens ${monthLabels[bothGatesMonth]}.`,
+        }
+      }
+      return {
+        type: "info" as const,
+        text: `Budget supports this hire from ${monthLabels[budgetGateMonth]}, but capacity doesn't reach ${CAPACITY_THRESHOLD}% until ${monthLabels[capacityGateMonth]}. Consider waiting until ${monthLabels[bothGatesMonth]} when the work actually demands it.`,
+      }
+    }
+    if (capacityGateMonth >= 0 && budgetGateMonth < 0) {
+      return {
+        type: "warning" as const,
+        text: `You'll need more capacity from ${monthLabels[capacityGateMonth]}, but this hire pushes people costs to ${Math.round(monthData[capacityGateMonth].peoplePct)}% — above your ${peoplePctTarget}% target.${revenueGap > 0 ? ` You need ${fmt$(Math.round(revenueGap))}/mo more revenue for the budget gate to open.` : ""}`,
+        sub: revenueGap > 0 && activeClientCount > 0
+          ? `Raise existing client rates by ${fmt$(Math.round(revenueGap / activeClientCount))}/mo each — or reduce delivery hours per client, which lets you serve more clients from existing capacity and grows revenue without adding cost.`
+          : "Raise rates with existing clients, or reduce delivery hours per client to serve more clients from existing capacity.",
+      }
+    }
+    if (budgetGateMonth >= 0 && capacityGateMonth < 0) {
+      return {
+        type: "info" as const,
+        text: `Budget supports this hire from ${monthLabels[budgetGateMonth]}, but capacity stays below ${CAPACITY_THRESHOLD}% for the next 12 months — no urgent need at current volumes.`,
+      }
+    }
+    return {
+      type: "neutral" as const,
+      text: "Neither gate opens in the next 12 months at this trajectory. Fill more pipeline before adding headcount.",
+    }
+  })() : null
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1916" }}>Hire Modeler</div>
+        <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
+          Model a prospective hire to see when capacity need and budget align.
+          Both gates must be open — you need the work and can afford the cost.
+        </div>
+      </div>
+
+      {/* Current state */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+        {[
+          {
+            label: "Capacity used now",
+            value: totalCapacity > 0 && contractedHours > 0 ? `${Math.round(currentCapUtil)}%` : "—",
+            sub: totalCapacity > 0 ? `${contractedHours} / ${totalCapacity} hrs` : "No team hours set",
+            alert: currentCapUtil >= 90 ? "red" : currentCapUtil >= CAPACITY_THRESHOLD ? "amber" : "",
+          },
+          {
+            label: "People % of revenue",
+            value: activeMRR > 0 ? `${Math.round(currentPeoplePct)}%` : "—",
+            sub: `Target: ${peoplePctTarget}%`,
+            alert: activeMRR > 0 && currentPeoplePct > peoplePctTarget ? "red" : "",
+          },
+          {
+            label: "Expected pipeline",
+            value: `${fmt$(Math.round(expectedNewMRR))}/mo`,
+            sub: `${fmt$(pipelineMRR)} × ${closeRatePct}% close`,
+            alert: "",
+          },
+        ].map(stat => (
+          <div key={stat.label} style={{ background: "#FBFAF7", border: "1px solid #ECE7DE", borderRadius: 8, padding: "10px 14px", minWidth: 160, flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 4 }}>{stat.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: stat.alert === "red" ? "#C2410C" : stat.alert === "amber" ? "#D97706" : "#1A1916" }}>{stat.value}</div>
+            <div style={{ fontSize: 10, color: "#9C9590", marginTop: 2 }}>{stat.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Hire inputs */}
+      <div style={{ display: "flex", gap: 12, marginBottom: hasHireInputs ? 16 : 4, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ minWidth: 180, flex: 1, maxWidth: 240 }}>
+          <label style={labelStyle}>Annual Cost</label>
+          <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff" }}>
+            <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0, userSelect: "none" as const }}>{sym}</span>
+            <input
+              style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "6px 10px 6px 4px", width: "100%", boxSizing: "border-box" as const }}
+              type="number" min={0} step={1000} value={annualCost}
+              onChange={e => setAnnualCost(e.target.value)} placeholder="60000" />
+          </div>
+        </div>
+        <div style={{ minWidth: 180, flex: 1, maxWidth: 240 }}>
+          <label style={labelStyle}>Billable hrs/mo</label>
+          <input style={inputStyle} type="number" min={0} step={5} value={billableHrs}
+            onChange={e => setBillableHrs(e.target.value)} placeholder="50" />
+        </div>
+        {hasHireInputs && hireMonthlyCost > 0 && (
+          <div style={{ fontSize: 11, color: "#9C9590", paddingBottom: 8 }}>{fmt$(Math.round(hireMonthlyCost))}/mo cost</div>
+        )}
+      </div>
+
+      {!hasHireInputs && (
+        <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 16, fontStyle: "italic" }}>
+          Enter an annual cost and billable hours above to model a specific hire.
+        </div>
+      )}
+
+      {/* Chart */}
+      <div style={{ position: "relative", width: "100%", paddingTop: `${(H / W) * 100}%` }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
+          {/* Hiring window shading */}
+          {hireRegions.map((r, i) => (
+            <rect key={`h${i}`} x={r.x} y={PT} width={r.width} height={plotH} fill="#DCFCE7" opacity={0.6} />
+          ))}
+          {/* Revenue gap shading */}
+          {gapRegions.map((r, i) => (
+            <rect key={`g${i}`} x={r.x} y={PT} width={r.width} height={plotH} fill="#FEF3C7" opacity={0.5} />
+          ))}
+
+          {/* Grid + Y labels */}
+          {[0, 25, 50, 75, 100].map(tick => (
+            <g key={tick}>
+              <line x1={PL} y1={toY(tick)} x2={W - PR} y2={toY(tick)} stroke="#ECE7DE" strokeWidth={1} />
+              <text x={PL - 6} y={toY(tick) + 4} textAnchor="end" fontSize={10} fill="#9C9590">{tick}%</text>
+            </g>
+          ))}
+
+          {/* Capacity threshold */}
+          {totalCapacity > 0 && contractedHours > 0 && (
+            <>
+              <line x1={PL} y1={toY(CAPACITY_THRESHOLD)} x2={W - PR} y2={toY(CAPACITY_THRESHOLD)} stroke="#16A34A" strokeWidth={1} strokeDasharray="4,3" opacity={0.55} />
+              <text x={W - PR - 4} y={toY(CAPACITY_THRESHOLD) - 4} fontSize={9} fill="#16A34A" textAnchor="end" opacity={0.7}>{CAPACITY_THRESHOLD}% capacity threshold</text>
+            </>
+          )}
+
+          {/* People% target */}
+          {hasHireInputs && activeMRR > 0 && (
+            <>
+              <line x1={PL} y1={toY(peoplePctTarget)} x2={W - PR} y2={toY(peoplePctTarget)} stroke="#2563EB" strokeWidth={1} strokeDasharray="4,3" opacity={0.55} />
+              <text x={W - PR - 4} y={toY(peoplePctTarget) - 4} fontSize={9} fill="#2563EB" textAnchor="end" opacity={0.7}>{peoplePctTarget}% people target</text>
+            </>
+          )}
+
+          {/* Capacity utilization line */}
+          {totalCapacity > 0 && contractedHours > 0 && (
+            <>
+              <path d={capLine} fill="none" stroke="#16A34A" strokeWidth={2} />
+              {monthData.map((d, i) => (
+                <circle key={i} cx={toX(i)} cy={toY(d.capUtil)} r={3} fill="#16A34A" opacity={0.8} />
+              ))}
+            </>
+          )}
+
+          {/* People % with hire line */}
+          {peopleLine && (
+            <>
+              <path d={peopleLine} fill="none" stroke="#2563EB" strokeWidth={2} />
+              {monthData.map((d, i) => (
+                <circle key={i} cx={toX(i)} cy={toY(d.peoplePct)} r={3} fill="#2563EB" opacity={0.8} />
+              ))}
+            </>
+          )}
+
+          {/* X labels */}
+          {monthLabels.map((label, i) => {
+            if (i % 3 !== 0 && i !== 11) return null
+            return <text key={i} x={toX(i)} y={H - 4} textAnchor="middle" fontSize={9} fill="#9C9590">{label}</text>
+          })}
+
+          {/* Legend */}
+          {totalCapacity > 0 && contractedHours > 0 && (
+            <>
+              <line x1={PL} y1={PT - 8} x2={PL + 18} y2={PT - 8} stroke="#16A34A" strokeWidth={2} />
+              <text x={PL + 22} y={PT - 4} fontSize={9} fill="#6B6760">Capacity utilization</text>
+            </>
+          )}
+          {hasHireInputs && activeMRR > 0 && (
+            <>
+              <line x1={PL + 145} y1={PT - 8} x2={PL + 163} y2={PT - 8} stroke="#2563EB" strokeWidth={2} />
+              <text x={PL + 167} y={PT - 4} fontSize={9} fill="#6B6760">People % with hire</text>
+            </>
+          )}
+          {hireRegions.length > 0 && (
+            <>
+              <rect x={PL + 290} y={PT - 14} width={12} height={12} fill="#DCFCE7" opacity={0.8} />
+              <text x={PL + 306} y={PT - 4} fontSize={9} fill="#6B6760">Hire window</text>
+            </>
+          )}
+          {gapRegions.length > 0 && (
+            <>
+              <rect x={PL + 380} y={PT - 14} width={12} height={12} fill="#FEF3C7" opacity={0.8} />
+              <text x={PL + 396} y={PT - 4} fontSize={9} fill="#6B6760">Revenue gap</text>
+            </>
+          )}
+        </svg>
+      </div>
+
+      {/* Recommendation */}
+      {msg && (
+        <div style={{
+          marginTop: 12, padding: "12px 16px", borderRadius: 8,
+          background: msg.type === "good" ? "#F0FDF4" : msg.type === "warning" ? "#FFFBEB" : msg.type === "info" ? "#EFF6FF" : "#F9FAFB",
+          borderLeft: `3px solid ${msg.type === "good" ? "#22C55E" : msg.type === "warning" ? "#F59E0B" : msg.type === "info" ? "#3B82F6" : "#9CA3AF"}`,
+        }}>
+          <div style={{ fontSize: 12, color: "#1A1916", lineHeight: 1.6 }}>{msg.text}</div>
+          {msg.sub && (
+            <div style={{ fontSize: 11, color: "#6B6760", marginTop: 8, lineHeight: 1.5 }}>
+              <strong>To close the gap:</strong> {msg.sub}
+            </div>
+          )}
         </div>
       )}
     </div>
