@@ -111,11 +111,11 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "dashboard", label: "Overview" },
   { key: "accounts", label: "Accounts" },
   { key: "projects", label: "Projects" },
-  { key: "reconciliation", label: "Reconciliation" },
-  { key: "progress", label: "Progress" },
-  { key: "products", label: "Products" },
-  { key: "goals", label: "Goals & Constants" },
   { key: "people", label: "People" },
+  { key: "products", label: "Products" },
+  { key: "progress", label: "Progress" },
+  { key: "goals", label: "Goals & Constants" },
+  { key: "reconciliation", label: "Reconciliation" },
 ]
 
 export default function ClientPageClient({
