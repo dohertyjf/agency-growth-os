@@ -183,7 +183,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
             onChange={e => setCloseRate(parseFloat(e.target.value) || 0)} />
         </div>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Avg Deal Size</label>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Avg Deal Size / mo</label>
           <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff", width: "100%", boxSizing: "border-box" }}>
             <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0, userSelect: "none" }}>{sym}</span>
             <input style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "6px 10px 6px 4px", width: "100%", boxSizing: "border-box" }}
