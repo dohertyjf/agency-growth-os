@@ -5,6 +5,12 @@ import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
 
 function currSym(c: string) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
 
+function fmtAxis(v: number, sym: string): string {
+  if (Math.abs(v) >= 100000) return sym + Math.round(v / 1000) + "k"
+  if (Math.abs(v) >= 10000) return sym + (Math.round(v / 100) / 10) + "k"
+  return sym + Math.round(v).toLocaleString()
+}
+
 interface Metric {
   month: string
   leads: number
@@ -116,7 +122,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   const hoursAvailable = billableHours - currentHoursUsed
   const slotsAvailable = hoursPerClient > 0 ? Math.floor(hoursAvailable / hoursPerClient) : null
 
-  // Chart
+  // Chart — same dimensions and technique as MetricChart
   const allVals = [startMRR, ...projected, revenueGoal, mrrCap ?? 0].filter(v => v > 0)
   const dataMax = allVals.length ? Math.max(...allVals) : 1
   const dataMin = allVals.length ? Math.min(...allVals) : 0
@@ -124,11 +130,12 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   const maxVal = dataMax + spread * 0.2
   const yMin = Math.max(0, dataMin - spread * 0.2)
   const yRange = maxVal - yMin || 1
-  const W = 520, H = 160, PL = 0, PR = 0, PT = 16, PB = 24
+  const W = 880, H = 240, PL = 60, PR = 24, PT = 20, PB = 36
   const plotW = W - PL - PR
   const plotH = H - PT - PB
   const toX = (i: number) => PL + (i / 11) * plotW
   const toY = (v: number) => PT + plotH - ((v - yMin) / yRange) * plotH
+  const yTicks = Array.from({ length: 5 }, (_, i) => yMin + (yRange * i) / 4)
 
   const pathD = projected.map((v, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(v)}`).join(" ")
   const goalY = revenueGoal > 0 ? toY(revenueGoal) : null
@@ -265,14 +272,34 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
       )}
 
       {/* Chart */}
-      <div style={{ overflowX: "auto" }}>
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+      <div style={{ position: "relative", width: "100%", paddingTop: `${(H / W) * 100}%` }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
+          {/* Grid + Y-axis labels */}
+          {yTicks.map((tick, i) => (
+            <g key={i}>
+              <line x1={PL} y1={toY(tick)} x2={W - PR} y2={toY(tick)} stroke="#ECE7DE" strokeWidth={1} />
+              <text x={PL - 8} y={toY(tick) + 4} textAnchor="end" fontSize={10} fill="#9C9590">
+                {fmtAxis(tick, sym)}
+              </text>
+            </g>
+          ))}
+
+          {/* X-axis labels */}
+          {monthLabels.map((label, i) => {
+            if (i % 3 !== 0 && i !== 11) return null
+            return (
+              <text key={i} x={toX(i)} y={H - 6} textAnchor="middle" fontSize={10} fill="#9C9590">
+                {label}
+              </text>
+            )
+          })}
+
           {/* Capacity ceiling line */}
           {capY !== null && mrrCap !== undefined && (
             <>
               <line x1={PL} y1={capY} x2={W - PR} y2={capY}
                 stroke="#6B6760" strokeWidth={1} strokeDasharray="3,3" opacity={0.4} />
-              <text x={W - PR - 4} y={capY + 10} fontSize={9} fill="#6B6760" textAnchor="end" opacity={0.6}>
+              <text x={W - PR - 4} y={capY - 4} fontSize={10} fill="#6B6760" textAnchor="end" opacity={0.7}>
                 Capacity ceiling {fmt$(mrrCap)}
               </text>
             </>
@@ -283,47 +310,28 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
             <>
               <line x1={PL} y1={goalY} x2={W - PR} y2={goalY}
                 stroke="#E9532A" strokeWidth={1} strokeDasharray="4,3" opacity={0.5} />
-              <text x={W - PR - 4} y={goalY - 3} fontSize={9} fill="#E9532A" textAnchor="end" opacity={0.7}>
+              <text x={W - PR - 4} y={goalY - 4} fontSize={10} fill="#E9532A" textAnchor="end" opacity={0.8}>
                 Goal {fmt$(revenueGoal)}
               </text>
             </>
           )}
 
+          {/* Capacity hit marker */}
+          {capacityHitMonth >= 0 && (
+            <line x1={toX(capacityHitMonth)} y1={PT} x2={toX(capacityHitMonth)} y2={PT + plotH}
+              stroke="#6B6760" strokeWidth={1} strokeDasharray="3,2" opacity={0.3} />
+          )}
+
           {/* Projected path */}
           <path d={pathD} fill="none" stroke="#E9532A" strokeWidth={2} strokeDasharray="5,3" />
 
-          {/* Capacity hit marker */}
-          {capacityHitMonth >= 0 && (
-            <line
-              x1={toX(capacityHitMonth)} y1={PT}
-              x2={toX(capacityHitMonth)} y2={PT + plotH}
-              stroke="#6B6760" strokeWidth={1} strokeDasharray="3,2" opacity={0.3}
-            />
-          )}
-
-          {/* Dots + month labels */}
-          {projected.map((v, i) => {
-            const atCap = mrrCap !== undefined && v >= mrrCap
-            const showLabel = i === 0 || i === 11
-            const showValue = showLabel && !(atCap && i !== 0)
-            return (
-              <g key={i}>
-                <circle cx={toX(i)} cy={toY(v)} r={3}
-                  fill={atCap ? "#6B6760" : "#E9532A"}
-                  opacity={0.6} />
-                {(i === 0 || i === 3 || i === 6 || i === 9 || i === 11) && (
-                  <text x={toX(i)} y={H - 4} fontSize={9} fill="#9C9590" textAnchor="middle">
-                    {monthLabels[i]}
-                  </text>
-                )}
-                {showValue && (
-                  <text x={toX(i)} y={toY(v) - 6} fontSize={9} fill="#1A1916" textAnchor={i === 0 ? "start" : "end"} fontWeight="600">
-                    {fmt$(v)}
-                  </text>
-                )}
-              </g>
-            )
-          })}
+          {/* Dots */}
+          {projected.map((v, i) => (
+            <circle key={i} cx={toX(i)} cy={toY(v)} r={3.5}
+              fill={mrrCap !== undefined && v >= mrrCap ? "#6B6760" : "#E9532A"}
+              stroke={mrrCap !== undefined && v >= mrrCap ? "#6B6760" : "#E9532A"}
+              strokeWidth={2} opacity={0.7} />
+          ))}
         </svg>
       </div>
     </div>
