@@ -179,16 +179,15 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
   const lostDeals = contracts.filter(c => c.status === "lost")
   const pipeline = [...opportunityDeals, ...potentialDeals]
 
-  // Funnel: cumulative counts (opportunity entered → made proposal → won)
+  // Conversion funnel: cumulative totals per stage
   const totalEntered = opportunityDeals.length + potentialDeals.length + wonDeals.length + lostDeals.length
   const totalProposal = potentialDeals.length + wonDeals.length + lostDeals.length
-  const funnelRows = [
-    { label: "Opportunity", count: totalEntered, color: "#6366F1" },
-    { label: "Potential", count: totalProposal, color: "#E9532A" },
-    { label: "Won", count: wonDeals.length, color: "#1F7A4D" },
-    { label: "Lost", count: lostDeals.length, color: "#9C9590" },
-  ]
-  const maxFunnel = Math.max(...funnelRows.map(r => r.count), 1)
+
+  // Conversion rates
+  const oppToProposalPct = totalEntered > 0 ? Math.round((totalProposal / totalEntered) * 100) : null
+  const proposalToWonPct = totalProposal > 0 ? Math.round((wonDeals.length / totalProposal) * 100) : null
+  const proposalToLostPct = totalProposal > 0 ? Math.round((lostDeals.length / totalProposal) * 100) : null
+  const proposalStillOpenPct = totalProposal > 0 ? Math.round((potentialDeals.length / totalProposal) * 100) : null
 
   // Stats
   const closeRate = wonDeals.length + lostDeals.length > 0
@@ -265,7 +264,7 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
           subtitle="Initial contact made"
           deals={opportunityDeals}
           accounts={accounts}
-          advanceLabel="→ Proposal"
+          advanceLabel="→ Potential"
           onAdvance={id => updateContract(id, { status: "potential" })}
           onLost={id => updateContract(id, { status: "lost" })}
           fmt$={fmt$}
@@ -273,7 +272,7 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
 
         <DealGroup
           title="Potential"
-          subtitle="Proposal sent · in negotiation"
+          subtitle="In negotiation"
           deals={potentialDeals}
           accounts={accounts}
           advanceLabel="✓ Won"
@@ -290,29 +289,66 @@ export default function PipelinePanel({ clientId, contracts, accounts, onContrac
         )}
       </div>
 
-      {/* Right: Funnel */}
+      {/* Right: Conversion Flow */}
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, position: "sticky", top: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 16 }}>Funnel</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 16 }}>Pipeline Flow</div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-          {funnelRows.map((row, i) => (
-            <div key={i}>
+        {totalEntered === 0 ? (
+          <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 20 }}>Flow appears once deals are added.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0, marginBottom: 20 }}>
+            {/* Opportunity */}
+            <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 11 }}>
-                <span style={{ color: "#6B6760", fontWeight: 500 }}>{row.label}</span>
-                <span style={{ color: "#1A1916", fontWeight: 700 }}>{row.count}</span>
+                <span style={{ color: "#6B6760", fontWeight: 600 }}>Opportunity</span>
+                <span style={{ color: "#1A1916", fontWeight: 700 }}>{totalEntered}</span>
               </div>
               <div style={{ height: 10, background: "#F5F1EC", borderRadius: 5, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%",
-                  width: `${(row.count / maxFunnel) * 100}%`,
-                  background: row.color,
-                  borderRadius: 5,
-                  transition: "width 0.4s",
-                }} />
+                <div style={{ height: "100%", width: "100%", background: "#6366F1", borderRadius: 5 }} />
               </div>
             </div>
-          ))}
-        </div>
+
+            {/* Conversion arrow */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 0 6px 4px" }}>
+              <span style={{ fontSize: 11, color: "#C0BAB2" }}>↓</span>
+              <span style={{ fontSize: 11, color: "#9C9590" }}>
+                {oppToProposalPct !== null ? `${oppToProposalPct}% moved to Potential` : "—"}
+              </span>
+            </div>
+
+            {/* Potential */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 11 }}>
+                <span style={{ color: "#6B6760", fontWeight: 600 }}>Potential</span>
+                <span style={{ color: "#1A1916", fontWeight: 700 }}>{totalProposal}</span>
+              </div>
+              <div style={{ height: 10, background: "#F5F1EC", borderRadius: 5, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${totalEntered > 0 ? (totalProposal / totalEntered) * 100 : 0}%`, background: "#E9532A", borderRadius: 5, transition: "width 0.4s" }} />
+              </div>
+            </div>
+
+            {/* Potential breakdown */}
+            {totalProposal > 0 && (
+              <div style={{ marginTop: 10, marginLeft: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  { label: "Won", count: wonDeals.length, pct: proposalToWonPct, color: "#1F7A4D", bg: "#DCFCE7" },
+                  { label: "Lost", count: lostDeals.length, pct: proposalToLostPct, color: "#9C9590", bg: "#F3F4F6" },
+                  { label: "Still Open", count: potentialDeals.length, pct: proposalStillOpenPct, color: "#92400E", bg: "#FFF7ED" },
+                ].map(row => (
+                  <div key={row.label}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, fontSize: 11 }}>
+                      <span style={{ color: "#6B6760" }}>{row.label}</span>
+                      <span style={{ color: "#1A1916", fontWeight: 600 }}>{row.count} <span style={{ color: "#9C9590", fontWeight: 400 }}>({row.pct ?? 0}%)</span></span>
+                    </div>
+                    <div style={{ height: 7, background: "#F5F1EC", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${row.pct ?? 0}%`, background: row.color, borderRadius: 4, transition: "width 0.4s" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ borderTop: "1px solid #ECE7DE", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           {closeRate !== null ? (
