@@ -85,6 +85,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   const [hoursPerClient, setHoursPerClient] = useState(round1(avgContractHours))
   const [billableHours, setBillableHours] = useState(totalCapacityHours || 0)
   const [revenueGoal, setRevenueGoal] = useState(goalMRR ?? 0)
+  const [clientCount, setClientCount] = useState(activeClientCount)
 
   function reset() {
     setLeads(defaultLeads)
@@ -94,6 +95,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
     setHoursPerClient(round1(avgContractHours))
     setBillableHours(totalCapacityHours || 0)
     setRevenueGoal(goalMRR ?? 0)
+    setClientCount(activeClientCount)
   }
 
   // Capacity ceiling: max clients from billable hours → max MRR
@@ -118,7 +120,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
     ? projected.findIndex(v => v >= mrrCap)
     : -1
 
-  const currentHoursUsed = activeClientCount * hoursPerClient
+  const currentHoursUsed = clientCount * hoursPerClient
   const hoursAvailable = billableHours - currentHoursUsed
   const slotsAvailable = hoursPerClient > 0 ? Math.floor(hoursAvailable / hoursPerClient) : null
 
@@ -212,6 +214,12 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           <input style={inputStyle} type="number" min={0} step={1000} value={revenueGoal || ""}
             onChange={e => setRevenueGoal(parseFloat(e.target.value) || 0)}
             placeholder="50000" />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Active Clients</label>
+          <input style={inputStyle} type="number" min={0} step={1} value={clientCount || ""}
+            onChange={e => setClientCount(parseFloat(e.target.value) || 0)}
+            placeholder="0" />
         </div>
       </div>
 
