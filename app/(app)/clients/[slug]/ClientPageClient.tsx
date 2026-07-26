@@ -49,6 +49,7 @@ interface Person {
   role: string | null
   responsibilities: string | null
   isExternal: boolean
+  isFullTime: boolean
   annualSalary: number
   billableHours: number
   startDate: string | null
@@ -153,6 +154,7 @@ export default function ClientPageClient({
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
+  const totalHoursWorked = people.filter(p => !p.isExternal).reduce((s, p) => s + (p.isFullTime ? 160 : p.billableHours), 0)
 
   // Per-month payroll: for each metric month, sum each active person's salary override
   // or fall back to annualSalary / 12, respecting start/end dates.
@@ -237,6 +239,7 @@ export default function ClientPageClient({
           initialStartDate={initialStartDate}
           initialEndDate={initialEndDate}
           totalCapacityHours={totalCapacityHours}
+          totalHoursWorked={totalHoursWorked}
           payrollByMonth={payrollByMonth}
         />
       )}

@@ -52,6 +52,7 @@ interface Person {
   role: string | null
   responsibilities: string | null
   isExternal: boolean
+  isFullTime: boolean
   annualSalary: number
   billableHours: number
   startDate: string | null
@@ -157,7 +158,7 @@ function fmtDate(d: string): string {
 
 type AddMode = "none" | "internal" | "external" | "bulk"
 
-const emptyForm = { name: "", role: "", coreRoles: [] as string[], description: "", annualSalary: "", billableHours: "", startDate: "", endDate: "" }
+const emptyForm = { name: "", role: "", coreRoles: [] as string[], description: "", annualSalary: "", billableHours: "", startDate: "", endDate: "", isFullTime: true }
 
 export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, contracts = [], goal, onPeopleChange, onSalaryMonthChange }: Props) {
   const fmt$ = useFmtCurrency()
@@ -167,7 +168,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
   const [addForm, setAddForm] = useState(emptyForm)
   const [addSaving, setAddSaving] = useState(false)
   const [editingPerson, setEditingPerson] = useState<Person | null>(null)
-  const [editForm, setEditForm] = useState({ ...emptyForm, isExternal: false })
+  const [editForm, setEditForm] = useState({ ...emptyForm, isExternal: false, isFullTime: true })
   const [editSaving, setEditSaving] = useState(false)
 
   const [bulkText, setBulkText] = useState("")
@@ -195,6 +196,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
           ? (addForm.description.trim() || null)
           : stringifyCoreRoles(addForm.coreRoles),
         isExternal,
+        isFullTime: isExternal ? true : addForm.isFullTime,
         annualSalary: parseFloat(addForm.annualSalary) || 0,
         billableHours: parseFloat(addForm.billableHours) || 0,
         startDate: addForm.startDate || null,
@@ -218,6 +220,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
       coreRoles: p.isExternal ? [] : parseCoreRoles(p.responsibilities),
       description: p.isExternal ? (p.responsibilities ?? "") : "",
       isExternal: p.isExternal,
+      isFullTime: p.isFullTime,
       annualSalary: p.annualSalary ? String(p.annualSalary) : "",
       billableHours: String(p.billableHours),
       startDate: p.startDate ?? "",
@@ -239,6 +242,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
           ? (editForm.description.trim() || null)
           : stringifyCoreRoles(editForm.coreRoles),
         isExternal: editForm.isExternal,
+        isFullTime: editForm.isExternal ? true : editForm.isFullTime,
         annualSalary: parseFloat(editForm.annualSalary) || 0,
         billableHours: parseFloat(editForm.billableHours) || 0,
         startDate: editForm.startDate || null,
@@ -624,6 +628,20 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                   <textarea style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} value={addForm.description} onChange={e => setAddForm(f => ({ ...f, description: e.target.value }))} placeholder="Executive coaching, strategic advisory…" />
                 </div>
               )}
+              {addMode === "internal" && (
+                <div>
+                  <label style={labelStyle}>Employment Type</label>
+                  <div style={{ display: "flex", gap: 0, border: "1px solid #ECE7DE", borderRadius: 6, overflow: "hidden" }}>
+                    {[{ value: true, label: "Full Time (160h)" }, { value: false, label: "Part Time / Contractor" }].map(opt => (
+                      <button key={String(opt.value)} type="button"
+                        onClick={() => setAddForm(f => ({ ...f, isFullTime: opt.value, billableHours: opt.value ? "128" : "" }))}
+                        style={{ flex: 1, padding: "7px 10px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", background: addForm.isFullTime === opt.value ? "#E9532A" : "#fff", color: addForm.isFullTime === opt.value ? "#fff" : "#6B6760", borderRight: opt.value ? "1px solid #ECE7DE" : "none" }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={labelStyle}>{addMode === "internal" ? "Annual Salary" : "Annual Cost"}</label>
@@ -631,8 +649,10 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                 </div>
                 {addMode === "internal" && (
                   <div>
-                    <label style={labelStyle}>Billable hrs/mo</label>
-                    <input style={inputStyle} type="number" min={0} step={1} value={addForm.billableHours} onChange={e => setAddForm(f => ({ ...f, billableHours: e.target.value }))} placeholder="50" />
+                    <label style={labelStyle}>{addForm.isFullTime ? "Billable hrs/mo" : "Monthly hrs"}</label>
+                    <input style={inputStyle} type="number" min={0} step={1} value={addForm.billableHours}
+                      onChange={e => setAddForm(f => ({ ...f, billableHours: e.target.value }))}
+                      placeholder={addForm.isFullTime ? "128" : "80"} />
                   </div>
                 )}
               </div>
@@ -699,6 +719,20 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                   <CoreRolePicker value={editForm.coreRoles} onChange={v => setEditForm(f => ({ ...f, coreRoles: v }))} />
                 </div>
               )}
+              {!editForm.isExternal && (
+                <div>
+                  <label style={labelStyle}>Employment Type</label>
+                  <div style={{ display: "flex", gap: 0, border: "1px solid #ECE7DE", borderRadius: 6, overflow: "hidden" }}>
+                    {[{ value: true, label: "Full Time (160h)" }, { value: false, label: "Part Time / Contractor" }].map(opt => (
+                      <button key={String(opt.value)} type="button"
+                        onClick={() => setEditForm(f => ({ ...f, isFullTime: opt.value, billableHours: opt.value && (!f.billableHours || parseFloat(f.billableHours) === 0) ? "128" : f.billableHours }))}
+                        style={{ flex: 1, padding: "7px 10px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", background: editForm.isFullTime === opt.value ? "#E9532A" : "#fff", color: editForm.isFullTime === opt.value ? "#fff" : "#6B6760", borderRight: opt.value ? "1px solid #ECE7DE" : "none" }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={labelStyle}>{editForm.isExternal ? "Annual Cost" : "Annual Salary"}</label>
@@ -706,8 +740,10 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                 </div>
                 {!editForm.isExternal && (
                   <div>
-                    <label style={labelStyle}>Billable hrs/mo</label>
-                    <input style={inputStyle} type="number" min={0} step={1} value={editForm.billableHours} onChange={e => setEditForm(f => ({ ...f, billableHours: e.target.value }))} placeholder="50" />
+                    <label style={labelStyle}>{editForm.isFullTime ? "Billable hrs/mo" : "Monthly hrs"}</label>
+                    <input style={inputStyle} type="number" min={0} step={1} value={editForm.billableHours}
+                      onChange={e => setEditForm(f => ({ ...f, billableHours: e.target.value }))}
+                      placeholder={editForm.isFullTime ? "128" : "80"} />
                   </div>
                 )}
               </div>

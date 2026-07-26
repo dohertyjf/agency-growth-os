@@ -15,6 +15,7 @@ const schema = z.object({
   role: z.string().nullable().optional(),
   responsibilities: z.string().nullable().optional(),
   isExternal: z.boolean().optional(),
+  isFullTime: z.boolean().optional(),
   annualSalary: z.number().min(0).optional(),
   billableHours: z.number().min(0).optional(),
   startDate: z.string().nullable().optional(),

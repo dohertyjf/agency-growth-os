@@ -59,6 +59,7 @@ interface Props {
   clientSlug: string
   clientName: string
   totalCapacityHours?: number
+  totalHoursWorked?: number
   payrollByMonth?: Map<string, number>
   metrics: Metric[]
   contracts: Contract[]
@@ -115,7 +116,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, payrollByMonth }: Props) {
+export default function Dashboard({ clientId, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, totalHoursWorked = 0, payrollByMonth }: Props) {
   const router = useRouter()
   const fmt$ = useFmtCurrency()
   const currency = useCurrency()
@@ -415,8 +416,8 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
   const acltv = acmv * avgDurationMonths
 
   const totalActiveHours = activeContracts.reduce((s, c) => s + (c.hoursPerMonth ?? 0), 0)
-  const hourlyYield = totalActiveHours > 0 && revenueForACMV > 0
-    ? revenueForACMV / totalActiveHours
+  const hourlyYield = totalHoursWorked > 0 && revenueForACMV > 0
+    ? revenueForACMV / totalHoursWorked
     : 0
 
   const cacMonths = allDerived.filter(m => (m.marketingSpend ?? 0) > 0 || m.newClients > 0).slice(-6)
@@ -646,7 +647,7 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
           <InsightCard
             label="Hourly Yield"
             value={fmt$(Math.round(hourlyYield))}
-            sub={`${totalActiveHours} hrs committed/mo`}
+            sub={`${totalHoursWorked} hrs worked/mo`}
           />
         )}
         {cac > 0 && (

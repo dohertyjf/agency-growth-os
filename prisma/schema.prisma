@@ -86,8 +86,8 @@ model MonthlyMetric {
   salaries      Float  @default(0)
   software      Float  @default(0)
   cashInBank    Float  @default(0)
-  leads           Float  @default(0)
-  newClients      Float  @default(0)
+  leads          Float  @default(0)
+  newClients     Float  @default(0)
   closeRate       Float  @default(0)
   churn           Float  @default(0)
   marketingSpend  Float  @default(0)
@@ -137,6 +137,7 @@ model Person {
   role             String?
   responsibilities String?
   isExternal       Boolean             @default(false)
+  isFullTime       Boolean             @default(true)
   annualSalary     Float               @default(0)
   billableHours    Float               @default(0)
   startDate        String?
