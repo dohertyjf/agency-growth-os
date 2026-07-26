@@ -62,6 +62,12 @@ interface PersonSalaryMonth {
   monthlySalary: number
 }
 
+interface PersonHoursMonth {
+  personId: string
+  month: string
+  monthlyHours: number
+}
+
 interface Account {
   id: string
   name: string
@@ -126,6 +132,7 @@ interface Props {
   initialRoadmap: RoadmapItem[]
   initialPeople: Person[]
   initialSalaryMonths: PersonSalaryMonth[]
+  initialHoursMonths: PersonHoursMonth[]
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -143,7 +150,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, clientSlug, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap, initialPeople, initialSalaryMonths,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -152,6 +159,7 @@ export default function ClientPageClient({
   const [clientProducts, setClientProducts] = useState<Product[]>(products)
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
+  const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
   const totalHoursWorked = people.filter(p => !p.isExternal).reduce((s, p) => s + (p.isFullTime ? 160 : p.billableHours), 0)
@@ -311,6 +319,7 @@ export default function ClientPageClient({
           clientId={clientId}
           initialPeople={people}
           initialSalaryMonths={salaryMonths}
+          initialHoursMonths={hoursMonths}
           contracts={contracts}
           goal={goal}
           onPeopleChange={setPeople}
@@ -318,6 +327,11 @@ export default function ClientPageClient({
             const idx = prev.findIndex(s => s.personId === sm.personId && s.month === sm.month)
             if (idx >= 0) return prev.map((s, i) => i === idx ? sm : s)
             return [...prev, sm]
+          })}
+          onHoursMonthChange={hm => setHoursMonths(prev => {
+            const idx = prev.findIndex(h => h.personId === hm.personId && h.month === hm.month)
+            if (idx >= 0) return prev.map((h, i) => i === idx ? hm : h)
+            return [...prev, hm]
           })}
         />
       )}

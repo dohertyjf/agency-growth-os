@@ -144,6 +144,7 @@ model Person {
   endDate          String?
   createdAt        DateTime            @default(now())
   salaryMonths     PersonSalaryMonth[]
+  hoursMonths      PersonHoursMonth[]
 }
 
 model PersonSalaryMonth {
@@ -153,6 +154,17 @@ model PersonSalaryMonth {
   month         String
   monthlySalary Float
   createdAt     DateTime @default(now())
+
+  @@unique([personId, month])
+}
+
+model PersonHoursMonth {
+  id           String   @id @default(cuid())
+  personId     String
+  person       Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  month        String
+  monthlyHours Float
+  createdAt    DateTime @default(now())
 
   @@unique([personId, month])
 }

@@ -19,7 +19,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   const id = client.id
 
-  const [metrics, goal, contracts, accountMonths, payments, accounts, products, roadmapItems, people, salaryMonths] = await Promise.all([
+  const [metrics, goal, contracts, accountMonths, payments, accounts, products, roadmapItems, people, salaryMonths, hoursMonths] = await Promise.all([
     prisma.monthlyMetric.findMany({ where: { clientId: id }, orderBy: { month: "asc" } }),
     prisma.goal.findUnique({ where: { clientId: id } }),
     prisma.contract.findMany({ where: { clientId: id }, orderBy: { start: "asc" } }),
@@ -30,6 +30,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
     prisma.roadmapItem.findMany({ where: { clientId: id } }),
     prisma.person.findMany({ where: { clientId: id }, orderBy: { createdAt: "asc" } }),
     prisma.personSalaryMonth.findMany({ where: { person: { clientId: id } } }),
+    prisma.personHoursMonth.findMany({ where: { person: { clientId: id } } }),
   ])
 
   return (
@@ -46,6 +47,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialContracts={contracts.map(c => ({ ...c, accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null, hoursPerMonth: c.hoursPerMonth, callDate: c.callDate ?? null, signedDate: c.signedDate ?? null, kickoffDate: c.kickoffDate ?? null }))}
       initialPeople={people.map(p => ({ id: p.id, name: p.name, role: p.role ?? null, responsibilities: p.responsibilities ?? null, isExternal: p.isExternal, isFullTime: p.isFullTime, annualSalary: p.annualSalary, billableHours: p.billableHours, startDate: p.startDate ?? null, endDate: p.endDate ?? null }))}
       initialSalaryMonths={salaryMonths.map(s => ({ personId: s.personId, month: s.month, monthlySalary: s.monthlySalary }))}
+      initialHoursMonths={hoursMonths.map(h => ({ personId: h.personId, month: h.month, monthlyHours: h.monthlyHours }))}
       initialAccounts={accounts.map(a => ({ id: a.id, name: a.name, contactName: a.contactName, contactEmail: a.contactEmail, notes: a.notes }))}
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}

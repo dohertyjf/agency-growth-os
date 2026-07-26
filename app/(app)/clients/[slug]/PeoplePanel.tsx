@@ -65,6 +65,12 @@ interface PersonSalaryMonth {
   monthlySalary: number
 }
 
+interface PersonHoursMonth {
+  personId: string
+  month: string
+  monthlyHours: number
+}
+
 interface Contract {
   status: string
   monthly: number
@@ -80,10 +86,12 @@ interface Props {
   clientId: string
   initialPeople: Person[]
   initialSalaryMonths: PersonSalaryMonth[]
+  initialHoursMonths?: PersonHoursMonth[]
   contracts?: Contract[]
   goal?: Goal | null
   onPeopleChange?: (people: Person[]) => void
   onSalaryMonthChange?: (sm: PersonSalaryMonth) => void
+  onHoursMonthChange?: (hm: PersonHoursMonth) => void
 }
 
 const inputStyle: React.CSSProperties = {
@@ -160,10 +168,11 @@ type AddMode = "none" | "internal" | "external" | "bulk"
 
 const emptyForm = { name: "", role: "", coreRoles: [] as string[], description: "", annualSalary: "", billableHours: "", startDate: "", endDate: "", isFullTime: true }
 
-export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, contracts = [], goal, onPeopleChange, onSalaryMonthChange }: Props) {
+export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, initialHoursMonths = [], contracts = [], goal, onPeopleChange, onSalaryMonthChange, onHoursMonthChange }: Props) {
   const fmt$ = useFmtCurrency()
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
+  const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
   const [addMode, setAddMode] = useState<AddMode>("none")
   const [addForm, setAddForm] = useState(emptyForm)
   const [addSaving, setAddSaving] = useState(false)
@@ -282,10 +291,17 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
   function handleSalaryMonthUpdate(sm: PersonSalaryMonth) {
     setSalaryMonths(prev => {
       const idx = prev.findIndex(s => s.personId === sm.personId && s.month === sm.month)
-      const next = idx >= 0 ? prev.map((s, i) => i === idx ? sm : s) : [...prev, sm]
-      return next
+      return idx >= 0 ? prev.map((s, i) => i === idx ? sm : s) : [...prev, sm]
     })
     onSalaryMonthChange?.(sm)
+  }
+
+  function handleHoursMonthUpdate(hm: PersonHoursMonth) {
+    setHoursMonths(prev => {
+      const idx = prev.findIndex(h => h.personId === hm.personId && h.month === hm.month)
+      return idx >= 0 ? prev.map((h, i) => i === idx ? hm : h) : [...prev, hm]
+    })
+    onHoursMonthChange?.(hm)
   }
 
   const internalHours = internal.reduce((s, p) => s + p.billableHours, 0)
@@ -590,8 +606,10 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
         <PersonSalaryTable
           people={people}
           salaryMonths={salaryMonths}
+          hoursMonths={hoursMonths}
           clientId={clientId}
           onSalaryMonthChange={handleSalaryMonthUpdate}
+          onHoursMonthChange={handleHoursMonthUpdate}
         />
       )}
 
@@ -1221,11 +1239,13 @@ function fmtYM(ym: string): string {
   return `${months[+m - 1]} '${y.slice(2)}`
 }
 
-function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange }: {
+function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSalaryMonthChange, onHoursMonthChange }: {
   people: Person[]
   salaryMonths: PersonSalaryMonth[]
+  hoursMonths: PersonHoursMonth[]
   clientId: string
   onSalaryMonthChange: (sm: PersonSalaryMonth) => void
+  onHoursMonthChange: (hm: PersonHoursMonth) => void
 }) {
   const fmt$ = useFmtCurrency()
   const nowYM = new Date().toISOString().slice(0, 7)
@@ -1245,11 +1265,16 @@ function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange
   const salaryMap = new Map<string, number>()
   salaryMonths.forEach(sm => salaryMap.set(`${sm.personId}:${sm.month}`, sm.monthlySalary))
 
-  const [editingCell, setEditingCell] = useState<{ personId: string; month: string } | null>(null)
+  const hoursMap = new Map<string, number>()
+  hoursMonths.forEach(hm => hoursMap.set(`${hm.personId}:${hm.month}`, hm.monthlyHours))
+
+  type EditTarget = { personId: string; month: string; kind: "salary" | "hours" }
+  const [editingCell, setEditingCell] = useState<EditTarget | null>(null)
   const [editValue, setEditValue] = useState("")
   const [saving, setSaving] = useState(false)
 
   function baseMonthlySalary(p: Person) { return p.annualSalary > 0 ? Math.round(p.annualSalary / 12) : 0 }
+  function baseMonthlyHours(p: Person) { return p.isFullTime ? 160 : p.billableHours }
 
   function isActive(p: Person, mo: string) {
     const start = toYM(p.startDate)
@@ -1259,42 +1284,62 @@ function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange
     return true
   }
 
-  function cellValue(personId: string, month: string, p: Person) {
+  function salaryCellValue(personId: string, month: string, p: Person) {
     const override = salaryMap.get(`${personId}:${month}`)
     return { value: override ?? baseMonthlySalary(p), isOverride: override !== undefined }
   }
 
-  async function saveCell(personId: string, month: string) {
+  function hoursCellValue(personId: string, month: string, p: Person) {
+    const override = hoursMap.get(`${personId}:${month}`)
+    return { value: override ?? baseMonthlyHours(p), isOverride: override !== undefined }
+  }
+
+  async function saveCell(target: EditTarget) {
     const raw = editValue.replace(/[$£€,\s]/g, "")
     const val = parseFloat(raw)
     if (isNaN(val) || val < 0) { setEditingCell(null); return }
     setSaving(true)
-    const res = await fetch(`/api/clients/${clientId}/people/${personId}/salary-months`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ month, monthlySalary: val }),
-    })
+    if (target.kind === "salary") {
+      const res = await fetch(`/api/clients/${clientId}/people/${target.personId}/salary-months`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month: target.month, monthlySalary: val }),
+      })
+      if (res.ok) onSalaryMonthChange({ personId: target.personId, month: target.month, monthlySalary: val })
+    } else {
+      const res = await fetch(`/api/clients/${clientId}/people/${target.personId}/hours-months`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month: target.month, monthlyHours: val }),
+      })
+      if (res.ok) onHoursMonthChange({ personId: target.personId, month: target.month, monthlyHours: val })
+    }
     setSaving(false)
-    if (res.ok) onSalaryMonthChange({ personId, month, monthlySalary: val })
     setEditingCell(null)
   }
 
-  function openCell(personId: string, month: string, currentValue: number) {
-    setEditingCell({ personId, month })
+  function openCell(target: EditTarget, currentValue: number) {
+    setEditingCell(target)
     setEditValue(currentValue > 0 ? String(currentValue) : "")
+  }
+
+  const stickyLabel: React.CSSProperties = {
+    padding: "6px 16px 6px 0", fontSize: 11, fontWeight: 600, color: "#9C9590",
+    whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1,
+    borderBottom: "1px solid #F5F1EC",
   }
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 4 }}>Monthly Salary</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 4 }}>Monthly Salary &amp; Hours</div>
       <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 14 }}>
-        Grey values derive from annual salary ÷ 12. Click a cell to set an override — e.g. after a raise taking effect next month.
+        Grey values are defaults (salary ÷ 12; 160h for FT, billable hrs for PT). Click any cell to override — e.g. when someone changes hours or gets a raise.
       </div>
       <div ref={scrollRef} style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 16px 4px 0", borderBottom: "1px solid #ECE7DE", minWidth: 140, whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>
+              <th style={{ textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 16px 4px 0", borderBottom: "1px solid #ECE7DE", minWidth: 160, whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>
                 Person
               </th>
               {months.map(mo => (
@@ -1305,35 +1350,79 @@ function PersonSalaryTable({ people, salaryMonths, clientId, onSalaryMonthChange
             </tr>
           </thead>
           <tbody>
-            {people.map(p => (
-              <tr key={p.id}>
-                <td style={{ padding: "8px 16px 8px 0", fontSize: 13, fontWeight: 500, color: "#1A1916", borderBottom: "1px solid #F5F1EC", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>
-                  <div>{p.name}</div>
-                  {p.isExternal && <div style={{ fontSize: 10, color: "#9C9590", marginTop: 1 }}>Vendor</div>}
-                </td>
-                {months.map(mo => {
-                  const active = isActive(p, mo)
-                  const { value, isOverride } = cellValue(p.id, mo, p)
-                  const isEditing = editingCell?.personId === p.id && editingCell.month === mo
-                  return (
-                    <td key={mo} style={{ padding: "4px 4px", textAlign: "right", borderBottom: "1px solid #F5F1EC", minWidth: 86, background: active ? undefined : "#FAFAF8" }}>
-                      {active && isEditing ? (
-                        <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)}
-                          onBlur={() => saveCell(p.id, mo)}
-                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); saveCell(p.id, mo) } if (e.key === "Escape") setEditingCell(null) }}
-                          disabled={saving}
-                          style={{ width: 78, textAlign: "right", fontSize: 12, border: "1px solid #E9532A", borderRadius: 4, padding: "3px 6px", outline: "none", fontFamily: "inherit", fontVariantNumeric: "tabular-nums" }} />
-                      ) : (
-                        <button type="button" onClick={() => active && openCell(p.id, mo, value)}
-                          style={{ background: "none", border: "none", cursor: active ? "pointer" : "default", padding: "3px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums", borderRadius: 4, color: !active ? "#ECE7DE" : isOverride ? "#1A1916" : "#C0BAB2", fontWeight: isOverride ? 600 : 400, width: "100%", textAlign: "right" }}>
-                          {active && value > 0 ? fmt$(value) : "—"}
-                        </button>
-                      )}
+            {people.map((p, pi) => {
+              const isLast = pi === people.length - 1
+              const rowBorder = isLast ? "2px solid #ECE7DE" : "1px solid #ECE7DE"
+              return (
+                <>
+                  {/* Salary row */}
+                  <tr key={`${p.id}-salary`}>
+                    <td style={{ ...stickyLabel, paddingTop: 10, borderBottom: "none", fontWeight: 500, fontSize: 13, color: "#1A1916" }}>
+                      <div>{p.name}</div>
+                      {p.isExternal && <div style={{ fontSize: 10, color: "#9C9590", marginTop: 1 }}>Vendor</div>}
                     </td>
-                  )
-                })}
-              </tr>
-            ))}
+                    {months.map(mo => {
+                      const active = isActive(p, mo)
+                      const { value, isOverride } = salaryCellValue(p.id, mo, p)
+                      const target: EditTarget = { personId: p.id, month: mo, kind: "salary" }
+                      const isEditing = editingCell?.personId === p.id && editingCell.month === mo && editingCell.kind === "salary"
+                      return (
+                        <td key={mo} style={{ padding: "4px 4px", textAlign: "right", borderBottom: "none", minWidth: 86, background: active ? undefined : "#FAFAF8" }}>
+                          {active && isEditing ? (
+                            <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)}
+                              onBlur={() => saveCell(target)}
+                              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); saveCell(target) } if (e.key === "Escape") setEditingCell(null) }}
+                              disabled={saving}
+                              style={{ width: 78, textAlign: "right", fontSize: 12, border: "1px solid #E9532A", borderRadius: 4, padding: "3px 6px", outline: "none", fontFamily: "inherit", fontVariantNumeric: "tabular-nums" }} />
+                          ) : (
+                            <button type="button" onClick={() => active && openCell(target, value)}
+                              style={{ background: "none", border: "none", cursor: active ? "pointer" : "default", padding: "3px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums", borderRadius: 4, color: !active ? "#ECE7DE" : isOverride ? "#1A1916" : "#C0BAB2", fontWeight: isOverride ? 600 : 400, width: "100%", textAlign: "right" }}>
+                              {active && value > 0 ? fmt$(value) : "—"}
+                            </button>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                  {/* Hours row — internal only */}
+                  {!p.isExternal && (
+                    <tr key={`${p.id}-hours`}>
+                      <td style={{ ...stickyLabel, paddingTop: 2, borderBottom: rowBorder }}>
+                        <span style={{ color: "#9C9590", fontSize: 11 }}>hrs/mo</span>
+                      </td>
+                      {months.map(mo => {
+                        const active = isActive(p, mo)
+                        const { value, isOverride } = hoursCellValue(p.id, mo, p)
+                        const target: EditTarget = { personId: p.id, month: mo, kind: "hours" }
+                        const isEditing = editingCell?.personId === p.id && editingCell.month === mo && editingCell.kind === "hours"
+                        return (
+                          <td key={mo} style={{ padding: "4px 4px", textAlign: "right", borderBottom: rowBorder, minWidth: 86, background: active ? undefined : "#FAFAF8" }}>
+                            {active && isEditing ? (
+                              <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)}
+                                onBlur={() => saveCell(target)}
+                                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); saveCell(target) } if (e.key === "Escape") setEditingCell(null) }}
+                                disabled={saving}
+                                style={{ width: 78, textAlign: "right", fontSize: 12, border: "1px solid #E9532A", borderRadius: 4, padding: "3px 6px", outline: "none", fontFamily: "inherit", fontVariantNumeric: "tabular-nums" }} />
+                            ) : (
+                              <button type="button" onClick={() => active && openCell(target, value)}
+                                style={{ background: "none", border: "none", cursor: active ? "pointer" : "default", padding: "3px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums", borderRadius: 4, color: !active ? "#ECE7DE" : isOverride ? "#1A1916" : "#C0BAB2", fontWeight: isOverride ? 600 : 400, width: "100%", textAlign: "right" }}>
+                                {active ? `${value}h` : "—"}
+                              </button>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )}
+                  {/* Spacer for external vendors (no hours row) */}
+                  {p.isExternal && (
+                    <tr key={`${p.id}-spacer`}>
+                      <td colSpan={months.length + 1} style={{ borderBottom: rowBorder, padding: 0, height: 1 }} />
+                    </tr>
+                  )}
+                </>
+              )
+            })}
           </tbody>
         </table>
       </div>
