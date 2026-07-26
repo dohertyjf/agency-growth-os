@@ -78,6 +78,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   }, [recentMetrics])
   const defaultChurn = useMemo(() => round1(avg(recentMetrics.map(m => m.churn))), [recentMetrics])
 
+  const [startRevenue, setStartRevenue] = useState(Math.round(startMRR))
   const [leads, setLeads] = useState(defaultLeads)
   const [closeRate, setCloseRate] = useState(defaultCloseRate)
   const [avgDeal, setAvgDeal] = useState(Math.round(avgContractSize))
@@ -88,6 +89,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   const [clientCount, setClientCount] = useState(activeClientCount)
 
   function reset() {
+    setStartRevenue(Math.round(startMRR))
     setLeads(defaultLeads)
     setCloseRate(defaultCloseRate)
     setAvgDeal(Math.round(avgContractSize))
@@ -105,9 +107,9 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   const mrrCap = maxClients !== null && avgDeal > 0 ? maxClients * avgDeal : undefined
 
   const projected = useMemo(
-    () => projectMRR(startMRR, leads, closeRate, avgDeal, churn, 12, mrrCap),
+    () => projectMRR(startRevenue, leads, closeRate, avgDeal, churn, 12, mrrCap),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [startMRR, leads, closeRate, avgDeal, churn, mrrCap]
+    [startRevenue, leads, closeRate, avgDeal, churn, mrrCap]
   )
 
   const monthLabels = useMemo(
@@ -125,7 +127,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   const slotsAvailable = hoursPerClient > 0 ? Math.floor(hoursAvailable / hoursPerClient) : null
 
   // Chart — same dimensions and technique as MetricChart
-  const allVals = [startMRR, ...projected, revenueGoal, mrrCap ?? 0].filter(v => v > 0)
+  const allVals = [startRevenue, ...projected, revenueGoal, mrrCap ?? 0].filter(v => v > 0)
   const dataMax = allVals.length ? Math.max(...allVals) : 1
   const dataMin = allVals.length ? Math.min(...allVals) : 0
   const spread = dataMax - dataMin || dataMax * 0.15 || 1
@@ -175,6 +177,15 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
       {/* Inputs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
         <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Starting Revenue {sym}</label>
+          <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff", width: "100%", boxSizing: "border-box" }}>
+            <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0, userSelect: "none" }}>{sym}</span>
+            <input style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "6px 10px 6px 4px", width: "100%", boxSizing: "border-box" }}
+              type="number" min={0} step={100} value={startRevenue}
+              onChange={e => setStartRevenue(parseFloat(e.target.value) || 0)} />
+          </div>
+        </div>
+        <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Leads / mo</label>
           <input style={inputStyle} type="number" min={0} step={0.5} value={leads}
             onChange={e => setLeads(parseFloat(e.target.value) || 0)} />
@@ -199,7 +210,7 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
             onChange={e => setChurn(parseFloat(e.target.value) || 0)} />
         </div>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Hrs / client</label>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>Avg monthly hours per client</label>
           <input style={inputStyle} type="number" min={0} step={0.5} value={hoursPerClient}
             onChange={e => setHoursPerClient(parseFloat(e.target.value) || 0)} />
         </div>
