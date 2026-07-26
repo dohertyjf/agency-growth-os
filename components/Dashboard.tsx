@@ -412,6 +412,10 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
     : 0
   const acltv = acmv * avgDurationMonths
 
+  const hourlyYield = totalCapacityHours > 0 && revenueForACMV > 0
+    ? revenueForACMV / totalCapacityHours
+    : 0
+
   return (
     <div>
       {/* Edit Client Modal */}
@@ -628,6 +632,13 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
             label="Avg Client Lifetime"
             value={fmt$(acltv)}
             sub={`~${Math.round(avgDurationMonths)} mo avg length`}
+          />
+        )}
+        {hourlyYield > 0 && (
+          <InsightCard
+            label="Hourly Yield"
+            value={fmt$(Math.round(hourlyYield))}
+            sub={`${totalCapacityHours} billable hrs/mo`}
           />
         )}
       </div>
