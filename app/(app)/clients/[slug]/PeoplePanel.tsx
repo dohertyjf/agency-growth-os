@@ -755,6 +755,7 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
 
   const [annualCost, setAnnualCost] = useState("")
   const [billableHrs, setBillableHrs] = useState("")
+  const [growthPct, setGrowthPct] = useState(0)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -784,6 +785,7 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
 
   const CAPACITY_THRESHOLD = 75
   const hoursPerRevUnit = activeMRR > 0 ? contractedHours / activeMRR : 0
+  const scaledExpectedNewMRR = expectedNewMRR * (1 + growthPct / 100)
 
   // 12-month projection
   const projMonths = Array.from({ length: 12 }, (_, i) => addMonthsYM(nowYM, i + 1))
@@ -791,7 +793,7 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
 
   const monthData = projMonths.map((_, i) => {
     const ramp = Math.min((i + 1) / 6, 1)
-    const revenue = activeMRR + expectedNewMRR * ramp
+    const revenue = activeMRR + scaledExpectedNewMRR * ramp
     const contracted = activeMRR > 0 ? revenue * hoursPerRevUnit : contractedHours
     const capUtil = totalCapacity > 0 ? (contracted / totalCapacity) * 100 : 0
     const peoplePct = revenue > 0 ? ((currentMonthlyPayroll + hireMonthlyCost) / revenue) * 100 : 100
@@ -851,6 +853,8 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
     ? monthData.map((d, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(d.peoplePct)}`).join(" ")
     : null
 
+  const scenarioNote = growthPct > 0 ? ` (${growthPct}% growth scenario)` : ""
+
   type MsgType = "good" | "warning" | "info" | "neutral"
   const msg: { type: MsgType; text: string; sub?: string } | null = hasHireInputs ? (() => {
     if (bothGatesMonth >= 0) {
@@ -860,19 +864,19 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
         return {
           type: "good" as const,
           text: same
-            ? `Both gates open in ${monthLabels[bothGatesMonth]} — capacity reaches ${CAPACITY_THRESHOLD}% and the budget supports this hire at the same time.`
-            : `Capacity reaches ${CAPACITY_THRESHOLD}% in ${monthLabels[capacityGateMonth]}. Budget supports the hire from ${monthLabels[budgetGateMonth]}. Hiring window opens ${monthLabels[bothGatesMonth]}.`,
+            ? `Both gates open in ${monthLabels[bothGatesMonth]}${scenarioNote} — capacity reaches ${CAPACITY_THRESHOLD}% and the budget supports this hire at the same time.`
+            : `Capacity reaches ${CAPACITY_THRESHOLD}% in ${monthLabels[capacityGateMonth]}. Budget supports the hire from ${monthLabels[budgetGateMonth]}. Hiring window opens ${monthLabels[bothGatesMonth]}${scenarioNote}.`,
         }
       }
       return {
         type: "info" as const,
-        text: `Budget supports this hire from ${monthLabels[budgetGateMonth]}, but capacity doesn't reach ${CAPACITY_THRESHOLD}% until ${monthLabels[capacityGateMonth]}. Consider waiting until ${monthLabels[bothGatesMonth]} when the work actually demands it.`,
+        text: `Budget supports this hire from ${monthLabels[budgetGateMonth]}${scenarioNote}, but capacity doesn't reach ${CAPACITY_THRESHOLD}% until ${monthLabels[capacityGateMonth]}. Consider waiting until ${monthLabels[bothGatesMonth]} when the work actually demands it.`,
       }
     }
     if (capacityGateMonth >= 0 && budgetGateMonth < 0) {
       return {
         type: "warning" as const,
-        text: `You'll need more capacity from ${monthLabels[capacityGateMonth]}, but this hire pushes people costs to ${Math.round(monthData[capacityGateMonth].peoplePct)}% — above your ${peoplePctTarget}% target.${revenueGap > 0 ? ` You need ${fmt$(Math.round(revenueGap))}/mo more revenue for the budget gate to open.` : ""}`,
+        text: `You'll need more capacity from ${monthLabels[capacityGateMonth]}${scenarioNote}, but this hire pushes people costs to ${Math.round(monthData[capacityGateMonth].peoplePct)}% — above your ${peoplePctTarget}% target.${revenueGap > 0 ? ` You need ${fmt$(Math.round(revenueGap))}/mo more revenue for the budget gate to open.` : ""}`,
         sub: revenueGap > 0 && activeClientCount > 0
           ? `Raise existing client rates by ${fmt$(Math.round(revenueGap / activeClientCount))}/mo each — or reduce delivery hours per client, which lets you serve more clients from existing capacity and grows revenue without adding cost.`
           : "Raise rates with existing clients, or reduce delivery hours per client to serve more clients from existing capacity.",
@@ -881,12 +885,12 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
     if (budgetGateMonth >= 0 && capacityGateMonth < 0) {
       return {
         type: "info" as const,
-        text: `Budget supports this hire from ${monthLabels[budgetGateMonth]}, but capacity stays below ${CAPACITY_THRESHOLD}% for the next 12 months — no urgent need at current volumes.`,
+        text: `Budget supports this hire from ${monthLabels[budgetGateMonth]}${scenarioNote}, but capacity stays below ${CAPACITY_THRESHOLD}% for the next 12 months — no urgent need at current volumes.`,
       }
     }
     return {
       type: "neutral" as const,
-      text: "Neither gate opens in the next 12 months at this trajectory. Fill more pipeline before adding headcount.",
+      text: `Neither gate opens in the next 12 months${scenarioNote ? " even " + scenarioNote : " at this trajectory"}. Fill more pipeline before adding headcount.`,
     }
   })() : null
 
@@ -928,6 +932,21 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
             <div style={{ fontSize: 10, color: "#9C9590", marginTop: 2 }}>{stat.sub}</div>
           </div>
         ))}
+      </div>
+
+      {/* Growth scenario */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600 }}>Growth scenario</span>
+        {[0, 10, 20, 30].map(pct => (
+          <button key={pct} onClick={() => setGrowthPct(pct)} style={{ padding: "3px 11px", fontSize: 11, fontWeight: 600, borderRadius: 99, cursor: "pointer", border: `1px solid ${growthPct === pct ? "#E9532A" : "#ECE7DE"}`, background: growthPct === pct ? "#E9532A" : "none", color: growthPct === pct ? "#fff" : "#6B6760" }}>
+            {pct === 0 ? "Base" : `+${pct}%`}
+          </button>
+        ))}
+        {growthPct > 0 && (
+          <span style={{ fontSize: 11, color: "#9C9590" }}>
+            Pipeline projected at {fmt$(Math.round(scaledExpectedNewMRR))}/mo vs {fmt$(Math.round(expectedNewMRR))}/mo base
+          </span>
+        )}
       </div>
 
       {/* Hire inputs */}
