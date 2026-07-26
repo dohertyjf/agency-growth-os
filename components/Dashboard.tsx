@@ -412,8 +412,9 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
     : 0
   const acltv = acmv * avgDurationMonths
 
-  const hourlyYield = totalCapacityHours > 0 && revenueForACMV > 0
-    ? revenueForACMV / totalCapacityHours
+  const totalActiveHours = activeContracts.reduce((s, c) => s + (c.hoursPerMonth ?? 0), 0)
+  const hourlyYield = totalActiveHours > 0 && revenueForACMV > 0
+    ? revenueForACMV / totalActiveHours
     : 0
 
   return (
@@ -638,7 +639,7 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
           <InsightCard
             label="Hourly Yield"
             value={fmt$(Math.round(hourlyYield))}
-            sub={`${totalCapacityHours} billable hrs/mo`}
+            sub={`${totalActiveHours} hrs committed/mo`}
           />
         )}
       </div>
