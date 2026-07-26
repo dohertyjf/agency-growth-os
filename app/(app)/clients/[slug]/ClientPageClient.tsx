@@ -25,6 +25,7 @@ interface Metric {
   newClients: number
   closeRate: number
   churn: number
+  marketingSpend: number
 }
 
 interface Contract {
@@ -177,7 +178,7 @@ export default function ClientPageClient({
     setMetrics(prev => {
       const exists = prev.find(m => m.month === month)
       if (exists) return prev.map(m => m.month === month ? { ...m, revenue } : m)
-      return [...prev, { id: "", clientId, month, revenue, totalExpenses: 0, salaries: 0, software: 0, cashInBank: 0, leads: 0, newClients: 0, closeRate: 0, churn: 0 }]
+      return [...prev, { id: "", clientId, month, revenue, totalExpenses: 0, salaries: 0, software: 0, cashInBank: 0, leads: 0, newClients: 0, closeRate: 0, churn: 0, marketingSpend: 0 }]
     })
   }
 

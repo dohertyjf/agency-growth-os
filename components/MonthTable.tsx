@@ -14,6 +14,7 @@ interface StoredRow {
   newClients: number
   closeRate: number
   churn: number
+  marketingSpend: number
 }
 
 interface Props {
@@ -35,6 +36,7 @@ interface ParsedMetricRow {
   leads: number
   newClients: number
   churn: number
+  marketingSpend: number
   errors: string[]
 }
 
@@ -60,7 +62,8 @@ function parseMetricsPaste(text: string): ParsedMetricRow[] {
   return dataLines.map(line => {
     const cols = line.split(/\t/).map(s => s.trim())
     const [rawMonth = "", rawRevenue = "", rawExpenses = "", rawSalaries = "",
-           rawSoftware = "", rawCash = "", rawLeads = "", rawNewClients = "", rawChurn = ""] = cols
+           rawSoftware = "", rawCash = "", rawLeads = "", rawNewClients = "", rawChurn = "",
+           rawMarketingSpend = ""] = cols
 
     const errors: string[] = []
     const month = normalizeMonth(rawMonth)
@@ -76,6 +79,7 @@ function parseMetricsPaste(text: string): ParsedMetricRow[] {
       leads: parseNum(rawLeads),
       newClients: parseNum(rawNewClients),
       churn: parseNum(rawChurn),
+      marketingSpend: parseNum(rawMarketingSpend),
       errors,
     }
   })
@@ -116,7 +120,7 @@ export function BulkMetricsModal({ clientId, onClose, onImport }: {
     onClose()
   }
 
-  const HEADERS = ["Month", "Revenue", "Total Expenses", "Salaries", "Software", "Cash in Bank", "Leads", "New Clients", "Churn", ""]
+  const HEADERS = ["Month", "Revenue", "Total Expenses", "Salaries", "Software", "Cash in Bank", "Leads", "New Clients", "Churn", "Marketing Spend", ""]
 
   return (
     <div
@@ -128,7 +132,7 @@ export function BulkMetricsModal({ clientId, onClose, onImport }: {
           <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Bulk Import Monthly Metrics</h2>
           <p style={{ fontSize: 12, color: "#9C9590", margin: 0 }}>
             Paste from a spreadsheet — columns in order:<br />
-            <strong>Month · Revenue · Total Expenses · Salaries · Software · Cash in Bank · Leads · New Clients · Churn</strong>
+            <strong>Month · Revenue · Total Expenses · Salaries · Software · Cash in Bank · Leads · New Clients · Churn · Marketing Spend</strong>
             <br />Month format: YYYY-MM &nbsp;·&nbsp; Dollar signs and commas are stripped automatically &nbsp;·&nbsp; Existing months are overwritten
           </p>
         </div>
@@ -153,7 +157,7 @@ export function BulkMetricsModal({ clientId, onClose, onImport }: {
               </thead>
               <tbody>
                 {rows.map((row, i) => {
-                  const vals = [row.revenue, row.totalExpenses, row.salaries, row.software, row.cashInBank, row.leads, row.newClients, row.churn]
+                  const vals = [row.revenue, row.totalExpenses, row.salaries, row.software, row.cashInBank, row.leads, row.newClients, row.churn, row.marketingSpend]
                   return (
                     <tr key={i} style={{ background: row.errors.length ? "#FFF5F5" : "transparent" }}>
                       <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", fontVariantNumeric: "tabular-nums", color: row.month ? "#1A1916" : "#C2410C" }}>
@@ -210,6 +214,7 @@ const EDITABLE_ROWS = [
   { key: "totalExpenses", label: "Total Expenses", format: "currency" },
   { key: "salaries", label: "Salaries", format: "currency" },
   { key: "software", label: "Software", format: "currency" },
+  { key: "marketingSpend", label: "Marketing Spend", format: "currency" },
   { key: "cashInBank", label: "Cash in Bank", format: "currency" },
   { key: "leads", label: "Leads", format: "number" },
   { key: "newClients", label: "New Clients", format: "number" },
@@ -221,6 +226,7 @@ const DERIVED_ROWS = [
   { key: "grossProfit", label: "Gross Profit", format: "currency" },
   { key: "netMargin", label: "Net Margin", format: "percent" },
   { key: "closeRate", label: "Close Rate", format: "percent" },
+  { key: "cac", label: "CAC", format: "currency" },
 ] as const
 
 type EditableKey = typeof EDITABLE_ROWS[number]["key"]
@@ -256,11 +262,13 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
     const r = data[month] ?? {}
     const leads = r.leads ?? 0
     const newClients = r.newClients ?? 0
+    const marketingSpend = r.marketingSpend ?? 0
     return {
       grossProfit: grossProfit(r.revenue ?? 0, r.salaries ?? 0),
       netProfit: netProfit(r.revenue ?? 0, r.totalExpenses ?? 0),
       netMargin: netMargin(r.revenue ?? 0, r.totalExpenses ?? 0),
       closeRate: leads > 0 ? (newClients / leads) * 100 : 0,
+      cac: newClients > 0 && marketingSpend > 0 ? marketingSpend / newClients : 0,
     }
   }, [data])
 

@@ -86,10 +86,11 @@ model MonthlyMetric {
   salaries      Float  @default(0)
   software      Float  @default(0)
   cashInBank    Float  @default(0)
-  leads         Float  @default(0)
-  newClients    Float  @default(0)
-  closeRate     Float  @default(0)
-  churn         Float  @default(0)
+  leads           Float  @default(0)
+  newClients      Float  @default(0)
+  closeRate       Float  @default(0)
+  churn           Float  @default(0)
+  marketingSpend  Float  @default(0)
 
   @@unique([clientId, month])
 }

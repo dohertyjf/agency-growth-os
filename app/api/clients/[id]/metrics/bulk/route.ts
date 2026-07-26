@@ -18,6 +18,7 @@ const rowSchema = z.object({
   leads: z.number().default(0),
   newClients: z.number().default(0),
   churn: z.number().default(0),
+  marketingSpend: z.number().default(0),
 })
 
 const schema = z.array(rowSchema).min(1).max(500)
@@ -48,6 +49,7 @@ export async function POST(
           leads: row.leads,
           newClients: row.newClients,
           churn: row.churn,
+          marketingSpend: row.marketingSpend,
           closeRate,
         },
         create: { clientId: id, ...row, closeRate },

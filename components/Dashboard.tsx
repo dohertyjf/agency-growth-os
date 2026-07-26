@@ -24,6 +24,7 @@ interface Metric {
   newClients: number
   closeRate: number
   churn: number
+  marketingSpend: number
 }
 
 interface Contract {
@@ -91,6 +92,7 @@ function derivedMetrics(m: Metric, payroll = 0) {
     netMargin: netMargin(m.revenue, m.totalExpenses),
     closeRate: m.leads > 0 ? (m.newClients / m.leads) * 100 : 0,
     peopleCostPct: payroll > 0 && m.revenue > 0 ? (payroll / m.revenue) * 100 : 0,
+    marketingSpend: m.marketingSpend ?? 0,
   }
 }
 
@@ -155,7 +157,7 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
     })
     setRawMetrics(prev => {
       if (prev.find(m => m.month === newMonth)) return prev
-      return [...prev, { month: newMonth, revenue: 0, totalExpenses: 0, salaries: 0, software: 0, cashInBank: 0, leads: 0, newClients: 0, closeRate: 0, churn: 0 }]
+      return [...prev, { month: newMonth, revenue: 0, totalExpenses: 0, salaries: 0, software: 0, cashInBank: 0, leads: 0, newClients: 0, closeRate: 0, churn: 0, marketingSpend: 0 }]
     })
     setAddingMonth(false)
     setNewMonth("")
@@ -417,6 +419,11 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
     ? revenueForACMV / totalActiveHours
     : 0
 
+  const cacMonths = allDerived.filter(m => (m.marketingSpend ?? 0) > 0 || m.newClients > 0).slice(-6)
+  const cacTotalSpend = cacMonths.reduce((s, m) => s + (m.marketingSpend ?? 0), 0)
+  const cacTotalNewClients = cacMonths.reduce((s, m) => s + m.newClients, 0)
+  const cac = cacTotalSpend > 0 && cacTotalNewClients > 0 ? cacTotalSpend / cacTotalNewClients : 0
+
   return (
     <div>
       {/* Edit Client Modal */}
@@ -640,6 +647,13 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
             label="Hourly Yield"
             value={fmt$(Math.round(hourlyYield))}
             sub={`${totalActiveHours} hrs committed/mo`}
+          />
+        )}
+        {cac > 0 && (
+          <InsightCard
+            label="CAC"
+            value={fmt$(Math.round(cac))}
+            sub={`per new client · ${cacMonths.length}mo avg`}
           />
         )}
       </div>
