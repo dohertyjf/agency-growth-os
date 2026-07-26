@@ -755,6 +755,8 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
 
   const [annualCost, setAnnualCost] = useState("")
   const [billableHrs, setBillableHrs] = useState("")
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   const nowYM = new Date().toISOString().slice(0, 7)
   const nowDate = new Date().toISOString().slice(0, 10)
@@ -817,6 +819,13 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
   const toX = (i: number) => PL + (i / 11) * plotW
   const toY = (pct: number) => PT + plotH - Math.min(pct, YMAX) / YMAX * plotH
   const slotW = plotW / 11
+
+  function handleSvgMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const svgX = ((e.clientX - rect.left) / rect.width) * W
+    setHoverIdx(Math.max(0, Math.min(11, Math.round((svgX - PL) / (plotW / 11)))))
+  }
 
   function regionBand(a: number, b: number) {
     const x = a === 0 ? PL : toX(a) - slotW / 2
@@ -951,7 +960,13 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
 
       {/* Chart */}
       <div style={{ position: "relative", width: "100%", paddingTop: `${(H / W) * 100}%` }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", cursor: "crosshair" }}
+          onMouseMove={handleSvgMouseMove}
+          onMouseLeave={() => setHoverIdx(null)}
+        >
           {/* Hiring window shading */}
           {hireRegions.map((r, i) => (
             <rect key={`h${i}`} x={r.x} y={PT} width={r.width} height={plotH} fill="#DCFCE7" opacity={0.6} />
@@ -1036,7 +1051,66 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
               <text x={PL + 396} y={PT - 4} fontSize={9} fill="#6B6760">Revenue gap</text>
             </>
           )}
+
+          {/* Hover indicator */}
+          {hoverIdx !== null && (
+            <g pointerEvents="none">
+              <line x1={toX(hoverIdx)} y1={PT} x2={toX(hoverIdx)} y2={H - PB} stroke="#9C9590" strokeWidth={1} opacity={0.35} />
+              {totalCapacity > 0 && contractedHours > 0 && (
+                <circle cx={toX(hoverIdx)} cy={toY(monthData[hoverIdx].capUtil)} r={4.5} fill="#16A34A" stroke="#fff" strokeWidth={1.5} />
+              )}
+              {peopleLine && (
+                <circle cx={toX(hoverIdx)} cy={toY(monthData[hoverIdx].peoplePct)} r={4.5} fill="#2563EB" stroke="#fff" strokeWidth={1.5} />
+              )}
+            </g>
+          )}
         </svg>
+
+        {/* Hover tooltip */}
+        {hoverIdx !== null && (
+          <div style={{
+            position: "absolute",
+            top: `${(PT / H) * 100}%`,
+            ...(hoverIdx < 6
+              ? { left: `${((toX(hoverIdx) + 18) / W) * 100}%` }
+              : { right: `${((W - toX(hoverIdx) + 18) / W) * 100}%` }),
+            background: "#fff",
+            border: "1px solid #ECE7DE",
+            borderRadius: 7,
+            padding: "8px 12px",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+            pointerEvents: "none",
+            zIndex: 10,
+            minWidth: 148,
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#1A1916", marginBottom: 6 }}>{monthLabels[hoverIdx]}</div>
+            {activeMRR > 0 && (
+              <div style={{ fontSize: 11, color: "#6B6760", marginBottom: 3 }}>
+                Revenue <strong style={{ color: "#1A1916" }}>{fmt$(Math.round(monthData[hoverIdx].revenue))}/mo</strong>
+              </div>
+            )}
+            {totalCapacity > 0 && contractedHours > 0 && (
+              <div style={{ fontSize: 11, color: "#16A34A", marginBottom: 3 }}>
+                Capacity <strong>{Math.round(monthData[hoverIdx].capUtil)}%</strong>
+              </div>
+            )}
+            {hasHireInputs && activeMRR > 0 && (
+              <div style={{ fontSize: 11, color: "#2563EB", marginBottom: 3 }}>
+                People % <strong>{Math.round(monthData[hoverIdx].peoplePct)}%</strong>
+              </div>
+            )}
+            {hasHireInputs && (
+              <div style={{ display: "flex", gap: 5, marginTop: 7 }}>
+                <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 4, fontWeight: 600, background: monthData[hoverIdx].capacityGate ? "#DCFCE7" : "#F3F4F6", color: monthData[hoverIdx].capacityGate ? "#166534" : "#9C9590" }}>
+                  {monthData[hoverIdx].capacityGate ? "✓" : "–"} Capacity
+                </span>
+                <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 4, fontWeight: 600, background: monthData[hoverIdx].budgetGate ? "#DCFCE7" : "#F3F4F6", color: monthData[hoverIdx].budgetGate ? "#166534" : "#9C9590" }}>
+                  {monthData[hoverIdx].budgetGate ? "✓" : "–"} Budget
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Recommendation */}
