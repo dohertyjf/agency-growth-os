@@ -112,8 +112,8 @@ export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; 
           .report-card { border: none !important; box-shadow: none !important; }
           /* Force brand colors (verdict box, CTA button) to render in the PDF */
           .report-card, .report-card * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          /* Page 2: notes + scenarios start on a fresh page */
-          .page-two { break-before: page; }
+          /* Page 2: notes + scenarios start on a fresh page, with breathing room up top */
+          .page-two { break-before: page; padding-top: 14mm; }
         }
         @page { margin: 18mm; }
       `}</style>
