@@ -140,6 +140,79 @@ export function projectMetric(
   return []
 }
 
+// ── 9.6 Capacity projection ("when does the model cap out") ──────────────────
+// Shared by the internal Growth Projection tool, the public Capacity
+// Calculator, and the /api/leads compute step so all three stay identical.
+export interface CapacityInputs {
+  startRevenue: number   // current MRR
+  leads: number          // leads / month
+  closeRate: number      // percent (0–100)
+  avgDeal: number        // monthly value per client
+  churn: number          // clients lost / month
+  hoursPerClient: number // avg monthly hours per client
+  billableHours: number  // total monthly billable capacity
+  activeClients: number  // clients served today
+  goalMRR?: number | null
+}
+
+export interface CapacityResult {
+  projected: number[]            // MRR for each of `months` future months
+  maxClients: number | null      // clients the billable hours can serve
+  mrrCap: number | null          // MRR ceiling implied by capacity
+  capacityHitMonth: number       // index into projected where cap is hit, -1 if never
+  goalHitMonth: number           // index where goal is reached, -1 if never / no goal
+  newClientsPerMonth: number
+  netMRRChange: number           // new MRR − churned MRR per month
+  currentHoursUsed: number
+  hoursAvailable: number
+  slotsAvailable: number | null  // open client slots at current hrs/client
+}
+
+export function projectMRR(
+  startMRR: number, leads: number, closeRate: number,
+  avgDeal: number, churnCount: number, months: number,
+  cap?: number
+): number[] {
+  const result: number[] = []
+  let mrr = startMRR
+  for (let i = 0; i < months; i++) {
+    const newMRR = leads * (closeRate / 100) * avgDeal
+    const churnedMRR = churnCount * avgDeal
+    mrr = Math.max(0, mrr + newMRR - churnedMRR)
+    if (cap !== undefined) mrr = Math.min(mrr, cap)
+    result.push(Math.round(mrr))
+  }
+  return result
+}
+
+export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResult {
+  const maxClients = inp.hoursPerClient > 0 && inp.billableHours > 0
+    ? Math.floor(inp.billableHours / inp.hoursPerClient)
+    : null
+  const mrrCap = maxClients !== null && inp.avgDeal > 0 ? maxClients * inp.avgDeal : null
+
+  const projected = projectMRR(
+    inp.startRevenue, inp.leads, inp.closeRate, inp.avgDeal, inp.churn, months,
+    mrrCap ?? undefined
+  )
+
+  const capacityHitMonth = mrrCap !== null ? projected.findIndex(v => v >= mrrCap) : -1
+  const goal = inp.goalMRR ?? 0
+  const goalHitMonth = goal > 0 ? projected.findIndex(v => v >= goal) : -1
+
+  const newClientsPerMonth = inp.leads * (inp.closeRate / 100)
+  const netMRRChange = newClientsPerMonth * inp.avgDeal - inp.churn * inp.avgDeal
+
+  const currentHoursUsed = inp.activeClients * inp.hoursPerClient
+  const hoursAvailable = inp.billableHours - currentHoursUsed
+  const slotsAvailable = inp.hoursPerClient > 0 ? Math.floor(hoursAvailable / inp.hoursPerClient) : null
+
+  return {
+    projected, maxClients, mrrCap, capacityHitMonth, goalHitMonth,
+    newClientsPerMonth, netMRRChange, currentHoursUsed, hoursAvailable, slotsAvailable,
+  }
+}
+
 // ── 9.5 Goals (run-rate) ─────────────────────────────────────────────────────
 export function mrrGoal(annualRevenueGoal: number) {
   return annualRevenueGoal / 12

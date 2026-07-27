@@ -10,8 +10,11 @@ export default auth((req) => {
 
   const isPublic =
     pathname.startsWith("/intake") ||
+    pathname.startsWith("/calculator") ||
+    pathname.startsWith("/embed.js") ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/intake") ||
+    pathname.startsWith("/api/leads") ||
     pathname.startsWith("/api/auth")
 
   if (!isPublic && !isLoggedIn) {

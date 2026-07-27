@@ -18,6 +18,7 @@ export default function AppNav({ role, userName }: Props) {
     ...(role === "coach" ? [{ href: "/clients", label: "Clients" }] : []),
     { href: "/calls", label: "Calls" },
     ...(role === "coach" ? [{ href: "/prospects", label: "Prospects" }] : []),
+    ...(role === "coach" ? [{ href: "/leads", label: "Leads" }] : []),
     { href: "/insights", label: "Insights" },
   ]
 
