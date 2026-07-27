@@ -1,6 +1,9 @@
-# Netlify secrets scanning: the NEXT_PUBLIC_* vars are public by design
-# (Next.js inlines them into the client bundle), so tell the scanner to
-# ignore them. Real secrets (DATABASE_URL, AUTH_SECRET, SLACK_WEBHOOK_URL)
-# are NOT listed here and remain scanned/protected.
+# Netlify secrets scanning: omit only values that are public by design and
+# legitimately appear in build output:
+#   - NEXT_PUBLIC_* : Next.js inlines these into the client bundle on purpose
+#   - NEXTAUTH_URL  : the site's own public URL, embedded by NextAuth
+# Genuine secrets (DATABASE_URL, AUTH_SECRET, SLACK_WEBHOOK_URL) are NOT listed
+# and remain scanned/protected. Verified locally that none of them leak into
+# the build output.
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_SCHEDULING_URL"
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_SCHEDULING_URL,NEXTAUTH_URL"
