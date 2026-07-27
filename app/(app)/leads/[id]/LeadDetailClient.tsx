@@ -49,6 +49,24 @@ export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; 
   const goal = inputs.goalMRR ?? 0
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
 
+  // The 4 most common growth levers — each re-runs the model with one input changed.
+  const scenarios = useMemo(() => {
+    const outcome = (patch: Partial<CapacityInputs>) => {
+      const res = projectCapacity({ ...inputs, ...patch })
+      if (res.mrrCap == null) return "no capacity ceiling at these settings"
+      return res.capacityHitMonth >= 0
+        ? `tops out at ${fmtCurrency(res.mrrCap, lead.currency)} in ${monthLabels[res.capacityHitMonth]}`
+        : `lifts your ceiling to ${fmtCurrency(res.mrrCap, lead.currency)} — beyond the next 12 months at this pace`
+    }
+    const cut = Math.max(1, Math.round(inputs.hoursPerClient * 0.75))
+    return [
+      { label: `Raise average client value 50% (to ${fmtCurrency(Math.round(inputs.avgDeal * 1.5), lead.currency)}/mo)`, result: outcome({ avgDeal: inputs.avgDeal * 1.5 }) },
+      { label: `Cut hours per client to ${cut} (−25% delivery time)`, result: outcome({ hoursPerClient: cut }) },
+      { label: `Double delivery capacity (to ${inputs.billableHours * 2} billable hrs/mo)`, result: outcome({ billableHours: inputs.billableHours * 2 }) },
+      { label: `Double your leads (to ${inputs.leads * 2}/mo)`, result: outcome({ leads: inputs.leads * 2 }) },
+    ]
+  }, [inputs, monthLabels, lead.currency])
+
   const dirty =
     JSON.stringify(inputs) !== JSON.stringify(lead.adjustedInputs ?? lead.inputs) ||
     takeaways !== (lead.takeaways ?? "")
@@ -84,14 +102,18 @@ export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; 
   return (
     <div>
       <style>{`
+        .print-only { display: none; }
         @media print {
           nav { display: none !important; }
           .no-print { display: none !important; }
+          .print-only { display: block !important; }
           body, main { background: #fff !important; }
           main { max-width: none !important; padding: 0 !important; }
-          .report-card { border: none !important; box-shadow: none !important; break-inside: avoid; }
+          .report-card { border: none !important; box-shadow: none !important; }
           /* Force brand colors (verdict box, CTA button) to render in the PDF */
           .report-card, .report-card * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          /* Page 2: notes + scenarios start on a fresh page */
+          .page-two { break-before: page; }
         }
         @page { margin: 18mm; }
       `}</style>
@@ -203,11 +225,25 @@ export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; 
           ))}
         </div>
 
-        {/* Takeaways (editable) */}
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", marginBottom: 10 }}>Takeaways</div>
-        <textarea value={takeaways} onChange={e => setTakeaways(e.target.value)} rows={6}
-          placeholder="Add your notes and recommendations here — these appear on the PDF you send to the prospect."
-          style={{ width: "100%", boxSizing: "border-box", fontSize: 14, lineHeight: 1.6, color: "#1A1916", border: "1px solid #ECE7DE", borderRadius: 8, padding: "12px 14px", background: "#FCFBF8", resize: "vertical", fontFamily: "inherit" }} />
+        {/* ── Page 2: Notes + scenarios ─────────────────────────────────── */}
+        <div className="page-two">
+          {/* Notes (editable on screen, rendered as text in the PDF) */}
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", marginBottom: 10 }}>Notes</div>
+          <textarea className="no-print" value={takeaways} onChange={e => setTakeaways(e.target.value)} rows={6}
+            placeholder="Add your notes and recommendations here — these appear on the PDF you send to the prospect."
+            style={{ width: "100%", boxSizing: "border-box", fontSize: 14, lineHeight: 1.6, color: "#1A1916", border: "1px solid #ECE7DE", borderRadius: 8, padding: "12px 14px", background: "#FCFBF8", resize: "vertical", fontFamily: "inherit" }} />
+          <div className="print-only" style={{ fontSize: 14, lineHeight: 1.6, color: "#1A1916", whiteSpace: "pre-wrap" }}>{takeaways}</div>
+
+          {/* Scenarios */}
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", margin: "26px 0 12px" }}>Ways to grow past your ceiling</div>
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
+            {scenarios.map((s, i) => (
+              <li key={i} style={{ fontSize: 14, lineHeight: 1.55, marginBottom: 12, color: "#1A1916" }}>
+                <strong>{s.label}</strong> → {s.result}.
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   )
