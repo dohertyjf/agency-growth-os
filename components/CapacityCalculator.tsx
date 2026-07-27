@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { projectCapacity, fmtCurrency, ymAdd, ymLabel } from "@/lib/calc"
+import { projectCapacity, ymAdd, ymLabel } from "@/lib/calc"
 import CapacityChart from "@/components/CapacityChart"
 
 type Currency = "USD" | "GBP" | "EUR"
@@ -24,7 +24,6 @@ interface Props {
 export default function CapacityCalculator({ embed = false, schedulingUrl = "" }: Props) {
   const [currency, setCurrency] = useState<Currency>("USD")
   const sym = currSym(currency)
-  const fmt$ = (v: number) => fmtCurrency(v, currency)
 
   // Inputs — sensible agency defaults so the chart shows a story immediately.
   const [startRevenue, setStartRevenue] = useState(20000)
@@ -45,6 +44,7 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
   const [emailError, setEmailError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [showCapture, setShowCapture] = useState(false)
 
   const r = useMemo(() => projectCapacity({
     startRevenue, leads, closeRate, avgDeal, churn,
@@ -105,10 +105,6 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
   }
 
   const goal = goalMRR
-  const capVal = r.mrrCap
-  const capMonthLabel = r.capacityHitMonth >= 0 ? monthLabels[r.capacityHitMonth] : null
-  const goalReachable = r.goalHitMonth >= 0
-  const goalBlockedByCap = goal > 0 && capVal != null && goal > capVal
 
   const num = (setter: (n: number) => void) =>
     (e: React.ChangeEvent<HTMLInputElement>) => setter(parseFloat(e.target.value) || 0)
@@ -199,39 +195,6 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
           </div>
         </div>
 
-        {/* Verdict */}
-        <div style={{ background: capMonthLabel ? "#FBF0EB" : "#F4F7F2", border: `1px solid ${capMonthLabel ? "#F0C3B0" : "#D6E3CE"}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
-          {capMonthLabel ? (
-            <div style={{ fontSize: 16, color: "#1A1916", lineHeight: 1.5 }}>
-              At this pace you hit your delivery ceiling of{" "}
-              <strong style={{ color: accent }}>{fmt$(capVal!)}/mo</strong>{" "}
-              around <strong>{capMonthLabel}</strong>
-              {r.maxClients != null && <> — about <strong>{r.maxClients} clients</strong>, all the billable hours your team has</>}.
-              {goalBlockedByCap && (
-                <div style={{ marginTop: 8, fontSize: 14, color: "#9A3412" }}>
-                  ⚠ Your goal of {fmt$(goal)}/mo sits <strong>above</strong>{" "}that ceiling — you can&apos;t sell your way there without adding capacity or raising prices.
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ fontSize: 16, color: "#1A1916", lineHeight: 1.5 }}>
-              You&apos;re not capacity-constrained in the next 12 months at this pace.
-              {goalReachable
-                ? <> You reach your {fmt$(goal)}/mo goal around <strong>{monthLabels[r.goalHitMonth]}</strong>.</>
-                : <> Add billable hours or a capacity figure above to find your ceiling.</>}
-            </div>
-          )}
-          <div style={{ fontSize: 13, color: "#6F6B64", marginTop: 10 }}>
-            Net movement:{" "}
-            <span style={{ color: r.netMRRChange >= 0 ? "#1F7A4D" : "#C2410C", fontWeight: 700 }}>
-              {r.netMRRChange >= 0 ? "+" : ""}{fmt$(r.netMRRChange)}/mo
-            </span>
-            {r.slotsAvailable != null && (
-              <> · {r.slotsAvailable > 0 ? `${r.slotsAvailable} client slot${r.slotsAvailable === 1 ? "" : "s"} open now` : "at capacity now"}</>
-            )}
-          </div>
-        </div>
-
         {/* Chart */}
         <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 24 }}>
           <CapacityChart
@@ -245,32 +208,45 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
           />
         </div>
 
-        {/* Lead capture */}
-        <div style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff" }}>
-          <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 24, fontWeight: 600, margin: "0 0 6px" }}>
-            Want to break through your ceiling?
-          </h3>
-          <p style={{ fontSize: 14, color: "#C9C4BC", margin: "0 0 20px", lineHeight: 1.55, maxWidth: 560 }}>
-            Enter your details and John will personally review your numbers, send you a breakdown,
-            and walk you through how to raise your ceiling on a free call.
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name"
-              style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
-            <input value={email} onChange={e => { setEmail(e.target.value); setEmailError("") }} type="email" placeholder="you@agency.com"
-              style={{ ...inputStyle, background: "#2A2824", border: `1px solid ${emailError ? "#C2410C" : "#3A3833"}`, color: "#fff" }} />
-            <input value={agency} onChange={e => setAgency(e.target.value)} placeholder="Agency name"
-              style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
+        {/* Gate: results are hidden until they submit */}
+        {!showCapture ? (
+          <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+            <button onClick={() => setShowCapture(true)}
+              style={{ fontSize: 16, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 10, padding: "15px 34px", cursor: "pointer" }}>
+              Get your results →
+            </button>
+            <p style={{ fontSize: 13, color: "#9C9590", margin: "12px auto 0", maxWidth: 460, lineHeight: 1.5 }}>
+              John will personally review your numbers and send your full breakdown — where your
+              model caps out, and exactly how to break through it.
+            </p>
           </div>
-          {/* Honeypot — hidden from humans */}
-          <input value={honeypot} onChange={e => setHoneypot(e.target.value)} tabIndex={-1} autoComplete="off"
-            aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
-          {emailError && <div style={{ fontSize: 12, color: "#F0A088", marginBottom: 10 }}>{emailError}</div>}
-          <button onClick={submit} disabled={submitting}
-            style={{ fontSize: 14, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "12px 24px", cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}>
-            {submitting ? "Sending…" : "Get my breakdown →"}
-          </button>
-        </div>
+        ) : (
+          <div style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff" }}>
+            <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 24, fontWeight: 600, margin: "0 0 6px" }}>
+              Where should we send your results?
+            </h3>
+            <p style={{ fontSize: 14, color: "#C9C4BC", margin: "0 0 20px", lineHeight: 1.55, maxWidth: 560 }}>
+              John will personally review your numbers, send your breakdown, and walk you through
+              how to raise your ceiling on a free call.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name"
+                style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
+              <input value={email} onChange={e => { setEmail(e.target.value); setEmailError("") }} type="email" placeholder="you@agency.com"
+                style={{ ...inputStyle, background: "#2A2824", border: `1px solid ${emailError ? "#C2410C" : "#3A3833"}`, color: "#fff" }} />
+              <input value={agency} onChange={e => setAgency(e.target.value)} placeholder="Agency name"
+                style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
+            </div>
+            {/* Honeypot — hidden from humans */}
+            <input value={honeypot} onChange={e => setHoneypot(e.target.value)} tabIndex={-1} autoComplete="off"
+              aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
+            {emailError && <div style={{ fontSize: 12, color: "#F0A088", marginBottom: 10 }}>{emailError}</div>}
+            <button onClick={submit} disabled={submitting}
+              style={{ fontSize: 14, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "12px 24px", cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}>
+              {submitting ? "Sending…" : "Get my results →"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
