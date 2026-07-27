@@ -1,7 +1,5 @@
 "use client"
-import { useEffect, useMemo, useRef, useState } from "react"
-import { projectCapacity, ymAdd, ymLabel } from "@/lib/calc"
-import CapacityChart from "@/components/CapacityChart"
+import { useEffect, useRef, useState } from "react"
 
 type Currency = "USD" | "GBP" | "EUR"
 function currSym(c: Currency) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
@@ -25,7 +23,7 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
   const [currency, setCurrency] = useState<Currency>("USD")
   const sym = currSym(currency)
 
-  // Inputs — sensible agency defaults so the chart shows a story immediately.
+  // Inputs — sensible agency defaults so the fields aren't empty on load.
   const [startRevenue, setStartRevenue] = useState(20000)
   const [leads, setLeads] = useState(10)
   const [closeRate, setCloseRate] = useState(20)
@@ -45,17 +43,6 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [showCapture, setShowCapture] = useState(false)
-
-  const r = useMemo(() => projectCapacity({
-    startRevenue, leads, closeRate, avgDeal, churn,
-    hoursPerClient, billableHours, activeClients, goalMRR,
-  }), [startRevenue, leads, closeRate, avgDeal, churn, hoursPerClient, billableHours, activeClients, goalMRR])
-
-  const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
-  const monthLabels = useMemo(
-    () => Array.from({ length: 12 }, (_, i) => ymLabel(ymAdd(now, i + 1))),
-    [now]
-  )
 
   // ── Embed: auto-report height to the parent page ──────────────────────────
   const rootRef = useRef<HTMLDivElement>(null)
@@ -104,8 +91,6 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
     }
   }
 
-  const goal = goalMRR
-
   const num = (setter: (n: number) => void) =>
     (e: React.ChangeEvent<HTMLInputElement>) => setter(parseFloat(e.target.value) || 0)
 
@@ -136,8 +121,8 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
                 When does your agency&apos;s growth model cap out?
               </h1>
               <p style={{ fontSize: 15, color: "#6F6B64", margin: 0, maxWidth: 620, lineHeight: 1.55 }}>
-                Enter your numbers below. This models your revenue forward and shows the month your
-                delivery capacity becomes the ceiling — the point where more sales can&apos;t grow you.
+                Enter your numbers and John will send you a personalized report — the month your
+                current model caps out, and the specific moves to grow past it.
               </p>
             </div>
             <select
@@ -193,19 +178,6 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
               <input style={inputStyle} type="number" min={0} step={1000} value={goalMRR} onChange={num(setGoalMRR)} />
             </div>
           </div>
-        </div>
-
-        {/* Chart */}
-        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 24 }}>
-          <CapacityChart
-            projected={r.projected}
-            startValue={startRevenue}
-            mrrCap={r.mrrCap}
-            goal={goal}
-            capacityHitMonth={r.capacityHitMonth}
-            monthLabels={monthLabels}
-            currency={currency}
-          />
         </div>
 
         {/* Gate: results are hidden until they submit */}
