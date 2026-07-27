@@ -31,7 +31,7 @@ const FIELDS: { key: keyof CapacityInputs; label: string; money?: boolean; step?
   { key: "goalMRR", label: "MRR Goal", money: true, step: 1000 },
 ]
 
-export default function LeadDetailClient({ lead }: { lead: Lead }) {
+export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; schedulingUrl: string }) {
   const router = useRouter()
   const sym = lead.currency === "GBP" ? "£" : lead.currency === "EUR" ? "€" : "$"
   const fmt$ = (v: number) => fmtCurrency(v, lead.currency)
@@ -90,6 +90,8 @@ export default function LeadDetailClient({ lead }: { lead: Lead }) {
           body, main { background: #fff !important; }
           main { max-width: none !important; padding: 0 !important; }
           .report-card { border: none !important; box-shadow: none !important; break-inside: avoid; }
+          /* Force brand colors (verdict box, CTA button) to render in the PDF */
+          .report-card, .report-card * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
         @page { margin: 18mm; }
       `}</style>
@@ -188,6 +190,22 @@ export default function LeadDetailClient({ lead }: { lead: Lead }) {
         <textarea value={takeaways} onChange={e => setTakeaways(e.target.value)} rows={6}
           placeholder="Add your notes and recommendations here — these appear on the PDF you send to the prospect."
           style={{ width: "100%", boxSizing: "border-box", fontSize: 14, lineHeight: 1.6, color: "#1A1916", border: "1px solid #ECE7DE", borderRadius: 8, padding: "12px 14px", background: "#FCFBF8", resize: "vertical", fontFamily: "inherit" }} />
+
+        {/* Call to action — appears on the PDF */}
+        <div style={{ marginTop: 28, paddingTop: 24, borderTop: "1px solid #F1ECE3", textAlign: "center" }}>
+          <div style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, color: "#1A1916", marginBottom: 6 }}>
+            Ready to grow past your ceiling?
+          </div>
+          <div style={{ fontSize: 14, color: "#6F6B64", margin: "0 auto 18px", maxWidth: 480, lineHeight: 1.55 }}>
+            Book a Growth Projection Review Call and we&apos;ll walk through your numbers together —
+            and the specific moves to raise your ceiling.
+          </div>
+          <a href={schedulingUrl} target="_blank" rel="noopener noreferrer"
+            style={{ display: "inline-block", background: accent, color: "#fff", fontSize: 15, fontWeight: 700, textDecoration: "none", borderRadius: 10, padding: "13px 28px" }}>
+            Schedule your Growth Projection Review Call →
+          </a>
+          <div style={{ fontSize: 12, color: "#9C9590", marginTop: 10 }}>{schedulingUrl}</div>
+        </div>
       </div>
     </div>
   )

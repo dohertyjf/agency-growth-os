@@ -27,8 +27,12 @@ export default async function LeadDetailPage({
   const inputs = parse(lead.inputs)
   if (!inputs) notFound()
 
+  const schedulingUrl =
+    process.env.NEXT_PUBLIC_SCHEDULING_URL || "https://www.johnfdoherty.com/growthreviewcall/"
+
   return (
     <LeadDetailClient
+      schedulingUrl={schedulingUrl}
       lead={{
         id: lead.id,
         email: lead.email,
