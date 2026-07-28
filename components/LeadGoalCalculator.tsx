@@ -215,7 +215,7 @@ export default function LeadGoalCalculator({ embed = false }: Props) {
             {/* Book-a-call banner */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
               <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.45 }}>
-                <strong>Want John to walk you through this?</strong> Book a free Growth Projection Review Call.
+                <strong>Want to walk through this live with John?</strong> Book a free Leads Strategy Call.
               </div>
               <button onClick={() => setModalOpen(true)}
                 style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "11px 20px", cursor: "pointer" }}>

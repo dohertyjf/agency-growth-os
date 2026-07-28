@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { fmtCurrency, type CapacityResult } from "@/lib/calc"
+import DeleteLeadButton from "@/components/DeleteLeadButton"
 
 export const dynamic = "force-dynamic"
 
@@ -36,25 +37,30 @@ export default async function LeadsPage() {
             try { result = JSON.parse(lead.result) as CapacityResult } catch { /* ignore */ }
             const ceiling = result?.mrrCap != null ? fmtCurrency(result.mrrCap, lead.currency) : "—"
             return (
-              <Link key={lead.id} href={`/leads/growth-projection/${lead.id}`}
-                style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", textDecoration: "none", color: "inherit", borderTop: i === 0 ? "none" : "1px solid #F1ECE3" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1916" }}>
-                    {lead.name || lead.email}{lead.agency ? <span style={{ color: "#9C9590", fontWeight: 400 }}> · {lead.agency}</span> : null}
+              <div key={lead.id} style={{ display: "flex", alignItems: "center", borderTop: i === 0 ? "none" : "1px solid #F1ECE3" }}>
+                <Link href={`/leads/growth-projection/${lead.id}`}
+                  style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", textDecoration: "none", color: "inherit", flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1916" }}>
+                      {lead.name || lead.email}{lead.agency ? <span style={{ color: "#9C9590", fontWeight: 400 }}> · {lead.agency}</span> : null}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#9C9590", marginTop: 2 }}>{lead.email}</div>
                   </div>
-                  <div style={{ fontSize: 12, color: "#9C9590", marginTop: 2 }}>{lead.email}</div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#E9532A", fontVariantNumeric: "tabular-nums" }}>{ceiling}</div>
+                    <div style={{ fontSize: 11, color: "#9C9590" }}>ceiling</div>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#9C9590", flexShrink: 0, width: 90, textAlign: "right" }}>
+                    {new Date(lead.createdAt).toLocaleDateString()}
+                  </div>
+                  {lead.scheduled && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#1F7A4D", background: "#E8F3EC", borderRadius: 4, padding: "2px 6px", flexShrink: 0 }}>BOOKED</span>
+                  )}
+                </Link>
+                <div style={{ padding: "0 14px", flexShrink: 0 }}>
+                  <DeleteLeadButton endpoint={`/api/leads/${lead.id}`} />
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#E9532A", fontVariantNumeric: "tabular-nums" }}>{ceiling}</div>
-                  <div style={{ fontSize: 11, color: "#9C9590" }}>ceiling</div>
-                </div>
-                <div style={{ fontSize: 12, color: "#9C9590", flexShrink: 0, width: 90, textAlign: "right" }}>
-                  {new Date(lead.createdAt).toLocaleDateString()}
-                </div>
-                {lead.scheduled && (
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#1F7A4D", background: "#E8F3EC", borderRadius: 4, padding: "2px 6px", flexShrink: 0 }}>BOOKED</span>
-                )}
-              </Link>
+              </div>
             )
           })}
         </div>

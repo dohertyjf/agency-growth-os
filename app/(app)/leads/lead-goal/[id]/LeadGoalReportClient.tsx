@@ -3,6 +3,7 @@ import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { leadsGoal } from "@/lib/calc"
 import LeadGoalResults from "@/components/LeadGoalResults"
+import DeleteLeadButton from "@/components/DeleteLeadButton"
 
 const accent = "#E9532A"
 
@@ -102,7 +103,10 @@ export default function LeadGoalReportClient({ lead, schedulingUrl }: { lead: Le
 
       {/* Controls — hidden in print */}
       <div className="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <a href="/leads/lead-goal" style={{ fontSize: 13, color: "#6B6760", textDecoration: "none" }}>← All submissions</a>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <a href="/leads/lead-goal" style={{ fontSize: 13, color: "#6B6760", textDecoration: "none" }}>← All submissions</a>
+          <DeleteLeadButton endpoint={`/api/lead-goal/${lead.id}`} redirectTo="/leads/lead-goal" />
+        </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button onClick={toggleScheduled}
             style={{ fontSize: 12, fontWeight: 600, borderRadius: 7, padding: "8px 14px", cursor: "pointer", border: "1px solid #ECE7DE", background: scheduled ? "#E8F3EC" : "#fff", color: scheduled ? "#1F7A4D" : "#6B6760" }}>
