@@ -51,7 +51,7 @@ async function notifySlack(args: {
   const capLine = args.capMonthLabel
     ? `Caps out ${args.capMonthLabel} at ${ceiling}`
     : `Ceiling: ${ceiling}`
-  const link = appUrl ? `${appUrl}/leads/${args.id}` : `/leads/${args.id}`
+  const link = appUrl ? `${appUrl}/leads/growth-projection/${args.id}` : `/leads/growth-projection/${args.id}`
   const text = `🎯 New capacity calculator lead: *${who}* (${args.email})\n${capLine}\n<${link}|Review in Agency Growth OS →>`
   try {
     await fetch(url, {

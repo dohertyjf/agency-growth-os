@@ -2,62 +2,58 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
-import { fmtCurrency, type CapacityResult } from "@/lib/calc"
 
 export const dynamic = "force-dynamic"
 
-export default async function LeadsPage() {
+const tools = [
+  {
+    href: "/leads/growth-projection",
+    title: "Growth Projection Report",
+    blurb: "“When does your agency's growth model cap out?” — capacity ceiling submissions.",
+  },
+  {
+    href: "/leads/lead-goal",
+    title: "Lead Goal",
+    blurb: "“How many leads do you need to hit your goal?” — lead-plan submissions.",
+  },
+]
+
+export default async function LeadsHubPage() {
   const session = await auth()
   if (!session) redirect("/auth/signin")
   if (session.user.role !== "coach") redirect("/dashboard")
 
-  const leads = await prisma.capacityLead.findMany({ orderBy: { createdAt: "desc" } })
+  const [capacityCount, leadGoalCount] = await Promise.all([
+    prisma.capacityLead.count(),
+    prisma.leadGoalSubmission.count(),
+  ])
+  const counts: Record<string, number> = {
+    "/leads/growth-projection": capacityCount,
+    "/leads/lead-goal": leadGoalCount,
+  }
 
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>
-          Capacity Calculator Leads
+          Leads
         </h1>
-        <p style={{ fontSize: 13, color: "#9C9590", margin: 0 }}>
-          {leads.length} submission{leads.length === 1 ? "" : "s"} from the public calculator
-        </p>
+        <p style={{ fontSize: 13, color: "#9C9590", margin: 0 }}>Submissions from your public lead-magnet tools</p>
       </div>
 
-      {leads.length === 0 ? (
-        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 40, textAlign: "center", color: "#9C9590", fontSize: 14 }}>
-          No leads yet. Submissions from the public calculator will appear here.
-        </div>
-      ) : (
-        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, overflow: "hidden" }}>
-          {leads.map((lead, i) => {
-            let result: CapacityResult | null = null
-            try { result = JSON.parse(lead.result) as CapacityResult } catch { /* ignore */ }
-            const ceiling = result?.mrrCap != null ? fmtCurrency(result.mrrCap, lead.currency) : "—"
-            return (
-              <Link key={lead.id} href={`/leads/${lead.id}`}
-                style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", textDecoration: "none", color: "inherit", borderTop: i === 0 ? "none" : "1px solid #F1ECE3" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1916" }}>
-                    {lead.name || lead.email}{lead.agency ? <span style={{ color: "#9C9590", fontWeight: 400 }}> · {lead.agency}</span> : null}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#9C9590", marginTop: 2 }}>{lead.email}</div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#E9532A", fontVariantNumeric: "tabular-nums" }}>{ceiling}</div>
-                  <div style={{ fontSize: 11, color: "#9C9590" }}>ceiling</div>
-                </div>
-                <div style={{ fontSize: 12, color: "#9C9590", flexShrink: 0, width: 90, textAlign: "right" }}>
-                  {new Date(lead.createdAt).toLocaleDateString()}
-                </div>
-                {lead.scheduled && (
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#1F7A4D", background: "#E8F3EC", borderRadius: 4, padding: "2px 6px", flexShrink: 0 }}>BOOKED</span>
-                )}
-              </Link>
-            )
-          })}
-        </div>
-      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+        {tools.map(t => (
+          <Link key={t.href} href={t.href}
+            style={{ display: "block", background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 22, textDecoration: "none", color: "inherit" }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+              <div style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 20, fontWeight: 600, color: "#1A1916" }}>{t.title}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#E9532A", fontVariantNumeric: "tabular-nums" }}>{counts[t.href] ?? 0}</div>
+            </div>
+            <p style={{ fontSize: 13, color: "#6F6B64", margin: 0, lineHeight: 1.5 }}>{t.blurb}</p>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#9C9590", marginTop: 14 }}>View submissions →</div>
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }

@@ -120,7 +120,7 @@ export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; 
 
       {/* Controls — hidden in print */}
       <div className="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <a href="/leads" style={{ fontSize: 13, color: "#6B6760", textDecoration: "none" }}>← All leads</a>
+        <a href="/leads/growth-projection" style={{ fontSize: 13, color: "#6B6760", textDecoration: "none" }}>← All submissions</a>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button onClick={toggleScheduled}
             style={{ fontSize: 12, fontWeight: 600, borderRadius: 7, padding: "8px 14px", cursor: "pointer", border: "1px solid #ECE7DE", background: scheduled ? "#E8F3EC" : "#fff", color: scheduled ? "#1F7A4D" : "#6B6760" }}>
