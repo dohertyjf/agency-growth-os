@@ -12,11 +12,10 @@ export default async function LeadGoalPage({
 }) {
   const sp = await searchParams
   const embed = sp.embed === "1" || sp.embed === "true"
-  const schedulingUrl = process.env.NEXT_PUBLIC_SCHEDULING_URL || ""
 
   return (
     <div style={{ minHeight: "100vh", background: "#FBFAF7" }}>
-      <LeadGoalCalculator embed={embed} schedulingUrl={schedulingUrl} />
+      <LeadGoalCalculator embed={embed} />
     </div>
   )
 }

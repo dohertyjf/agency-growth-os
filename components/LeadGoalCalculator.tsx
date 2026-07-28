@@ -7,6 +7,8 @@ type Currency = "USD" | "GBP" | "EUR"
 function currSym(c: Currency) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
 
 const accent = "#E9532A"
+// John's Google Appointment Scheduling page, embedded in the booking modal.
+const BOOKING_URL = "https://calendar.google.com/calendar/appointments/schedules/AcZssZ1KAcVxnxyAbVyWshakSOwQcGXhbYtzndKY1NBI0cP79r8QjDOZoI1xJMVy8KkdEEjXcwkO8sAy?gv=true"
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 const fieldStyle: React.CSSProperties = { display: "flex", flexDirection: "column" }
 const inputWrap: React.CSSProperties = { marginTop: "auto" }
@@ -27,10 +29,9 @@ function MoneyInput({ sym, value, onChange, step = 500, onBlur }: { sym: string;
 
 interface Props {
   embed?: boolean
-  schedulingUrl?: string
 }
 
-export default function LeadGoalCalculator({ embed = false, schedulingUrl = "" }: Props) {
+export default function LeadGoalCalculator({ embed = false }: Props) {
   const [currency, setCurrency] = useState<Currency>("USD")
   const sym = currSym(currency)
 
@@ -251,20 +252,12 @@ export default function LeadGoalCalculator({ embed = false, schedulingUrl = "" }
               </p>
             </div>
             <div style={{ padding: "8px 20px 22px" }}>
-              {schedulingUrl ? (
-                <>
-                  <iframe src={schedulingUrl} title="Book a call"
-                    style={{ width: "100%", height: 520, border: "1px solid #ECE7DE", borderRadius: 10, background: "#FBFAF7" }} />
-                  <div style={{ textAlign: "center", marginTop: 12, display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-                    <a href={schedulingUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: accent, fontWeight: 600 }}>Open the booking page in a new tab →</a>
-                    <button onClick={() => setModalOpen(false)} style={{ fontSize: 13, color: "#9C9590", background: "none", border: "none", cursor: "pointer" }}>I&apos;ll explore first</button>
-                  </div>
-                </>
-              ) : (
-                <div style={{ textAlign: "center", padding: "20px 0" }}>
-                  <button onClick={() => setModalOpen(false)} style={{ fontSize: 13, color: "#9C9590", background: "none", border: "none", cursor: "pointer" }}>Close and explore your results</button>
-                </div>
-              )}
+              <iframe src={BOOKING_URL} title="Book a call"
+                style={{ width: "100%", height: 600, border: "1px solid #ECE7DE", borderRadius: 10, background: "#FBFAF7" }} />
+              <div style={{ textAlign: "center", marginTop: 12, display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+                <a href={BOOKING_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: accent, fontWeight: 600 }}>Open the booking page in a new tab →</a>
+                <button onClick={() => setModalOpen(false)} style={{ fontSize: 13, color: "#9C9590", background: "none", border: "none", cursor: "pointer" }}>I&apos;ll explore first</button>
+              </div>
             </div>
           </div>
         </div>
