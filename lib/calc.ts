@@ -213,6 +213,90 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   }
 }
 
+// ── 9.6b Leads goal ("how many leads to hit a revenue goal") ─────────────────
+// Revenue-based (not MRR). Churn is derived from how much revenue recurs, so
+// callers only supply dollar figures — never a churn %.
+export interface LeadsGoalInputs {
+  currentRevenue: number     // R0 — collected last month
+  goalRevenue: number        // G  — target monthly revenue
+  closeRate: number          // fraction 0–1 (qualified prospects → clients)
+  avgDealValue: number       // k  — revenue a new client brings their first month
+  recurringRevenue: number   // of R0, how much bills again next month (no new sale)
+  currentLeads?: number | null
+  months: number             // scenario timeframe
+}
+
+export interface LeadsGoalResult {
+  valid: boolean                          // false if close rate or deal size is 0
+  churnRate: number                       // c = rollOff / R0
+  rollOff: number                         // D = R0 − recurring
+  revenuePerLead: number                  // cr × k
+  leadsToHoldCurrent: number              // replace today's roll-off
+  leadsToHoldGoal: number                 // sustain the goal forever
+  leadsToReachGoal: number                // reach G within `months`
+  newClientsPerMonth: number
+  growthLeads: number                     // of the needed leads, the portion beyond treadmill
+  gap: number | null                      // needed − current (null if no current leads)
+  ceilingAtCurrentLeads: number | null    // plateau revenue (null = no ceiling, 0% churn)
+  reachesGoalAtCurrentLeads: boolean | null
+  runwayHalfLifeMonths: number | null     // months to halve if they stop selling (null = no decay)
+  goalBelowCurrent: boolean
+  alreadyEnoughLeads: boolean
+}
+
+export function leadsGoal(inp: LeadsGoalInputs): LeadsGoalResult {
+  const R0 = Math.max(0, inp.currentRevenue)
+  const G = Math.max(0, inp.goalRevenue)
+  const cr = inp.closeRate
+  const k = inp.avgDealValue
+  const N = Math.max(1, Math.round(inp.months))
+  const rec = Math.min(Math.max(0, inp.recurringRevenue), R0)
+  const rollOff = R0 - rec
+  const churnRate = R0 > 0 ? rollOff / R0 : 0
+  const revenuePerLead = cr * k
+
+  const base: LeadsGoalResult = {
+    valid: false, churnRate, rollOff, revenuePerLead,
+    leadsToHoldCurrent: 0, leadsToHoldGoal: 0, leadsToReachGoal: 0,
+    newClientsPerMonth: 0, growthLeads: 0, gap: null,
+    ceilingAtCurrentLeads: null, reachesGoalAtCurrentLeads: null,
+    runwayHalfLifeMonths: null,
+    goalBelowCurrent: G <= R0, alreadyEnoughLeads: false,
+  }
+  if (!(revenuePerLead > 0)) return base
+
+  const c = churnRate
+  const leadsToHoldCurrent = rollOff / revenuePerLead
+  const leadsToHoldGoal = (c * G) / revenuePerLead
+
+  let leadsToReachGoal: number
+  if (c <= 0) {
+    // No roll-off → linear growth, no ceiling.
+    leadsToReachGoal = Math.max(0, (G - R0) / (N * revenuePerLead))
+  } else {
+    const factor = Math.pow(1 - c, N)
+    leadsToReachGoal = Math.max(0, ((G - R0 * factor) * c) / (revenuePerLead * (1 - factor)))
+  }
+
+  const newClientsPerMonth = leadsToReachGoal * cr
+  const growthLeads = Math.max(0, leadsToReachGoal - leadsToHoldCurrent)
+
+  const L = inp.currentLeads != null && inp.currentLeads >= 0 ? inp.currentLeads : null
+  const ceilingAtCurrentLeads = L != null ? (c > 0 ? (L * revenuePerLead) / c : null) : null
+  const reachesGoalAtCurrentLeads =
+    L != null ? (c > 0 ? (ceilingAtCurrentLeads as number) >= G : L > 0 ? true : R0 >= G) : null
+
+  return {
+    ...base, valid: true,
+    leadsToHoldCurrent, leadsToHoldGoal, leadsToReachGoal,
+    newClientsPerMonth, growthLeads,
+    gap: L != null ? leadsToReachGoal - L : null,
+    ceilingAtCurrentLeads, reachesGoalAtCurrentLeads,
+    runwayHalfLifeMonths: c > 0 ? Math.log(0.5) / Math.log(1 - c) : null,
+    alreadyEnoughLeads: L != null ? L >= leadsToReachGoal : false,
+  }
+}
+
 // ── 9.5 Goals (run-rate) ─────────────────────────────────────────────────────
 export function mrrGoal(annualRevenueGoal: number) {
   return annualRevenueGoal / 12

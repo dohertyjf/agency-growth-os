@@ -11,6 +11,7 @@ export default auth((req) => {
   const isPublic =
     pathname.startsWith("/intake") ||
     pathname.startsWith("/calculator") ||
+    pathname.startsWith("/lead-goal") ||
     pathname.startsWith("/embed.js") ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/intake") ||
