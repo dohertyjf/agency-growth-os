@@ -150,10 +150,16 @@ export default function LeadGoalCalculator() {
                 </div>
               )}
               {!r.goalBelowCurrent && (
-                <div style={{ fontSize: 13, color: "#C9C4BC", marginTop: 10, lineHeight: 1.5 }}>
-                  ≈ {r.newClientsPerMonth.toFixed(1)} new clients/mo.
-                  {treadmill > 0 && <> Of those {needed} leads, about <strong style={{ color: "#fff" }}>{treadmill} just replace what rolls off</strong> — only {Math.max(0, needed - treadmill)} actually grow you.</>}
-                </div>
+                <>
+                  <div style={{ fontSize: 15, color: "#EDEAE4", marginTop: 10, lineHeight: 1.4 }}>
+                    That works out to about <strong style={{ color: "#fff" }}>{r.newClientsPerMonth.toFixed(1)} new clients a month</strong>.
+                  </div>
+                  {treadmill > 0 && (
+                    <div style={{ fontSize: 13, color: "#C9C4BC", marginTop: 8, lineHeight: 1.5 }}>
+                      Of those {needed} leads, about <strong style={{ color: "#fff" }}>{treadmill} just replace what rolls off</strong> — only {Math.max(0, needed - treadmill)} actually grow you.
+                    </div>
+                  )}
+                </>
               )}
               {(r.goalBelowCurrent || r.alreadyEnoughLeads) && (
                 <div style={{ fontSize: 14, color: "#F4A47F", marginTop: 14, paddingTop: 14, borderTop: "1px solid #3A3833", lineHeight: 1.5, fontWeight: 600 }}>
