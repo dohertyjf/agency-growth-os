@@ -29,9 +29,10 @@ function MoneyInput({ sym, value, onChange, step = 500, onBlur }: { sym: string;
 
 interface Props {
   embed?: boolean
+  prefill?: { name?: string; email?: string; agency?: string }
 }
 
-export default function LeadGoalCalculator({ embed = false }: Props) {
+export default function LeadGoalCalculator({ embed = false, prefill }: Props) {
   const [currency, setCurrency] = useState<Currency>("USD")
   const sym = currSym(currency)
 
@@ -43,9 +44,9 @@ export default function LeadGoalCalculator({ embed = false }: Props) {
   const [salesConvosStr, setSalesConvosStr] = useState("")
   const [months, setMonths] = useState(12)
 
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [agency, setAgency] = useState("")
+  const [name, setName] = useState(prefill?.name ?? "")
+  const [email, setEmail] = useState(prefill?.email ?? "")
+  const [agency, setAgency] = useState(prefill?.agency ?? "")
   const [honeypot, setHoneypot] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -186,7 +187,8 @@ export default function LeadGoalCalculator({ embed = false }: Props) {
               </p>
             </div>
           ) : (
-            <div style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff" }}>
+            <form onSubmit={e => { e.preventDefault(); submit() }}
+              style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff" }}>
               <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 24, fontWeight: 600, margin: "0 0 6px" }}>
                 Where should we send your results?
               </h3>
@@ -195,20 +197,23 @@ export default function LeadGoalCalculator({ embed = false }: Props) {
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
                 <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name"
+                  name="name" autoComplete="name"
                   style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
                 <input value={email} onChange={e => { setEmail(e.target.value); setError("") }} type="email" placeholder="you@agency.com"
+                  name="email" autoComplete="email"
                   style={{ ...inputStyle, background: "#2A2824", border: `1px solid ${error ? "#C2410C" : "#3A3833"}`, color: "#fff" }} />
                 <input value={agency} onChange={e => setAgency(e.target.value)} placeholder="Agency name"
+                  name="organization" autoComplete="organization"
                   style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
               </div>
               <input value={honeypot} onChange={e => setHoneypot(e.target.value)} tabIndex={-1} autoComplete="off"
                 aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
               {error && <div style={{ fontSize: 12, color: "#F0A088", marginBottom: 10 }}>{error}</div>}
-              <button onClick={submit} disabled={submitting}
+              <button type="submit" disabled={submitting}
                 style={{ fontSize: 14, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "12px 24px", cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}>
                 {submitting ? "Sending…" : "Show my results →"}
               </button>
-            </div>
+            </form>
           )
         ) : (
           <>

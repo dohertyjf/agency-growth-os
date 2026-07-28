@@ -12,10 +12,12 @@ export default async function LeadGoalPage({
 }) {
   const sp = await searchParams
   const embed = sp.embed === "1" || sp.embed === "true"
+  const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined)
+  const prefill = { name: str(sp.name), email: str(sp.email), agency: str(sp.agency) }
 
   return (
     <div style={{ minHeight: "100vh", background: "#FBFAF7" }}>
-      <LeadGoalCalculator embed={embed} />
+      <LeadGoalCalculator embed={embed} prefill={prefill} />
     </div>
   )
 }
