@@ -163,14 +163,24 @@ export default function LeadGoalCalculator() {
             </div>
 
             {/* When they'll actually reach the goal at their current lead pace */}
-            {r.monthsToReachAtCurrentLeads != null && !r.goalBelowCurrent && (() => {
-              const reachN = Math.ceil(r.monthsToReachAtCurrentLeads as number)
-              const ahead = reachN <= months
+            {currentLeads != null && currentLeads > 0 && !r.goalBelowCurrent && (() => {
+              const reachN = r.monthsToReachAtCurrentLeads != null ? Math.ceil(r.monthsToReachAtCurrentLeads) : null
+              if (r.reachesGoalAtCurrentLeads && reachN != null) {
+                const ahead = reachN <= months
+                return (
+                  <div style={{ background: ahead ? "#EAF3EC" : "#FBF0EB", border: `1px solid ${ahead ? "#C9E0CF" : "#F0C3B0"}`, borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
+                    You&apos;re targeting <strong>{months} months</strong> — at your current <strong>{currentLeads} qualified leads/mo</strong>, you&apos;ll actually reach{" "}
+                    <strong>{fmt$(goalRevenue)}/mo</strong> in about{" "}
+                    <strong style={{ color: ahead ? "#1F7A4D" : "#C2410C" }}>{reachN} month{reachN === 1 ? "" : "s"}</strong>.
+                  </div>
+                )
+              }
               return (
-                <div style={{ background: ahead ? "#EAF3EC" : "#FBF0EB", border: `1px solid ${ahead ? "#C9E0CF" : "#F0C3B0"}`, borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
-                  You&apos;re targeting <strong>{months} months</strong> — at your current <strong>{currentLeads} qualified leads/mo</strong>, you&apos;ll actually reach{" "}
-                  <strong>{fmt$(goalRevenue)}/mo</strong> in about{" "}
-                  <strong style={{ color: ahead ? "#1F7A4D" : "#C2410C" }}>{reachN} month{reachN === 1 ? "" : "s"}</strong>.
+                <div style={{ background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
+                  At your current <strong>{currentLeads} qualified leads/mo</strong> you won&apos;t reach{" "}
+                  <strong>{fmt$(goalRevenue)}/mo</strong> — you&apos;d plateau at{" "}
+                  <strong style={{ color: "#C2410C" }}>{fmt$(r.ceilingAtCurrentLeads ?? 0)}/mo</strong>. You&apos;d need{" "}
+                  <strong>{needed} qualified leads/mo</strong> to hit it in {months} months.
                 </div>
               )
             })()}
