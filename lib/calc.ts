@@ -239,6 +239,7 @@ export interface LeadsGoalResult {
   gap: number | null                      // needed − current (null if no current leads)
   ceilingAtCurrentLeads: number | null    // plateau revenue (null = no ceiling, 0% churn)
   reachesGoalAtCurrentLeads: boolean | null
+  monthsToReachAtCurrentLeads: number | null // when they'd hit the goal at current lead pace
   runwayHalfLifeMonths: number | null     // months to halve if they stop selling (null = no decay)
   goalBelowCurrent: boolean
   alreadyEnoughLeads: boolean
@@ -260,7 +261,7 @@ export function leadsGoal(inp: LeadsGoalInputs): LeadsGoalResult {
     leadsToHoldCurrent: 0, leadsToHoldGoal: 0, leadsToReachGoal: 0,
     newClientsPerMonth: 0, growthLeads: 0, gap: null,
     ceilingAtCurrentLeads: null, reachesGoalAtCurrentLeads: null,
-    runwayHalfLifeMonths: null,
+    monthsToReachAtCurrentLeads: null, runwayHalfLifeMonths: null,
     goalBelowCurrent: G <= R0, alreadyEnoughLeads: false,
   }
   if (!(revenuePerLead > 0)) return base
@@ -286,12 +287,29 @@ export function leadsGoal(inp: LeadsGoalInputs): LeadsGoalResult {
   const reachesGoalAtCurrentLeads =
     L != null ? (c > 0 ? (ceilingAtCurrentLeads as number) >= G : L > 0 ? true : R0 >= G) : null
 
+  // Months to reach the goal at the current lead pace (invert the recurrence for N).
+  let monthsToReachAtCurrentLeads: number | null = null
+  if (L != null && G <= R0) {
+    monthsToReachAtCurrentLeads = 0
+  } else if (L != null && L > 0 && G > R0) {
+    const A = L * revenuePerLead
+    if (c <= 0) {
+      monthsToReachAtCurrentLeads = A > 0 ? (G - R0) / A : null
+    } else {
+      const ceiling = A / c
+      if (ceiling > G) {
+        const n = Math.log((G - ceiling) / (R0 - ceiling)) / Math.log(1 - c)
+        monthsToReachAtCurrentLeads = isFinite(n) && n > 0 ? n : null
+      }
+    }
+  }
+
   return {
     ...base, valid: true,
     leadsToHoldCurrent, leadsToHoldGoal, leadsToReachGoal,
     newClientsPerMonth, growthLeads,
     gap: L != null ? leadsToReachGoal - L : null,
-    ceilingAtCurrentLeads, reachesGoalAtCurrentLeads,
+    ceilingAtCurrentLeads, reachesGoalAtCurrentLeads, monthsToReachAtCurrentLeads,
     runwayHalfLifeMonths: c > 0 ? Math.log(0.5) / Math.log(1 - c) : null,
     alreadyEnoughLeads: L != null ? L >= leadsToReachGoal : false,
   }

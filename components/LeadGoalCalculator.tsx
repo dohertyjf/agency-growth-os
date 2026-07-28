@@ -162,6 +162,19 @@ export default function LeadGoalCalculator() {
               )}
             </div>
 
+            {/* When they'll actually reach the goal at their current lead pace */}
+            {r.monthsToReachAtCurrentLeads != null && !r.goalBelowCurrent && (() => {
+              const reachN = Math.ceil(r.monthsToReachAtCurrentLeads as number)
+              const ahead = reachN <= months
+              return (
+                <div style={{ background: ahead ? "#EAF3EC" : "#FBF0EB", border: `1px solid ${ahead ? "#C9E0CF" : "#F0C3B0"}`, borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
+                  You&apos;re targeting <strong>{months} months</strong> — at your current <strong>{currentLeads} qualified leads/mo</strong>, you&apos;ll actually reach{" "}
+                  <strong>{fmt$(goalRevenue)}/mo</strong> in about{" "}
+                  <strong style={{ color: ahead ? "#1F7A4D" : "#C2410C" }}>{reachN} month{reachN === 1 ? "" : "s"}</strong>.
+                </div>
+              )
+            })()}
+
             {/* Gap + ceiling (only when current leads provided) */}
             {currentLeads != null && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 16 }}>
@@ -195,7 +208,7 @@ export default function LeadGoalCalculator() {
             {/* Roll-off + runway */}
             <div style={{ background: "#F5F1EC", borderRadius: 12, padding: "14px 18px", fontSize: 13, color: "#6B6760", lineHeight: 1.6 }}>
               <strong style={{ color: "#1A1916" }}>{fmt$(r.rollOff)}/mo</strong> of your revenue rolls off ({Math.round(r.churnRate * 100)}% doesn&apos;t recur).
-              {r.runwayHalfLifeMonths != null && <> Stop selling entirely and your revenue would halve in about <strong style={{ color: "#1A1916" }}>{r.runwayHalfLifeMonths.toFixed(1)} months</strong>.</>}
+              {r.runwayHalfLifeMonths != null && <> If you stopped selling entirely — no new leads or clients — your revenue would halve in about <strong style={{ color: "#1A1916" }}>{r.runwayHalfLifeMonths.toFixed(1)} months</strong>.</>}
             </div>
           </>
         )}
