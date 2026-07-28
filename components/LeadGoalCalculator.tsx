@@ -7,6 +7,11 @@ function currSym(c: Currency) { return c === "GBP" ? "£" : c === "EUR" ? "€" 
 
 const accent = "#E9532A"
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
+// Each field is a flex column; the grid stretches all cells in a row to equal
+// height, and the input is pinned to the bottom — so inputs line up no matter
+// how many lines the question wraps to.
+const fieldStyle: React.CSSProperties = { display: "flex", flexDirection: "column" }
+const inputWrap: React.CSSProperties = { marginTop: "auto" }
 const inputStyle: React.CSSProperties = {
   padding: "8px 11px", border: "1px solid #ECE7DE", borderRadius: 8, fontSize: 14,
   background: "#FCFBF8", color: "#1A1916", width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none",
@@ -69,31 +74,41 @@ export default function LeadGoalCalculator() {
         {/* Inputs */}
         <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 20 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 }}>
-            <div>
+            <div style={fieldStyle}>
               <label style={labelStyle}>What did you collect in revenue last month?</label>
-              <MoneyInput sym={sym} value={currentRevenue} onChange={setCurrentRevenue} />
+              <div style={inputWrap}>
+                <MoneyInput sym={sym} value={currentRevenue}
+                  onChange={n => { setCurrentRevenue(n); setRecurring(r => Math.min(r, n)) }} />
+              </div>
             </div>
-            <div>
+            <div style={fieldStyle}>
               <label style={labelStyle}>What&apos;s your target monthly revenue?</label>
-              <MoneyInput sym={sym} value={goalRevenue} onChange={setGoalRevenue} step={1000} />
+              <div style={inputWrap}><MoneyInput sym={sym} value={goalRevenue} onChange={setGoalRevenue} step={1000} /></div>
             </div>
-            <div>
+            <div style={fieldStyle}>
               <label style={labelStyle}>Out of 10 qualified prospects, how many do you close?</label>
-              <input style={inputStyle} type="number" min={0} max={10} step={0.5} value={closedPer10}
-                onChange={e => setClosedPer10(parseFloat(e.target.value) || 0)} />
+              <div style={inputWrap}>
+                <input style={inputStyle} type="number" min={0} max={10} step={0.5} value={closedPer10}
+                  onChange={e => setClosedPer10(parseFloat(e.target.value) || 0)} />
+              </div>
             </div>
-            <div>
+            <div style={fieldStyle}>
               <label style={labelStyle}>Avg revenue a new client brings their first month?</label>
-              <MoneyInput sym={sym} value={avgDeal} onChange={setAvgDeal} step={250} />
+              <div style={inputWrap}><MoneyInput sym={sym} value={avgDeal} onChange={setAvgDeal} step={250} /></div>
             </div>
-            <div>
-              <label style={labelStyle}>Of that revenue, how much bills again next month (no new sale)?</label>
-              <MoneyInput sym={sym} value={recurring} onChange={setRecurring} />
+            <div style={fieldStyle}>
+              <label style={labelStyle}>How much of last month&apos;s revenue bills again this month?</label>
+              <div style={inputWrap}>
+                <MoneyInput sym={sym} value={Math.min(recurring, currentRevenue)}
+                  onChange={n => setRecurring(Math.min(n, currentRevenue))} />
+              </div>
             </div>
-            <div>
+            <div style={fieldStyle}>
               <label style={labelStyle}>Qualified leads you get per month <span style={{ color: "#B8B2A8", fontWeight: 400 }}>(optional)</span></label>
-              <input style={inputStyle} type="number" min={0} step={1} value={currentLeadsStr}
-                onChange={e => setCurrentLeadsStr(e.target.value)} placeholder="e.g. 8" />
+              <div style={inputWrap}>
+                <input style={inputStyle} type="number" min={0} step={1} value={currentLeadsStr}
+                  onChange={e => setCurrentLeadsStr(e.target.value)} placeholder="e.g. 8" />
+              </div>
             </div>
           </div>
         </div>
