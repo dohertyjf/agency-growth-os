@@ -82,6 +82,13 @@ export default function LeadGoalCalculator({ embed = false, prefill }: Props) {
     return () => ro.disconnect()
   })
 
+  // Tell the embed to go full-screen while the booking modal is open so it
+  // centers on the real viewport instead of being trapped inside the iframe.
+  useEffect(() => {
+    if (!embed || typeof window === "undefined") return
+    window.parent.postMessage({ type: "jd-calc:modal", open: modalOpen }, "*")
+  }, [embed, modalOpen])
+
   function openCapture() {
     if (salesConvosStr.trim() === "") {
       setError("Please enter your sales conversations per month (enter 0 if none).")
