@@ -1,5 +1,7 @@
 "use client"
 import { useEffect, useRef, useState } from "react"
+import { leadsGoal } from "@/lib/calc"
+import LeadGoalResults from "@/components/LeadGoalResults"
 
 type Currency = "USD" | "GBP" | "EUR"
 function currSym(c: Currency) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
@@ -32,13 +34,13 @@ export default function LeadGoalCalculator({ embed = false, schedulingUrl = "" }
   const [currency, setCurrency] = useState<Currency>("USD")
   const sym = currSym(currency)
 
-  // Inputs as text so cleared fields stay empty (no stray "0").
   const [currentRevenueStr, setCurrentRevenueStr] = useState("10000")
   const [goalRevenueStr, setGoalRevenueStr] = useState("25000")
   const [closedPer10Str, setClosedPer10Str] = useState("3")
   const [avgDealStr, setAvgDealStr] = useState("2500")
   const [recurringStr, setRecurringStr] = useState("8000")
   const [salesConvosStr, setSalesConvosStr] = useState("")
+  const [months, setMonths] = useState(12)
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -46,15 +48,23 @@ export default function LeadGoalCalculator({ embed = false, schedulingUrl = "" }
   const [honeypot, setHoneypot] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
   const [showCapture, setShowCapture] = useState(false)
+  const [captured, setCaptured] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
 
   const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
   const currentRevenue = num(currentRevenueStr)
+  const goalRevenue = num(goalRevenueStr)
+  const avgDeal = num(avgDealStr)
+  const recurring = num(recurringStr)
+  const cr = Math.min(10, Math.max(0, num(closedPer10Str))) / 10
+  const currentLeads = salesConvosStr.trim() === "" ? null : num(salesConvosStr)
 
   const clampRecurring = () => {
     if (num(recurringStr) > currentRevenue) setRecurringStr(String(currentRevenue))
   }
+
+  const r = leadsGoal({ currentRevenue, goalRevenue, closeRate: cr, avgDealValue: avgDeal, recurringRevenue: recurring, currentLeads, months })
 
   // ── Embed: auto-report height to the parent page ──────────────────────────
   const rootRef = useRef<HTMLDivElement>(null)
@@ -92,42 +102,17 @@ export default function LeadGoalCalculator({ embed = false, schedulingUrl = "" }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email, name: name || undefined, agency: agency || undefined, currency,
-          inputs: {
-            currentRevenue, goalRevenue: num(goalRevenueStr),
-            closeRate: Math.min(10, Math.max(0, num(closedPer10Str))) / 10,
-            avgDealValue: num(avgDealStr), recurringRevenue: num(recurringStr),
-            currentLeads: num(salesConvosStr),
-          },
+          inputs: { currentRevenue, goalRevenue, closeRate: cr, avgDealValue: avgDeal, recurringRevenue: recurring, currentLeads: currentLeads ?? 0 },
           honeypot,
         }),
       })
       if (res.ok) {
-        if (schedulingUrl) {
-          if (embed && window.parent !== window) window.parent.postMessage({ type: "jd-calc:redirect", url: schedulingUrl }, "*")
-          else window.location.href = schedulingUrl
-        } else {
-          setSubmitted(true)
-        }
+        setCaptured(true)
+        setModalOpen(true)
       }
     } finally {
       setSubmitting(false)
     }
-  }
-
-  if (submitted) {
-    return (
-      <div ref={rootRef} style={{ background: "#FBFAF7", padding: embed ? "48px 24px" : "80px 24px", textAlign: "center" }}>
-        <div style={{ maxWidth: 480, margin: "0 auto" }}>
-          <div style={{ width: 56, height: 56, margin: "0 auto 20px", borderRadius: 14, background: accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </div>
-          <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 30, fontWeight: 600, margin: "0 0 12px", color: "#1A1916" }}>Thanks — you&apos;re in.</h2>
-          <p style={{ fontSize: 15, lineHeight: 1.6, color: "#6F6B64" }}>
-            John will personally review your numbers and send your lead plan to <strong>{email}</strong>.
-          </p>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -140,8 +125,8 @@ export default function LeadGoalCalculator({ embed = false, schedulingUrl = "" }
               How many leads do you need to hit your goal?
             </h1>
             <p style={{ fontSize: 15, color: "#6F6B64", margin: 0, maxWidth: 620, lineHeight: 1.55 }}>
-              Answer a few questions about your numbers and John will send you a personalized lead
-              plan — the sales conversations per month it takes to reach and hold your revenue goal.
+              Answer a few questions about your numbers and we&apos;ll show the sales conversations per
+              month it takes to reach — and hold — your revenue goal.
             </p>
           </div>
           <select value={currency} onChange={e => setCurrency(e.target.value as Currency)}
@@ -150,7 +135,7 @@ export default function LeadGoalCalculator({ embed = false, schedulingUrl = "" }
           </select>
         </div>
 
-        {/* Inputs */}
+        {/* Inputs (always editable) */}
         <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 20 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 }}>
             <div style={fieldStyle}>
@@ -186,45 +171,104 @@ export default function LeadGoalCalculator({ embed = false, schedulingUrl = "" }
           </div>
         </div>
 
-        {/* Gate: results are hidden until they submit */}
-        {!showCapture ? (
-          <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
-            <button onClick={openCapture}
-              style={{ fontSize: 16, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 10, padding: "15px 34px", cursor: "pointer" }}>
-              Get your lead plan →
-            </button>
-            {error && <div style={{ fontSize: 13, color: "#C2410C", marginTop: 10 }}>{error}</div>}
-            <p style={{ fontSize: 13, color: "#9C9590", margin: "12px auto 0", maxWidth: 460, lineHeight: 1.5 }}>
-              John will personally review your numbers and send your lead plan — how many leads a
-              month you need, and where the real constraint is.
-            </p>
-          </div>
-        ) : (
-          <div style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff" }}>
-            <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 24, fontWeight: 600, margin: "0 0 6px" }}>
-              Where should we send your lead plan?
-            </h3>
-            <p style={{ fontSize: 14, color: "#C9C4BC", margin: "0 0 20px", lineHeight: 1.55, maxWidth: 560 }}>
-              John will personally review your numbers, send your plan, and walk you through it on a free call.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name"
-                style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
-              <input value={email} onChange={e => { setEmail(e.target.value); setError("") }} type="email" placeholder="you@agency.com"
-                style={{ ...inputStyle, background: "#2A2824", border: `1px solid ${error ? "#C2410C" : "#3A3833"}`, color: "#fff" }} />
-              <input value={agency} onChange={e => setAgency(e.target.value)} placeholder="Agency name"
-                style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
+        {/* Pre-capture gate, or post-capture results */}
+        {!captured ? (
+          !showCapture ? (
+            <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+              <button onClick={openCapture}
+                style={{ fontSize: 16, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 10, padding: "15px 34px", cursor: "pointer" }}>
+                See your results →
+              </button>
+              {error && <div style={{ fontSize: 13, color: "#C2410C", marginTop: 10 }}>{error}</div>}
+              <p style={{ fontSize: 13, color: "#9C9590", margin: "12px auto 0", maxWidth: 460, lineHeight: 1.5 }}>
+                Tell us where to send your results and you can explore the numbers live.
+              </p>
             </div>
-            <input value={honeypot} onChange={e => setHoneypot(e.target.value)} tabIndex={-1} autoComplete="off"
-              aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
-            {error && <div style={{ fontSize: 12, color: "#F0A088", marginBottom: 10 }}>{error}</div>}
-            <button onClick={submit} disabled={submitting}
-              style={{ fontSize: 14, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "12px 24px", cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}>
-              {submitting ? "Sending…" : "Get my lead plan →"}
-            </button>
-          </div>
+          ) : (
+            <div style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff" }}>
+              <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 24, fontWeight: 600, margin: "0 0 6px" }}>
+                Where should we send your results?
+              </h3>
+              <p style={{ fontSize: 14, color: "#C9C4BC", margin: "0 0 20px", lineHeight: 1.55, maxWidth: 560 }}>
+                Enter your details to unlock your results — then play with the numbers as much as you like.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name"
+                  style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
+                <input value={email} onChange={e => { setEmail(e.target.value); setError("") }} type="email" placeholder="you@agency.com"
+                  style={{ ...inputStyle, background: "#2A2824", border: `1px solid ${error ? "#C2410C" : "#3A3833"}`, color: "#fff" }} />
+                <input value={agency} onChange={e => setAgency(e.target.value)} placeholder="Agency name"
+                  style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
+              </div>
+              <input value={honeypot} onChange={e => setHoneypot(e.target.value)} tabIndex={-1} autoComplete="off"
+                aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
+              {error && <div style={{ fontSize: 12, color: "#F0A088", marginBottom: 10 }}>{error}</div>}
+              <button onClick={submit} disabled={submitting}
+                style={{ fontSize: 14, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "12px 24px", cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}>
+                {submitting ? "Sending…" : "Show my results →"}
+              </button>
+            </div>
+          )
+        ) : (
+          <>
+            {/* Book-a-call banner */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
+              <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.45 }}>
+                <strong>Want John to walk you through this?</strong> Book a free Growth Projection Review Call.
+              </div>
+              <button onClick={() => setModalOpen(true)}
+                style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "11px 20px", cursor: "pointer" }}>
+                Book a call →
+              </button>
+            </div>
+
+            <LeadGoalResults
+              r={r}
+              goalRevenue={goalRevenue}
+              currentLeads={currentLeads}
+              months={months}
+              setMonths={setMonths}
+              currency={currency}
+            />
+          </>
         )}
       </div>
+
+      {/* Booking modal */}
+      {modalOpen && (
+        <div onClick={() => setModalOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(26,25,22,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, maxWidth: 760, width: "100%", maxHeight: "92vh", overflow: "auto", position: "relative", boxShadow: "0 12px 48px rgba(0,0,0,0.28)" }}>
+            <button onClick={() => setModalOpen(false)} aria-label="Close"
+              style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", border: "none", background: "#F0EDE8", color: "#1A1916", fontSize: 18, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>
+              ×
+            </button>
+            <div style={{ padding: "28px 28px 12px", textAlign: "center" }}>
+              <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 26, fontWeight: 600, margin: "0 0 8px", color: "#1A1916" }}>Your results are ready 🎉</h3>
+              <p style={{ fontSize: 14, color: "#6F6B64", margin: "0 auto", maxWidth: 520, lineHeight: 1.55 }}>
+                Book a free Growth Projection Review Call and John will walk you through your numbers and the fastest path to your goal — or close this to explore the results yourself.
+              </p>
+            </div>
+            <div style={{ padding: "8px 20px 22px" }}>
+              {schedulingUrl ? (
+                <>
+                  <iframe src={schedulingUrl} title="Book a call"
+                    style={{ width: "100%", height: 520, border: "1px solid #ECE7DE", borderRadius: 10, background: "#FBFAF7" }} />
+                  <div style={{ textAlign: "center", marginTop: 12, display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+                    <a href={schedulingUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: accent, fontWeight: 600 }}>Open the booking page in a new tab →</a>
+                    <button onClick={() => setModalOpen(false)} style={{ fontSize: 13, color: "#9C9590", background: "none", border: "none", cursor: "pointer" }}>I&apos;ll explore first</button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: "20px 0" }}>
+                  <button onClick={() => setModalOpen(false)} style={{ fontSize: 13, color: "#9C9590", background: "none", border: "none", cursor: "pointer" }}>Close and explore your results</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
