@@ -17,11 +17,11 @@ const inputStyle: React.CSSProperties = {
   background: "#FCFBF8", color: "#1A1916", width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none",
 }
 
-function MoneyInput({ sym, value, onChange, step = 500 }: { sym: string; value: number; onChange: (n: number) => void; step?: number }) {
+function MoneyInput({ sym, value, onChange, step = 500, onBlur }: { sym: string; value: string; onChange: (s: string) => void; step?: number; onBlur?: () => void }) {
   return (
     <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 8, background: "#FCFBF8" }}>
       <span style={{ padding: "0 2px 0 11px", fontSize: 14, color: "#9C9590", flexShrink: 0, userSelect: "none" }}>{sym}</span>
-      <input type="number" min={0} step={step} value={value} onChange={e => onChange(parseFloat(e.target.value) || 0)}
+      <input type="number" min={0} step={step} value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur}
         style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 14, color: "#1A1916", padding: "8px 11px 8px 4px", width: "100%", boxSizing: "border-box" }} />
     </div>
   )
@@ -32,16 +32,27 @@ export default function LeadGoalCalculator() {
   const sym = currSym(currency)
   const fmt$ = (v: number) => fmtCurrency(v, currency)
 
-  const [currentRevenue, setCurrentRevenue] = useState(10000)
-  const [goalRevenue, setGoalRevenue] = useState(25000)
-  const [closedPer10, setClosedPer10] = useState(3)
-  const [avgDeal, setAvgDeal] = useState(2500)
-  const [recurring, setRecurring] = useState(8000)
+  // Inputs are held as text so cleared fields stay empty (no stray "0").
+  const [currentRevenueStr, setCurrentRevenueStr] = useState("10000")
+  const [goalRevenueStr, setGoalRevenueStr] = useState("25000")
+  const [closedPer10Str, setClosedPer10Str] = useState("3")
+  const [avgDealStr, setAvgDealStr] = useState("2500")
+  const [recurringStr, setRecurringStr] = useState("8000")
   const [currentLeadsStr, setCurrentLeadsStr] = useState("")
   const [months, setMonths] = useState(12)
 
-  const currentLeads = currentLeadsStr.trim() === "" ? null : parseFloat(currentLeadsStr) || 0
-  const cr = Math.min(10, Math.max(0, closedPer10)) / 10
+  const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
+  const currentRevenue = num(currentRevenueStr)
+  const goalRevenue = num(goalRevenueStr)
+  const avgDeal = num(avgDealStr)
+  const recurring = num(recurringStr)
+  const currentLeads = currentLeadsStr.trim() === "" ? null : num(currentLeadsStr)
+  const cr = Math.min(10, Math.max(0, num(closedPer10Str))) / 10
+
+  // Recurring can't exceed revenue — enforced on blur so it never fights typing.
+  const clampRecurring = () => {
+    if (num(recurringStr) > currentRevenue) setRecurringStr(String(currentRevenue))
+  }
 
   const r = leadsGoal({
     currentRevenue, goalRevenue, closeRate: cr, avgDealValue: avgDeal,
@@ -77,30 +88,28 @@ export default function LeadGoalCalculator() {
             <div style={fieldStyle}>
               <label style={labelStyle}>What did you collect in revenue last month?</label>
               <div style={inputWrap}>
-                <MoneyInput sym={sym} value={currentRevenue}
-                  onChange={n => { setCurrentRevenue(n); setRecurring(r => Math.min(r, n)) }} />
+                <MoneyInput sym={sym} value={currentRevenueStr} onChange={setCurrentRevenueStr} onBlur={clampRecurring} />
               </div>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>What&apos;s your target monthly revenue?</label>
-              <div style={inputWrap}><MoneyInput sym={sym} value={goalRevenue} onChange={setGoalRevenue} step={1000} /></div>
+              <div style={inputWrap}><MoneyInput sym={sym} value={goalRevenueStr} onChange={setGoalRevenueStr} step={1000} /></div>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Out of 10 qualified prospects, how many do you close?</label>
               <div style={inputWrap}>
-                <input style={inputStyle} type="number" min={0} max={10} step={0.5} value={closedPer10}
-                  onChange={e => setClosedPer10(parseFloat(e.target.value) || 0)} />
+                <input style={inputStyle} type="number" min={0} max={10} step={0.5} value={closedPer10Str}
+                  onChange={e => setClosedPer10Str(e.target.value)} />
               </div>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Avg revenue a new client brings their first month?</label>
-              <div style={inputWrap}><MoneyInput sym={sym} value={avgDeal} onChange={setAvgDeal} step={250} /></div>
+              <div style={inputWrap}><MoneyInput sym={sym} value={avgDealStr} onChange={setAvgDealStr} step={250} /></div>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>How much of last month&apos;s revenue bills again this month?</label>
               <div style={inputWrap}>
-                <MoneyInput sym={sym} value={Math.min(recurring, currentRevenue)}
-                  onChange={n => setRecurring(Math.min(n, currentRevenue))} />
+                <MoneyInput sym={sym} value={recurringStr} onChange={setRecurringStr} onBlur={clampRecurring} />
               </div>
             </div>
             <div style={fieldStyle}>
@@ -140,10 +149,17 @@ export default function LeadGoalCalculator() {
                   <span style={{ color: "#F4A47F", fontWeight: 800, fontSize: 26 }}>{needed} qualified leads/month</span>.
                 </div>
               )}
-              <div style={{ fontSize: 13, color: "#C9C4BC", marginTop: 10, lineHeight: 1.5 }}>
-                ≈ {r.newClientsPerMonth.toFixed(1)} new clients/mo.
-                {treadmill > 0 && !r.goalBelowCurrent && <> Of those {needed} leads, about <strong style={{ color: "#fff" }}>{treadmill} just replace what rolls off</strong> — only {Math.max(0, needed - treadmill)} actually grow you.</>}
-              </div>
+              {!r.goalBelowCurrent && (
+                <div style={{ fontSize: 13, color: "#C9C4BC", marginTop: 10, lineHeight: 1.5 }}>
+                  ≈ {r.newClientsPerMonth.toFixed(1)} new clients/mo.
+                  {treadmill > 0 && <> Of those {needed} leads, about <strong style={{ color: "#fff" }}>{treadmill} just replace what rolls off</strong> — only {Math.max(0, needed - treadmill)} actually grow you.</>}
+                </div>
+              )}
+              {(r.goalBelowCurrent || r.alreadyEnoughLeads) && (
+                <div style={{ fontSize: 14, color: "#F4A47F", marginTop: 14, paddingTop: 14, borderTop: "1px solid #3A3833", lineHeight: 1.5, fontWeight: 600 }}>
+                  At this point, leads is no longer your constraint. Capacity, pricing, and more become your constraint.
+                </div>
+              )}
             </div>
 
             {/* Gap + ceiling (only when current leads provided) */}
