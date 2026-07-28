@@ -1,15 +1,11 @@
 "use client"
-import { useState } from "react"
-import { leadsGoal, fmtCurrency } from "@/lib/calc"
+import { useEffect, useRef, useState } from "react"
 
 type Currency = "USD" | "GBP" | "EUR"
 function currSym(c: Currency) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
 
 const accent = "#E9532A"
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
-// Each field is a flex column; the grid stretches all cells in a row to equal
-// height, and the input is pinned to the bottom — so inputs line up no matter
-// how many lines the question wraps to.
 const fieldStyle: React.CSSProperties = { display: "flex", flexDirection: "column" }
 const inputWrap: React.CSSProperties = { marginTop: "auto" }
 const inputStyle: React.CSSProperties = {
@@ -27,43 +23,115 @@ function MoneyInput({ sym, value, onChange, step = 500, onBlur }: { sym: string;
   )
 }
 
-export default function LeadGoalCalculator() {
+interface Props {
+  embed?: boolean
+  schedulingUrl?: string
+}
+
+export default function LeadGoalCalculator({ embed = false, schedulingUrl = "" }: Props) {
   const [currency, setCurrency] = useState<Currency>("USD")
   const sym = currSym(currency)
-  const fmt$ = (v: number) => fmtCurrency(v, currency)
 
-  // Inputs are held as text so cleared fields stay empty (no stray "0").
+  // Inputs as text so cleared fields stay empty (no stray "0").
   const [currentRevenueStr, setCurrentRevenueStr] = useState("10000")
   const [goalRevenueStr, setGoalRevenueStr] = useState("25000")
   const [closedPer10Str, setClosedPer10Str] = useState("3")
   const [avgDealStr, setAvgDealStr] = useState("2500")
   const [recurringStr, setRecurringStr] = useState("8000")
-  const [currentLeadsStr, setCurrentLeadsStr] = useState("")
-  const [months, setMonths] = useState(12)
+  const [salesConvosStr, setSalesConvosStr] = useState("")
+
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [agency, setAgency] = useState("")
+  const [honeypot, setHoneypot] = useState("")
+  const [error, setError] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [showCapture, setShowCapture] = useState(false)
 
   const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
   const currentRevenue = num(currentRevenueStr)
-  const goalRevenue = num(goalRevenueStr)
-  const avgDeal = num(avgDealStr)
-  const recurring = num(recurringStr)
-  const currentLeads = currentLeadsStr.trim() === "" ? null : num(currentLeadsStr)
-  const cr = Math.min(10, Math.max(0, num(closedPer10Str))) / 10
 
-  // Recurring can't exceed revenue — enforced on blur so it never fights typing.
   const clampRecurring = () => {
     if (num(recurringStr) > currentRevenue) setRecurringStr(String(currentRevenue))
   }
 
-  const r = leadsGoal({
-    currentRevenue, goalRevenue, closeRate: cr, avgDealValue: avgDeal,
-    recurringRevenue: recurring, currentLeads, months,
+  // ── Embed: auto-report height to the parent page ──────────────────────────
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!embed || typeof window === "undefined") return
+    const post = () => {
+      const h = rootRef.current?.scrollHeight ?? document.body.scrollHeight
+      window.parent.postMessage({ type: "jd-calc:height", height: h }, "*")
+    }
+    post()
+    const ro = new ResizeObserver(post)
+    if (rootRef.current) ro.observe(rootRef.current)
+    return () => ro.disconnect()
   })
 
-  const needed = Math.ceil(r.leadsToReachGoal)
-  const treadmill = Math.round(r.leadsToHoldCurrent)
+  function openCapture() {
+    if (salesConvosStr.trim() === "") {
+      setError("Please enter your sales conversations per month (enter 0 if none).")
+      return
+    }
+    setError("")
+    setShowCapture(true)
+  }
+
+  async function submit() {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Please enter a valid email address.")
+      return
+    }
+    setError("")
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/lead-goal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email, name: name || undefined, agency: agency || undefined, currency,
+          inputs: {
+            currentRevenue, goalRevenue: num(goalRevenueStr),
+            closeRate: Math.min(10, Math.max(0, num(closedPer10Str))) / 10,
+            avgDealValue: num(avgDealStr), recurringRevenue: num(recurringStr),
+            currentLeads: num(salesConvosStr),
+          },
+          honeypot,
+        }),
+      })
+      if (res.ok) {
+        if (schedulingUrl) {
+          if (embed && window.parent !== window) window.parent.postMessage({ type: "jd-calc:redirect", url: schedulingUrl }, "*")
+          else window.location.href = schedulingUrl
+        } else {
+          setSubmitted(true)
+        }
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div ref={rootRef} style={{ background: "#FBFAF7", padding: embed ? "48px 24px" : "80px 24px", textAlign: "center" }}>
+        <div style={{ maxWidth: 480, margin: "0 auto" }}>
+          <div style={{ width: 56, height: 56, margin: "0 auto 20px", borderRadius: 14, background: accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </div>
+          <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 30, fontWeight: 600, margin: "0 0 12px", color: "#1A1916" }}>Thanks — you&apos;re in.</h2>
+          <p style={{ fontSize: 15, lineHeight: 1.6, color: "#6F6B64" }}>
+            John will personally review your numbers and send your lead plan to <strong>{email}</strong>.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div style={{ background: "#FBFAF7", padding: "40px 24px" }}>
+    <div ref={rootRef} style={{ background: "#FBFAF7", padding: embed ? "24px 18px" : "40px 24px" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
@@ -72,8 +140,8 @@ export default function LeadGoalCalculator() {
               How many leads do you need to hit your goal?
             </h1>
             <p style={{ fontSize: 15, color: "#6F6B64", margin: 0, maxWidth: 620, lineHeight: 1.55 }}>
-              Answer a few questions about your numbers and we&apos;ll show the qualified leads per
-              month it takes to reach — and hold — your revenue goal.
+              Answer a few questions about your numbers and John will send you a personalized lead
+              plan — the sales conversations per month it takes to reach and hold your revenue goal.
             </p>
           </div>
           <select value={currency} onChange={e => setCurrency(e.target.value as Currency)}
@@ -87,16 +155,14 @@ export default function LeadGoalCalculator() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 }}>
             <div style={fieldStyle}>
               <label style={labelStyle}>What did you collect in revenue last month?</label>
-              <div style={inputWrap}>
-                <MoneyInput sym={sym} value={currentRevenueStr} onChange={setCurrentRevenueStr} onBlur={clampRecurring} />
-              </div>
+              <div style={inputWrap}><MoneyInput sym={sym} value={currentRevenueStr} onChange={setCurrentRevenueStr} onBlur={clampRecurring} /></div>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>What&apos;s your target monthly revenue?</label>
               <div style={inputWrap}><MoneyInput sym={sym} value={goalRevenueStr} onChange={setGoalRevenueStr} step={1000} /></div>
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>Out of 10 qualified prospects, how many do you close?</label>
+              <label style={labelStyle}>Out of 10 sales conversations, how many do you close?</label>
               <div style={inputWrap}>
                 <input style={inputStyle} type="number" min={0} max={10} step={0.5} value={closedPer10Str}
                   onChange={e => setClosedPer10Str(e.target.value)} />
@@ -108,125 +174,55 @@ export default function LeadGoalCalculator() {
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>How much of last month&apos;s revenue bills again this month?</label>
-              <div style={inputWrap}>
-                <MoneyInput sym={sym} value={recurringStr} onChange={setRecurringStr} onBlur={clampRecurring} />
-              </div>
+              <div style={inputWrap}><MoneyInput sym={sym} value={recurringStr} onChange={setRecurringStr} onBlur={clampRecurring} /></div>
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>Qualified leads you get per month <span style={{ color: "#B8B2A8", fontWeight: 400 }}>(optional)</span></label>
+              <label style={labelStyle}>Sales conversations per month <span style={{ color: "#B8B2A8", fontWeight: 400 }}>(your qualified leads)</span></label>
               <div style={inputWrap}>
-                <input style={inputStyle} type="number" min={0} step={1} value={currentLeadsStr}
-                  onChange={e => setCurrentLeadsStr(e.target.value)} placeholder="e.g. 8" />
+                <input style={inputStyle} type="number" min={0} step={1} value={salesConvosStr}
+                  onChange={e => { setSalesConvosStr(e.target.value); setError("") }} placeholder="e.g. 8" />
               </div>
             </div>
           </div>
         </div>
 
-        {!r.valid ? (
-          <div style={{ background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: 20, fontSize: 14, color: "#9A3412" }}>
-            Enter a close rate and an average deal size to calculate.
+        {/* Gate: results are hidden until they submit */}
+        {!showCapture ? (
+          <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+            <button onClick={openCapture}
+              style={{ fontSize: 16, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 10, padding: "15px 34px", cursor: "pointer" }}>
+              Get your lead plan →
+            </button>
+            {error && <div style={{ fontSize: 13, color: "#C2410C", marginTop: 10 }}>{error}</div>}
+            <p style={{ fontSize: 13, color: "#9C9590", margin: "12px auto 0", maxWidth: 460, lineHeight: 1.5 }}>
+              John will personally review your numbers and send your lead plan — how many leads a
+              month you need, and where the real constraint is.
+            </p>
           </div>
         ) : (
-          <>
-            {/* Timeframe slider */}
-            <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", whiteSpace: "nowrap" }}>Reach it in</label>
-              <input type="range" min={3} max={24} step={1} value={months} onChange={e => setMonths(parseInt(e.target.value))}
-                style={{ flex: 1, minWidth: 160, accentColor: accent }} />
-              <span style={{ fontSize: 14, fontWeight: 700, color: accent, minWidth: 78, textAlign: "right" }}>{months} months</span>
+          <div style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff" }}>
+            <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 24, fontWeight: 600, margin: "0 0 6px" }}>
+              Where should we send your lead plan?
+            </h3>
+            <p style={{ fontSize: 14, color: "#C9C4BC", margin: "0 0 20px", lineHeight: 1.55, maxWidth: 560 }}>
+              John will personally review your numbers, send your plan, and walk you through it on a free call.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name"
+                style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
+              <input value={email} onChange={e => { setEmail(e.target.value); setError("") }} type="email" placeholder="you@agency.com"
+                style={{ ...inputStyle, background: "#2A2824", border: `1px solid ${error ? "#C2410C" : "#3A3833"}`, color: "#fff" }} />
+              <input value={agency} onChange={e => setAgency(e.target.value)} placeholder="Agency name"
+                style={{ ...inputStyle, background: "#2A2824", border: "1px solid #3A3833", color: "#fff" }} />
             </div>
-
-            {/* Headline */}
-            <div style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff", marginBottom: 16 }}>
-              {r.goalBelowCurrent ? (
-                <div style={{ fontSize: 18, lineHeight: 1.4 }}>
-                  You&apos;re already past {fmt$(goalRevenue)}/mo. To <strong>hold</strong> it, you need{" "}
-                  <span style={{ color: "#F4A47F", fontWeight: 800, fontSize: 22 }}>{Math.ceil(r.leadsToHoldGoal)} qualified leads/mo</span>.
-                </div>
-              ) : (
-                <div style={{ fontSize: 18, lineHeight: 1.4 }}>
-                  To reach <strong>{fmt$(goalRevenue)}/mo</strong> in <strong>{months} months</strong>, you need{" "}
-                  <span style={{ color: "#F4A47F", fontWeight: 800, fontSize: 26 }}>{needed} qualified leads/month</span>.
-                </div>
-              )}
-              {!r.goalBelowCurrent && (
-                <>
-                  <div style={{ fontSize: 15, color: "#EDEAE4", marginTop: 10, lineHeight: 1.4 }}>
-                    That works out to about <strong style={{ color: "#fff" }}>{r.newClientsPerMonth.toFixed(1)} new clients a month</strong>.
-                  </div>
-                  {treadmill > 0 && (
-                    <div style={{ fontSize: 13, color: "#C9C4BC", marginTop: 8, lineHeight: 1.5 }}>
-                      Of those {needed} leads, about <strong style={{ color: "#fff" }}>{treadmill} just replace what rolls off</strong> — only {Math.max(0, needed - treadmill)} actually grow you.
-                    </div>
-                  )}
-                </>
-              )}
-              {(r.goalBelowCurrent || r.alreadyEnoughLeads) && (
-                <div style={{ fontSize: 14, color: "#F4A47F", marginTop: 14, paddingTop: 14, borderTop: "1px solid #3A3833", lineHeight: 1.5, fontWeight: 600 }}>
-                  At this point, leads is no longer your constraint. Capacity, pricing, and more become your constraint.
-                </div>
-              )}
-            </div>
-
-            {/* When they'll actually reach the goal at their current lead pace */}
-            {currentLeads != null && currentLeads > 0 && !r.goalBelowCurrent && (() => {
-              const reachN = r.monthsToReachAtCurrentLeads != null ? Math.ceil(r.monthsToReachAtCurrentLeads) : null
-              if (r.reachesGoalAtCurrentLeads && reachN != null) {
-                const ahead = reachN <= months
-                return (
-                  <div style={{ background: ahead ? "#EAF3EC" : "#FBF0EB", border: `1px solid ${ahead ? "#C9E0CF" : "#F0C3B0"}`, borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
-                    You&apos;re targeting <strong>{months} months</strong> — at your current <strong>{currentLeads} qualified leads/mo</strong>, you&apos;ll actually reach{" "}
-                    <strong>{fmt$(goalRevenue)}/mo</strong> in about{" "}
-                    <strong style={{ color: ahead ? "#1F7A4D" : "#C2410C" }}>{reachN} month{reachN === 1 ? "" : "s"}</strong>.
-                  </div>
-                )
-              }
-              return (
-                <div style={{ background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
-                  At your current <strong>{currentLeads} qualified leads/mo</strong> you won&apos;t reach{" "}
-                  <strong>{fmt$(goalRevenue)}/mo</strong> — you&apos;d plateau at{" "}
-                  <strong style={{ color: "#C2410C" }}>{fmt$(r.ceilingAtCurrentLeads ?? 0)}/mo</strong>. You&apos;d need{" "}
-                  <strong>{needed} qualified leads/mo</strong> to hit it in {months} months.
-                </div>
-              )
-            })()}
-
-            {/* Gap + ceiling (only when current leads provided) */}
-            {currentLeads != null && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 16 }}>
-                <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#9C9590", marginBottom: 6 }}>The gap</div>
-                  {r.alreadyEnoughLeads ? (
-                    <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.5 }}>
-                      You already generate enough leads. The constraint isn&apos;t lead volume — it&apos;s your <strong>close rate, retention, or deal size</strong>.
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.5 }}>
-                      You get <strong>{currentLeads}</strong>/mo → you&apos;re{" "}
-                      <strong style={{ color: accent }}>{Math.ceil(r.gap as number)} lead{Math.ceil(r.gap as number) === 1 ? "" : "s"}/mo short</strong>.
-                    </div>
-                  )}
-                </div>
-                <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#9C9590", marginBottom: 6 }}>Your ceiling at {currentLeads} leads/mo</div>
-                  {r.ceilingAtCurrentLeads == null ? (
-                    <div style={{ fontSize: 14, color: "#1F7A4D", lineHeight: 1.5 }}>No ceiling — with nothing rolling off, your revenue compounds.</div>
-                  ) : (
-                    <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.5 }}>
-                      Revenue plateaus at <strong style={{ color: r.reachesGoalAtCurrentLeads ? "#1F7A4D" : "#C2410C" }}>{fmt$(r.ceilingAtCurrentLeads)}/mo</strong> —{" "}
-                      {r.reachesGoalAtCurrentLeads ? "enough for your goal." : "below your goal. More leads alone won't get you there."}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Roll-off + runway */}
-            <div style={{ background: "#F5F1EC", borderRadius: 12, padding: "14px 18px", fontSize: 13, color: "#6B6760", lineHeight: 1.6 }}>
-              <strong style={{ color: "#1A1916" }}>{fmt$(r.rollOff)}/mo</strong> of your revenue rolls off ({Math.round(r.churnRate * 100)}% doesn&apos;t recur).
-              {r.runwayHalfLifeMonths != null && <> If you stopped selling entirely — no new leads or clients — your revenue would halve in about <strong style={{ color: "#1A1916" }}>{r.runwayHalfLifeMonths.toFixed(1)} months</strong>.</>}
-            </div>
-          </>
+            <input value={honeypot} onChange={e => setHoneypot(e.target.value)} tabIndex={-1} autoComplete="off"
+              aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
+            {error && <div style={{ fontSize: 12, color: "#F0A088", marginBottom: 10 }}>{error}</div>}
+            <button onClick={submit} disabled={submitting}
+              style={{ fontSize: 14, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "12px 24px", cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}>
+              {submitting ? "Sending…" : "Get my lead plan →"}
+            </button>
+          </div>
         )}
       </div>
     </div>

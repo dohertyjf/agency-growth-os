@@ -227,6 +227,21 @@ model IntakeSubmission {
   createdAt DateTime @default(now())
 }
 
+// Public "how many leads to hit your goal" calculator submissions (lead magnet).
+model LeadGoalSubmission {
+  id             String   @id @default(cuid())
+  email          String
+  name           String?
+  agency         String?
+  currency       String   @default("USD")
+  inputs         String   // JSON: the numbers the visitor submitted
+  result         String   // JSON: computed LeadsGoalResult snapshot at submit time
+  adjustedInputs String?  // JSON: John's working-copy tweaks (never overwrites `inputs`)
+  takeaways      String?  // John's editable notes for the report
+  scheduled      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
 // Public "when does your agency cap out" calculator submissions (lead magnet).
 model CapacityLead {
   id             String   @id @default(cuid())

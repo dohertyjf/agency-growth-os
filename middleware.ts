@@ -16,6 +16,7 @@ export default auth((req) => {
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/intake") ||
     pathname.startsWith("/api/leads") ||
+    pathname.startsWith("/api/lead-goal") ||
     pathname.startsWith("/api/auth")
 
   if (!isPublic && !isLoggedIn) {

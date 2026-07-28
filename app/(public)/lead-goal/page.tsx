@@ -2,14 +2,21 @@ import LeadGoalCalculator from "@/components/LeadGoalCalculator"
 
 export const metadata = {
   title: "Lead Goal Calculator — How many leads to hit your revenue goal?",
-  description: "Find the qualified leads per month it takes to reach and hold your revenue goal.",
+  description: "Find the sales conversations per month it takes to reach and hold your revenue goal.",
 }
 
-// Static page (no request-time data) — served from the CDN, no cold render.
-export default function LeadGoalPage() {
+export default async function LeadGoalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const sp = await searchParams
+  const embed = sp.embed === "1" || sp.embed === "true"
+  const schedulingUrl = process.env.NEXT_PUBLIC_SCHEDULING_URL || ""
+
   return (
     <div style={{ minHeight: "100vh", background: "#FBFAF7" }}>
-      <LeadGoalCalculator />
+      <LeadGoalCalculator embed={embed} schedulingUrl={schedulingUrl} />
     </div>
   )
 }
