@@ -197,7 +197,7 @@ export default function LeadGoalCalculator() {
                   ) : (
                     <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.5 }}>
                       You get <strong>{currentLeads}</strong>/mo → you&apos;re{" "}
-                      <strong style={{ color: accent }}>{Math.ceil(r.gap as number)} leads/mo short</strong>.
+                      <strong style={{ color: accent }}>{Math.ceil(r.gap as number)} lead{Math.ceil(r.gap as number) === 1 ? "" : "s"}/mo short</strong>.
                     </div>
                   )}
                 </div>
