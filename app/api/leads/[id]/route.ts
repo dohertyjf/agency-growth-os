@@ -18,6 +18,7 @@ const schema = z.object({
   adjustedInputs: inputsSchema.nullable().optional(),
   takeaways: z.string().nullable().optional(),
   scheduled: z.boolean().optional(),
+  reportSent: z.boolean().optional(),
 })
 
 export async function PATCH(
@@ -34,12 +35,13 @@ export async function PATCH(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const data: { adjustedInputs?: string | null; takeaways?: string | null; scheduled?: boolean } = {}
+  const data: { adjustedInputs?: string | null; takeaways?: string | null; scheduled?: boolean; reportSent?: boolean } = {}
   if (parsed.data.adjustedInputs !== undefined) {
     data.adjustedInputs = parsed.data.adjustedInputs ? JSON.stringify(parsed.data.adjustedInputs) : null
   }
   if (parsed.data.takeaways !== undefined) data.takeaways = parsed.data.takeaways
   if (parsed.data.scheduled !== undefined) data.scheduled = parsed.data.scheduled
+  if (parsed.data.reportSent !== undefined) data.reportSent = parsed.data.reportSent
 
   const lead = await prisma.capacityLead.update({ where: { id }, data })
   return Response.json({ id: lead.id })

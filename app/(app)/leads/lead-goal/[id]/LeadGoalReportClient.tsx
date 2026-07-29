@@ -26,6 +26,7 @@ interface Lead {
   adjustedInputs: Inputs | null
   takeaways: string | null
   scheduled: boolean
+  reportSent: boolean
   createdAt: string
 }
 
@@ -45,9 +46,15 @@ export default function LeadGoalReportClient({ lead, schedulingUrl }: { lead: Le
   const [inputs, setInputs] = useState<Inputs>(lead.adjustedInputs ?? lead.inputs)
   const [takeaways, setTakeaways] = useState(lead.takeaways ?? "")
   const [scheduled, setScheduled] = useState(lead.scheduled)
+  const [reportSent, setReportSent] = useState(lead.reportSent)
   const [months, setMonths] = useState(12)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+
+  const firstName = (lead.name ?? "").trim().split(" ")[0] || "there"
+  const emailSubject = "Your Lead Plan"
+  const emailBody = `Hi ${firstName},\n\nThanks for running your numbers through the Lead Goal tool — I've put together your lead plan and attached it here.\n\nThe short version: here's how many sales conversations a month it takes to hit your goal, and where the real constraint is. The plan breaks it down.\n\nWant to go through it live together? Grab a time here: ${schedulingUrl}\n\nTalk soon,\nJohn`
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(lead.email)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`
 
   const r = useMemo(
     () => leadsGoal({ ...inputs, currentLeads: inputs.currentLeads, months }),
@@ -71,6 +78,16 @@ export default function LeadGoalReportClient({ lead, schedulingUrl }: { lead: Le
       })
       if (res.ok) { setSavedAt("Saved"); router.refresh() }
     } finally { setSaving(false) }
+  }
+
+  async function toggleReportSent() {
+    const next = !reportSent
+    setReportSent(next)
+    await fetch(`/api/lead-goal/${lead.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reportSent: next }),
+    })
+    router.refresh()
   }
 
   async function toggleScheduled() {
@@ -107,7 +124,15 @@ export default function LeadGoalReportClient({ lead, schedulingUrl }: { lead: Le
           <a href="/leads/lead-goal" style={{ fontSize: 13, color: "#6B6760", textDecoration: "none" }}>← All submissions</a>
           <DeleteLeadButton endpoint={`/api/lead-goal/${lead.id}`} redirectTo="/leads/lead-goal" />
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <a href={gmailUrl} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 12, fontWeight: 600, color: "#1A1916", background: "#fff", border: "1px solid #ECE7DE", borderRadius: 7, padding: "8px 14px", textDecoration: "none" }}>
+            ✉ Compose email
+          </a>
+          <button onClick={toggleReportSent}
+            style={{ fontSize: 12, fontWeight: 600, borderRadius: 7, padding: "8px 14px", cursor: "pointer", border: "1px solid #ECE7DE", background: reportSent ? "#E8F3EC" : "#fff", color: reportSent ? "#1F7A4D" : "#6B6760" }}>
+            {reportSent ? "✓ Report sent" : "Mark report sent"}
+          </button>
           <button onClick={toggleScheduled}
             style={{ fontSize: 12, fontWeight: 600, borderRadius: 7, padding: "8px 14px", cursor: "pointer", border: "1px solid #ECE7DE", background: scheduled ? "#E8F3EC" : "#fff", color: scheduled ? "#1F7A4D" : "#6B6760" }}>
             {scheduled ? "✓ Call booked" : "Mark call booked"}

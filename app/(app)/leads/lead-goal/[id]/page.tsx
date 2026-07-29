@@ -51,6 +51,7 @@ export default async function LeadGoalReportPage({
         adjustedInputs: parse(lead.adjustedInputs),
         takeaways: lead.takeaways,
         scheduled: lead.scheduled,
+        reportSent: lead.reportSent,
         createdAt: lead.createdAt.toISOString(),
       }}
     />

@@ -239,6 +239,7 @@ model LeadGoalSubmission {
   adjustedInputs String?  // JSON: John's working-copy tweaks (never overwrites `inputs`)
   takeaways      String?  // John's editable notes for the report
   scheduled      Boolean  @default(false)
+  reportSent     Boolean  @default(false)
   createdAt      DateTime @default(now())
 }
 
@@ -254,6 +255,7 @@ model CapacityLead {
   adjustedInputs String?  // JSON: John's working-copy tweaks (never overwrites `inputs`)
   takeaways      String?  // John's editable notes for the report
   scheduled      Boolean  @default(false)
+  reportSent     Boolean  @default(false)
   createdAt      DateTime @default(now())
 }
 

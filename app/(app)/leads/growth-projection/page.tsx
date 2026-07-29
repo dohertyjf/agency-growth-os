@@ -53,6 +53,9 @@ export default async function LeadsPage() {
                   <div style={{ fontSize: 12, color: "#9C9590", flexShrink: 0, width: 90, textAlign: "right" }}>
                     {new Date(lead.createdAt).toLocaleDateString()}
                   </div>
+                  {lead.reportSent && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#6B6760", background: "#F0EDE8", borderRadius: 4, padding: "2px 6px", flexShrink: 0 }}>SENT</span>
+                  )}
                   {lead.scheduled && (
                     <span style={{ fontSize: 10, fontWeight: 700, color: "#1F7A4D", background: "#E8F3EC", borderRadius: 4, padding: "2px 6px", flexShrink: 0 }}>BOOKED</span>
                   )}

@@ -43,6 +43,7 @@ export default async function LeadDetailPage({
         adjustedInputs: parse(lead.adjustedInputs),
         takeaways: lead.takeaways,
         scheduled: lead.scheduled,
+        reportSent: lead.reportSent,
         createdAt: lead.createdAt.toISOString(),
       }}
     />
