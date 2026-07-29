@@ -30,9 +30,10 @@ function MoneyInput({ sym, value, onChange, step = 500, onBlur }: { sym: string;
 interface Props {
   embed?: boolean
   prefill?: { name?: string; email?: string; agency?: string }
+  live?: boolean // internal sales-call mode: results shown, no capture/modal
 }
 
-export default function LeadGoalCalculator({ embed = false, prefill }: Props) {
+export default function LeadGoalCalculator({ embed = false, prefill, live = false }: Props) {
   const [currency, setCurrency] = useState<Currency>("USD")
   const sym = currSym(currency)
 
@@ -51,7 +52,7 @@ export default function LeadGoalCalculator({ embed = false, prefill }: Props) {
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [showCapture, setShowCapture] = useState(false)
-  const [captured, setCaptured] = useState(false)
+  const [captured, setCaptured] = useState(live)
   const [modalOpen, setModalOpen] = useState(false)
 
   const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
@@ -224,16 +225,18 @@ export default function LeadGoalCalculator({ embed = false, prefill }: Props) {
           )
         ) : (
           <>
-            {/* Book-a-call banner */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
-              <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.45 }}>
-                <strong>Want to walk through this live with John?</strong> Book a free Leads Strategy Call.
+            {/* Book-a-call banner (public only) */}
+            {!live && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
+                <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.45 }}>
+                  <strong>Want to walk through this live with John?</strong> Book a free Leads Strategy Call.
+                </div>
+                <button onClick={() => setModalOpen(true)}
+                  style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "11px 20px", cursor: "pointer" }}>
+                  Book a call →
+                </button>
               </div>
-              <button onClick={() => setModalOpen(true)}
-                style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "11px 20px", cursor: "pointer" }}>
-                Book a call →
-              </button>
-            </div>
+            )}
 
             <LeadGoalResults
               r={r}
