@@ -19,6 +19,11 @@ interface Metric {
   newClients: number
 }
 
+interface SavedProjection {
+  startRevenue: number; leads: number; closeRate: number; avgDeal: number
+  churn: number; hoursPerClient: number; billableHours: number; revenueGoal: number; clientCount: number
+}
+
 interface Props {
   metrics: Metric[]
   startMRR: number
@@ -27,6 +32,8 @@ interface Props {
   totalCapacityHours: number
   avgContractHours: number
   activeClientCount: number
+  clientId?: string
+  savedProjection?: SavedProjection | null
 }
 
 function avg(nums: number[]): number {
@@ -59,7 +66,7 @@ const inputStyle: React.CSSProperties = {
   width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none",
 }
 
-export default function GrowthProjection({ metrics, startMRR, avgContractSize, goalMRR, totalCapacityHours, avgContractHours, activeClientCount }: Props) {
+export default function GrowthProjection({ metrics, startMRR, avgContractSize, goalMRR, totalCapacityHours, avgContractHours, activeClientCount, clientId, savedProjection }: Props) {
   const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
   const fmt$ = useFmtCurrency()
   const sym = currSym(useCurrency())
@@ -78,15 +85,30 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
   }, [recentMetrics])
   const defaultChurn = useMemo(() => round1(avg(recentMetrics.map(m => m.churn))), [recentMetrics])
 
-  const [startRevenue, setStartRevenue] = useState(Math.round(startMRR))
-  const [leads, setLeads] = useState(defaultLeads)
-  const [closeRate, setCloseRate] = useState(defaultCloseRate)
-  const [avgDeal, setAvgDeal] = useState(Math.round(avgContractSize))
-  const [churn, setChurn] = useState(defaultChurn)
-  const [hoursPerClient, setHoursPerClient] = useState(round1(avgContractHours))
-  const [billableHours, setBillableHours] = useState(totalCapacityHours || 0)
-  const [revenueGoal, setRevenueGoal] = useState(goalMRR ?? 0)
-  const [clientCount, setClientCount] = useState(activeClientCount)
+  const sp = savedProjection
+  const [startRevenue, setStartRevenue] = useState(sp?.startRevenue ?? Math.round(startMRR))
+  const [leads, setLeads] = useState(sp?.leads ?? defaultLeads)
+  const [closeRate, setCloseRate] = useState(sp?.closeRate ?? defaultCloseRate)
+  const [avgDeal, setAvgDeal] = useState(sp?.avgDeal ?? Math.round(avgContractSize))
+  const [churn, setChurn] = useState(sp?.churn ?? defaultChurn)
+  const [hoursPerClient, setHoursPerClient] = useState(sp?.hoursPerClient ?? round1(avgContractHours))
+  const [billableHours, setBillableHours] = useState(sp?.billableHours ?? (totalCapacityHours || 0))
+  const [revenueGoal, setRevenueGoal] = useState(sp?.revenueGoal ?? (goalMRR ?? 0))
+  const [clientCount, setClientCount] = useState(sp?.clientCount ?? activeClientCount)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function saveState() {
+    if (!clientId) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectionState: JSON.stringify({ startRevenue, leads, closeRate, avgDeal, churn, hoursPerClient, billableHours, revenueGoal, clientCount }) }),
+      })
+      if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+    } finally { setSaving(false) }
+  }
 
   function reset() {
     setStartRevenue(Math.round(startMRR))
@@ -171,6 +193,12 @@ export default function GrowthProjection({ metrics, startMRR, avgContractSize, g
           <button onClick={reset} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>
             Reset to data
           </button>
+          {clientId && (
+            <button onClick={saveState} disabled={saving}
+              style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: saved ? "#1F7A4D" : "#1A1916", border: "none", borderRadius: 5, padding: "3px 12px", cursor: saving ? "default" : "pointer" }}>
+              {saving ? "Saving…" : saved ? "✓ Saved" : "Save this state"}
+            </button>
+          )}
         </div>
       </div>
 

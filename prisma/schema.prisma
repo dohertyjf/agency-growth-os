@@ -52,6 +52,7 @@ model Client {
   status        ClientStatus    @default(active)
   startDate     String?
   endDate       String?
+  projectionState String?       // JSON: saved Growth Projection input state
   users         User[]
   goal          Goal?
   metrics       MonthlyMetric[]

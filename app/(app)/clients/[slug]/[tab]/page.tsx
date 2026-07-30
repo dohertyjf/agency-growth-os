@@ -36,6 +36,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
   return (
     <ClientPageClient
       clientId={id}
+      projectionState={client.projectionState}
       clientSlug={slug}
       clientName={client.name}
       clientAgency={client.agency ?? null}

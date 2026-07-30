@@ -8,6 +8,7 @@ const schema = z.object({
   startDate: z.string().nullable().optional(),
   name: z.string().min(1).optional(),
   agency: z.string().nullable().optional(),
+  projectionState: z.string().nullable().optional(),
 })
 
 export async function PATCH(

@@ -32,9 +32,17 @@ const ROADMAP: Array<{
   { key: "time-audit", label: "Time audit", number: "2" },
   { key: "fix-cash-flow", label: "Fix cash flow", number: "3" },
   { key: "identify-icp", label: "Identify ICP", number: "4" },
-  { key: "messaging-positioning", label: "Create messaging and positioning", number: "5" },
-  { key: "start-marketing", label: "Start marketing", number: "6" },
-  { key: "fix-offer", label: "Fix offer (packaging and pricing)", number: "7" },
+  {
+    key: "fix-offer",
+    label: "Offer",
+    number: "5",
+    children: [
+      { key: "fix-offer-packaging", label: "Packaging", letter: "a" },
+      { key: "fix-offer-pricing", label: "Pricing", letter: "b" },
+    ],
+  },
+  { key: "messaging-positioning", label: "Create messaging and positioning", number: "6" },
+  { key: "start-marketing", label: "Start marketing", number: "7" },
   { key: "contracts", label: "Contracts", number: "8" },
   { key: "fix-sales", label: "Fix sales", number: "9" },
   { key: "hire-admin", label: "Hire admin", number: "10" },
@@ -42,10 +50,10 @@ const ROADMAP: Array<{
   { key: "hiring", label: "Hiring", number: "12" },
 ]
 
-const STATUS_CONFIG: Record<Exclude<Status, "none">, { bg: string; ring: string; label: string }> = {
-  red:    { bg: "#DC2626", ring: "#DC2626", label: "R" },
-  yellow: { bg: "#D97706", ring: "#D97706", label: "Y" },
-  green:  { bg: "#16A34A", ring: "#16A34A", label: "G" },
+const STATUS_CONFIG: Record<Exclude<Status, "none">, { bg: string; ring: string; label: string; text: string }> = {
+  red:    { bg: "#DC2626", ring: "#DC2626", label: "R", text: "#fff" },
+  yellow: { bg: "#EAB308", ring: "#EAB308", label: "Y", text: "#1A1916" },
+  green:  { bg: "#16A34A", ring: "#16A34A", label: "G", text: "#fff" },
 }
 
 function StatusPicker({ itemKey, status, onChange }: { itemKey: string; status: Status; onChange: (key: string, s: Status) => void }) {
@@ -65,7 +73,7 @@ function StatusPicker({ itemKey, status, onChange }: { itemKey: string; status: 
               borderRadius: "50%",
               border: active ? `2px solid ${cfg.ring}` : "2px solid #E5E7EB",
               background: active ? cfg.bg : "#F9FAFB",
-              color: active ? "#fff" : "#D1D5DB",
+              color: active ? cfg.text : "#D1D5DB",
               fontSize: 10,
               fontWeight: 700,
               cursor: "pointer",

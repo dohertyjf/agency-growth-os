@@ -56,6 +56,7 @@ type ClientStatus = "potential" | "active" | "paused"
 
 interface Props {
   clientId: string
+  projectionState?: string | null
   clientSlug: string
   clientName: string
   totalCapacityHours?: number
@@ -116,7 +117,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, totalHoursWorked = 0, payrollByMonth }: Props) {
+export default function Dashboard({ clientId, projectionState, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, totalHoursWorked = 0, payrollByMonth }: Props) {
   const router = useRouter()
   const fmt$ = useFmtCurrency()
   const currency = useCurrency()
@@ -694,6 +695,8 @@ export default function Dashboard({ clientId, clientSlug, clientName, metrics: r
         totalCapacityHours={totalCapacityHours}
         avgContractHours={avgContractHours}
         activeClientCount={activeClientCount}
+        clientId={clientId}
+        savedProjection={(() => { try { return projectionState ? JSON.parse(projectionState) : null } catch { return null } })()}
       />
 
       {/* Month Table */}

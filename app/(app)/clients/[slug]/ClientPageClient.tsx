@@ -115,6 +115,7 @@ type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation"
 
 interface Props {
   clientId: string
+  projectionState: string | null
   clientSlug: string
   clientName: string
   clientAgency: string | null
@@ -148,7 +149,7 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function ClientPageClient({
-  clientId, clientSlug, clientName, clientAgency, currentTab,
+  clientId, projectionState, clientSlug, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
   metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
 }: Props) {
@@ -237,6 +238,7 @@ export default function ClientPageClient({
       {currentTab === "dashboard" && (
         <Dashboard
           clientId={clientId}
+          projectionState={projectionState}
           clientSlug={clientSlug}
           clientName={clientName}
           metrics={metrics}
