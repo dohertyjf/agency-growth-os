@@ -17,6 +17,7 @@ const ROADMAP: Array<{
   key: string
   label: string
   number: string
+  trackable?: boolean
   children?: Array<{ key: string; label: string; letter: string }>
 }> = [
   {
@@ -36,6 +37,7 @@ const ROADMAP: Array<{
     key: "fix-offer",
     label: "Offer",
     number: "5",
+    trackable: true,
     children: [
       { key: "fix-offer-packaging", label: "Packaging", letter: "a" },
       { key: "fix-offer-pricing", label: "Pricing", letter: "b" },
@@ -135,6 +137,7 @@ export default function ProgressPanel({ clientId, initialItems }: Props) {
                 <div style={{ padding: "12px 20px 4px", display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#9C9590", minWidth: 20, textAlign: "right" }}>{step.number}.</span>
                   <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1916", flex: 1 }}>{step.label}</span>
+                  {step.trackable && <StatusPicker itemKey={step.key} status={getStatus(step.key)} onChange={handleChange} />}
                 </div>
                 {step.children.map((child, ci) => (
                   <div key={child.key} style={{ padding: "6px 20px 6px 52px", display: "flex", alignItems: "center", gap: 12, background: ci % 2 === 0 ? "#FDFCFA" : "#fff" }}>
