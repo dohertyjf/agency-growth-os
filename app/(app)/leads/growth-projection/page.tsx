@@ -4,6 +4,7 @@ import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { fmtCurrency, type CapacityResult } from "@/lib/calc"
 import DeleteLeadButton from "@/components/DeleteLeadButton"
+import ExportLeadsButton from "@/components/ExportLeadsButton"
 
 export const dynamic = "force-dynamic"
 
@@ -16,14 +17,18 @@ export default async function LeadsPage() {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <Link href="/leads" style={{ fontSize: 13, color: "#6B6760", textDecoration: "none" }}>← All lead tools</Link>
-        <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, margin: "8px 0 4px", color: "#1A1916" }}>
-          Growth Projection Report submissions
-        </h1>
-        <p style={{ fontSize: 13, color: "#9C9590", margin: 0 }}>
-          {leads.length} submission{leads.length === 1 ? "" : "s"} from the public capacity calculator
-        </p>
+      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <Link href="/leads" style={{ fontSize: 13, color: "#6B6760", textDecoration: "none" }}>← All lead tools</Link>
+          <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, margin: "8px 0 4px", color: "#1A1916" }}>
+            Growth Projection Report submissions
+          </h1>
+          <p style={{ fontSize: 13, color: "#9C9590", margin: 0 }}>
+            {leads.length} submission{leads.length === 1 ? "" : "s"} from the public capacity calculator
+          </p>
+        </div>
+        <ExportLeadsButton filename="growth-projection-leads.csv"
+          rows={leads.map(l => ({ email: l.email, name: l.name, agency: l.agency, createdAt: l.createdAt.toISOString() }))} />
       </div>
 
       {leads.length === 0 ? (
