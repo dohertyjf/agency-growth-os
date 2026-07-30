@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
+import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import AddClientModal from "./AddClientModal"
 import ClientsGrid from "./ClientsGrid"
@@ -23,7 +24,12 @@ export default async function ClientsPage() {
         <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, color: "#1A1916", margin: 0 }}>
           Clients
         </h1>
-        <AddClientModal />
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Link href="/clients/import" style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", background: "#fff", border: "1px solid #ECE7DE", borderRadius: 8, padding: "9px 16px", textDecoration: "none" }}>
+            Import from sheet
+          </Link>
+          <AddClientModal />
+        </div>
       </div>
       <ClientsGrid clients={clients} now={now} />
     </div>
