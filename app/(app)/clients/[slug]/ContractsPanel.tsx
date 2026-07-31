@@ -564,7 +564,6 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     }
   }
   const handleHoursChange = (contractId: string, hours: number) => patchContract(contractId, { hoursPerMonth: hours })
-  const handleActualHoursChange = (contractId: string, hours: number | null) => patchContract(contractId, { actualHours: hours })
 
   async function handleMinRateChange(rate: number | null) {
     setMinHourlyRate(rate)
@@ -720,7 +719,6 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               accounts={localAccounts}
               minHourlyRate={minHourlyRate}
               onHoursChange={handleHoursChange}
-              onActualHoursChange={handleActualHoursChange}
               onMinRateChange={handleMinRateChange}
             />
           )}
@@ -882,12 +880,11 @@ function HoursCell({ value, onSave }: { value: number | null; onSave: (v: number
   )
 }
 
-function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange, onActualHoursChange, onMinRateChange }: {
+function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange, onMinRateChange }: {
   contracts: Contract[]
   accounts: Account[]
   minHourlyRate: number | null
   onHoursChange: (id: string, hours: number) => Promise<boolean>
-  onActualHoursChange: (id: string, hours: number | null) => Promise<boolean>
   onMinRateChange: (rate: number | null) => void
 }) {
   const fmtCurrency = useFmtCurrency()
@@ -903,13 +900,8 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange, o
 
   const oneoffs = contracts
     .filter(c => c.type === "oneoff" && (c.status === "active" || c.status === "finished"))
-    .map(c => {
-      const actual = c.actualHours != null && c.actualHours > 0 ? c.actualHours : null
-      const soldPerHr = c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null
-      const actualPerHr = actual != null ? c.monthly / actual : null
-      return { c, accountName: nameFor(c), soldPerHr, actualPerHr, effective: actualPerHr ?? soldPerHr }
-    })
-    .sort((a, b) => (b.effective ?? -1) - (a.effective ?? -1))
+    .map(c => ({ c, accountName: nameFor(c), perHr: c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null }))
+    .sort((a, b) => (b.perHr ?? -1) - (a.perHr ?? -1))
 
   const totalMonthly = retainers.reduce((s, r) => s + (r.perHr != null ? r.c.monthly : 0), 0)
   const totalHours = retainers.reduce((s, r) => s + (r.perHr != null ? r.c.hoursPerMonth : 0), 0)
@@ -988,39 +980,29 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange, o
 
         {oneoffs.length > 0 && (
           <>
-            <div style={sectionLabel}>One-offs · sold vs actual</div>
-            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 520 }}>
+            <div style={sectionLabel}>One-offs</div>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 460 }}>
               <thead>
                 <tr>
-                  {["Project", "Client", "Value", "Sold hrs", "Actual hrs", "$ / hr"].map((h, i) => (
+                  {["Project", "Client", "Value", "Hours", "$ / hr"].map((h, i) => (
                     <th key={h} style={{ ...th, textAlign: i >= 2 ? "right" : "left" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {oneoffs.map(({ c, accountName, soldPerHr, actualPerHr, effective }) => (
+                {oneoffs.map(({ c, accountName, perHr }) => (
                   <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC" }}>
                     <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}</td>
                     <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(c.monthly)}</td>
                     <td style={{ padding: "4px 10px", textAlign: "right" }}>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-                        <HoursCell value={c.hoursPerMonth} onSave={v => onHoursChange(c.id, v ?? 0)} />
-                        {soldPerHr != null && <span style={{ fontSize: 10, color: "#B0A9A0", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(soldPerHr)}/hr</span>}
-                      </div>
+                      <HoursCell value={c.hoursPerMonth} onSave={v => onHoursChange(c.id, v ?? 0)} />
                     </td>
-                    <td style={{ padding: "4px 10px", textAlign: "right" }}>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-                        <HoursCell value={c.actualHours ?? null} onSave={v => onActualHoursChange(c.id, v)} />
-                        {actualPerHr != null && <span style={{ fontSize: 10, color: "#B0A9A0", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(actualPerHr)}/hr</span>}
-                      </div>
-                    </td>
-                    <td style={{ padding: "8px 10px", fontSize: 14, textAlign: "right" }}><RatePerHr v={effective} /></td>
+                    <td style={{ padding: "8px 10px", fontSize: 14, textAlign: "right" }}><RatePerHr v={perHr} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div style={{ fontSize: 10, color: "#B0A9A0", marginTop: 6 }}>$/hr uses actual hours once entered, otherwise sold/projected.</div>
           </>
         )}
       </div>
