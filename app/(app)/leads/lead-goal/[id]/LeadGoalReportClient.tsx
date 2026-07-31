@@ -194,11 +194,11 @@ export default function LeadGoalReportClient({ lead, schedulingUrl }: { lead: Le
               Ready to hit your goal?
             </div>
             <div style={{ fontSize: 13, color: "#6F6B64", margin: "0 auto 14px", maxWidth: 480, lineHeight: 1.5 }}>
-              Book a Growth Projection Review Call and we&apos;ll walk through your numbers and the fastest path to your target.
+              Book a Leads Strategy Call and we&apos;ll walk through your numbers and the fastest path to your target.
             </div>
             <a href={schedulingUrl} target="_blank" rel="noopener noreferrer"
               style={{ display: "inline-block", background: accent, color: "#fff", fontSize: 15, fontWeight: 700, textDecoration: "none", borderRadius: 10, padding: "12px 26px" }}>
-              Schedule your Growth Projection Review Call →
+              Schedule your Leads Strategy Call →
             </a>
             <div style={{ fontSize: 12, color: "#9C9590", marginTop: 10 }}>{schedulingUrl}</div>
           </div>
