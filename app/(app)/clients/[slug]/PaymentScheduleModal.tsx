@@ -10,8 +10,10 @@ interface Row { month: string; amount: string }
 interface Props {
   contractId: string
   projectName: string
-  total: number       // the project's total fee (one-off) or monthly value
+  mode?: "oneoff" | "retainer"
+  total: number       // one-off: the full fee. retainer: the monthly amount.
   startMonth: string  // YYYY-MM, used to seed default months
+  endMonth?: string | null  // retainer: contractedThrough, bounds the seeded term
   onClose: () => void
 }
 
@@ -21,9 +23,16 @@ function ymAdd(ym: string, n: number): string {
   const t = y * 12 + (m - 1) + n
   return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`
 }
+function ymDiff(a: string, b: string): number {
+  const [ay, am] = a.split("-").map(Number)
+  const [by, bm] = b.split("-").map(Number)
+  if (!ay || !am || !by || !bm) return 0
+  return (by * 12 + bm) - (ay * 12 + am)
+}
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
 
-export default function PaymentScheduleModal({ contractId, projectName, total, startMonth, onClose }: Props) {
+export default function PaymentScheduleModal({ contractId, projectName, mode = "oneoff", total, startMonth, endMonth, onClose }: Props) {
+  const isRetainer = mode === "retainer"
   const router = useRouter()
   const fmt$ = useFmtCurrency()
   const cur = useCurrency()
@@ -42,13 +51,17 @@ export default function PaymentScheduleModal({ contractId, projectName, total, s
         if (pays.length) {
           setRows(pays.map(p => ({ month: p.month, amount: String(p.amount) })))
           setExisting(pays.map(p => p.month))
+        } else if (isRetainer && startMonth) {
+          // Seed one row per month across the contract term, at the monthly amount.
+          const span = endMonth ? Math.min(Math.max(1, ymDiff(startMonth, endMonth) + 1), 36) : 12
+          setRows(Array.from({ length: span }, (_, i) => ({ month: ymAdd(startMonth, i), amount: String(Math.round(total)) })))
         } else {
           setRows([{ month: startMonth || "", amount: String(Math.round(total)) }])
         }
       })
       .finally(() => active && setLoading(false))
     return () => { active = false }
-  }, [contractId, startMonth, total])
+  }, [contractId, startMonth, endMonth, total, isRetainer])
 
   const scheduled = rows.reduce((s, r) => s + num(r.amount), 0)
   const base = startMonth || rows[0]?.month || new Date().toISOString().slice(0, 7)
@@ -66,6 +79,9 @@ export default function PaymentScheduleModal({ contractId, projectName, total, s
   function fill403030(pcts: number[]) {
     setRows(pcts.map((p, i) => ({ month: ymAdd(base, i), amount: String(Math.round(total * p / 100)) })))
   }
+  // Retainer quick-fills.
+  function fillSame() { setRows(rs => rs.map(r => ({ ...r, amount: String(Math.round(total)) }))) }
+  function shiftMonths(n: number) { setRows(rs => rs.map(r => ({ ...r, month: r.month ? ymAdd(r.month, n) : r.month }))) }
 
   async function save() {
     setSaving(true)
@@ -92,14 +108,24 @@ export default function PaymentScheduleModal({ contractId, projectName, total, s
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(26,25,22,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 1000 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 24, width: "min(560px, 100%)", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 12px 48px rgba(0,0,0,0.24)" }}>
         <div style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, color: "#1A1916" }}>Payment schedule</div>
-        <div style={{ fontSize: 13, color: "#9C9590", marginBottom: 16 }}>{projectName} · total {fmt$(total)}</div>
+        <div style={{ fontSize: 13, color: "#9C9590", marginBottom: 16 }}>{projectName} · {isRetainer ? `${fmt$(total)}/mo` : `total ${fmt$(total)}`}</div>
 
         {loading ? <div style={{ fontSize: 13, color: "#9C9590" }}>Loading…</div> : (
           <>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-              <button onClick={fillEven} style={chip}>Split evenly</button>
-              <button onClick={() => fill403030([40, 40, 20])} style={chip}>40 / 40 / 20</button>
-              <button onClick={() => fill403030([50, 50])} style={chip}>50 / 50</button>
+              {isRetainer ? (
+                <>
+                  <button onClick={fillSame} style={chip}>Same each month</button>
+                  <button onClick={() => shiftMonths(1)} style={chip}>Shift +1 month</button>
+                  <button onClick={() => shiftMonths(-1)} style={chip}>Shift −1 month</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={fillEven} style={chip}>Split evenly</button>
+                  <button onClick={() => fill403030([40, 40, 20])} style={chip}>40 / 40 / 20</button>
+                  <button onClick={() => fill403030([50, 50])} style={chip}>50 / 50</button>
+                </>
+              )}
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr auto", gap: 8, alignItems: "center", marginBottom: 10 }}>
@@ -110,7 +136,7 @@ export default function PaymentScheduleModal({ contractId, projectName, total, s
                   <input style={inputStyle} type="month" value={r.month} onChange={e => setRow(i, { month: e.target.value })} />
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <input style={{ ...inputStyle, flex: 1, width: "100%" }} type="number" min={0} value={r.amount} onChange={e => setRow(i, { amount: e.target.value })} />
-                    {total > 0 && <span style={{ fontSize: 11, color: "#9C9590", minWidth: 34, textAlign: "right" }}>{Math.round(num(r.amount) / total * 100)}%</span>}
+                    {!isRetainer && total > 0 && <span style={{ fontSize: 11, color: "#9C9590", minWidth: 34, textAlign: "right" }}>{Math.round(num(r.amount) / total * 100)}%</span>}
                   </div>
                   <button onClick={() => removeRow(i)} title="Remove" style={{ background: "none", border: "none", color: "#C4BFBA", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
                 </div>
@@ -119,10 +145,16 @@ export default function PaymentScheduleModal({ contractId, projectName, total, s
 
             <button onClick={addRow} style={{ ...chip, marginBottom: 14 }}>+ Add payment</button>
 
-            <div style={{ fontSize: 13, color: scheduled === Math.round(total) ? "#1F7A4D" : "#C2410C", marginBottom: 16 }}>
-              Scheduled: <strong>{fmt$(scheduled)}</strong> of {fmt$(total)}
-              {scheduled !== Math.round(total) && <> · {scheduled > total ? "over" : "under"} by {fmt$(Math.abs(total - scheduled))}</>}
-            </div>
+            {isRetainer ? (
+              <div style={{ fontSize: 13, color: "#6B6760", marginBottom: 16 }}>
+                Scheduled: <strong style={{ color: "#1A1916" }}>{fmt$(scheduled)}</strong> across {rows.filter(r => /^\d{4}-\d{2}$/.test(r.month)).length} month{rows.filter(r => /^\d{4}-\d{2}$/.test(r.month)).length === 1 ? "" : "s"}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: scheduled === Math.round(total) ? "#1F7A4D" : "#C2410C", marginBottom: 16 }}>
+                Scheduled: <strong>{fmt$(scheduled)}</strong> of {fmt$(total)}
+                {scheduled !== Math.round(total) && <> · {scheduled > total ? "over" : "under"} by {fmt$(Math.abs(total - scheduled))}</>}
+              </div>
+            )}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button onClick={onClose} style={{ ...chip, border: "1px solid #E0DAD0" }}>Cancel</button>

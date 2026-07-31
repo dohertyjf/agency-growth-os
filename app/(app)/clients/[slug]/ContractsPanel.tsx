@@ -551,7 +551,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
         <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
       )}
       {schedulingContract && (
-        <PaymentScheduleModal contractId={schedulingContract.id} projectName={schedulingContract.name} total={schedulingContract.monthly} startMonth={schedulingContract.start} onClose={() => setSchedulingContract(null)} />
+        <PaymentScheduleModal contractId={schedulingContract.id} projectName={schedulingContract.name} mode={schedulingContract.type === "oneoff" ? "oneoff" : "retainer"} total={schedulingContract.monthly} startMonth={schedulingContract.start} endMonth={schedulingContract.contractedThrough} onClose={() => setSchedulingContract(null)} />
       )}
       {duplicatingContract && (
         <DuplicateModal contract={duplicatingContract} clientId={clientId} accounts={localAccounts} onClose={() => setDuplicatingContract(null)} onSave={handleDuplicated} onAccountCreated={handleAccountCreated} />
@@ -782,9 +782,7 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
               <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: colors.bg, color: colors.text, textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
                 {STATUS_LABELS[s]}
               </span>
-              {isOneoff && (
-                <button onClick={() => onSchedule(c)} title="Payment schedule" style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px", whiteSpace: "nowrap" }}>Schedule</button>
-              )}
+              <button onClick={() => onSchedule(c)} title="Payment schedule" style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px", whiteSpace: "nowrap" }}>Schedule</button>
               <button onClick={() => onDuplicate(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>Copy</button>
               <button onClick={() => onEdit(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>Edit</button>
               <button onClick={() => onDelete(c.id)} style={{ background: "none", border: "none", color: "#9C9590", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
