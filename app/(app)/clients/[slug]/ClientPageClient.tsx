@@ -310,6 +310,7 @@ export default function ClientPageClient({
               initialPayments={initialPayments}
               onRevenueUpdate={handleRevenueUpdate}
               onPaymentsChange={setPayments}
+              onContractUpdate={updated => setContracts(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c))}
             />
           ) : (
             <CashflowProjection contracts={contracts} />
