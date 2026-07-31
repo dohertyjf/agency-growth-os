@@ -73,7 +73,7 @@ export interface ContractRow {
   monthly: number
   start: string
   contractedThrough: string | null  // null = ongoing retainer
-  status: "active" | "potential"
+  status: "opportunity" | "potential" | "active" | "lost" | "finished"
   type?: "retainer" | "oneoff"
 }
 
@@ -83,15 +83,23 @@ export function ymDiff(a: string, b: string) {
   return (by * 12 + bm) - (ay * 12 + am)
 }
 
+// Signed work only — the contracted floor. (Excludes qualified/opportunity
+// pipeline and lost deals, so the confidence tiers stack cleanly.)
 export function bookedActive(contracts: ContractRow[], ym: string) {
   return contracts
-    .filter(c => c.status !== "potential" && c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym))
+    .filter(c => (c.status === "active" || c.status === "finished") && c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym))
     .reduce((s, c) => s + c.monthly, 0)
 }
 
 export function bookedPotential(contracts: ContractRow[], ym: string) {
   return contracts
     .filter(c => c.status === "potential" && c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym))
+    .reduce((s, c) => s + c.monthly, 0)
+}
+
+export function bookedOpportunity(contracts: ContractRow[], ym: string) {
+  return contracts
+    .filter(c => c.status === "opportunity" && c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym))
     .reduce((s, c) => s + c.monthly, 0)
 }
 

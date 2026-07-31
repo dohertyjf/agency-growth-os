@@ -27,9 +27,13 @@ interface Props {
   series2Label?: string
   series3?: ChartPoint[]
   series3Label?: string
+  series4?: ChartPoint[]
+  series4Label?: string
   flowBars?: FlowBars
   goalValue?: number
 }
+
+const OPP_COLOR = "#8B5CF6"
 
 function fmt(v: number, format: "currency" | "percent" | "number", sym = "$"): string {
   if (format === "currency") {
@@ -45,7 +49,7 @@ const PAD = { top: 20, right: 24, bottom: 36, left: 60 }
 const VW = 880
 const VH = 240
 
-export default function MetricChart({ points, format, label, series2, series2Label, series3, series3Label, flowBars, goalValue }: Props) {
+export default function MetricChart({ points, format, label, series2, series2Label, series3, series3Label, series4, series4Label, flowBars, goalValue }: Props) {
   const [hover, setHover] = useState<number | null>(null)
   const sym = currSym(useCurrency())
 
@@ -66,7 +70,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
   const plotH = VH - PAD.top - PAD.bottom
 
   const barVals = flowBars ? [...flowBars.newRevenue, ...flowBars.churnedRevenue] : []
-  const allVals = [...points, ...(series2 ?? []), ...(series3 ?? [])].map(p => p.value).concat(barVals)
+  const allVals = [...points, ...(series2 ?? []), ...(series3 ?? []), ...(series4 ?? [])].map(p => p.value).concat(barVals)
   const dataMin = Math.min(...allVals)
   const dataMax = Math.max(...allVals)
   const spread = dataMax - dataMin || Math.abs(dataMax) || 1
@@ -109,11 +113,13 @@ export default function MetricChart({ points, format, label, series2, series2Lab
   const s1 = buildPaths(points)
   const s2 = series2?.length ? buildPaths(series2) : null
   const s3 = series3?.length ? buildPaths(series3) : null
+  const s4 = series4?.length ? buildPaths(series4) : null
 
   const colW = refPoints.length > 1 ? plotW / refPoints.length : plotW
   const hasBothSeries = !!(points.length && series2?.length)
   const hasSeries3 = !!(series3?.length)
-  const hasProjected = s1.hasProj || (s2?.hasProj ?? false) || (s3?.hasProj ?? false)
+  const hasSeries4 = !!(series4?.length)
+  const hasProjected = s1.hasProj || (s2?.hasProj ?? false) || (s3?.hasProj ?? false) || (s4?.hasProj ?? false)
 
   return (
     <div style={{ position: "relative" }}>
@@ -191,6 +197,17 @@ export default function MetricChart({ points, format, label, series2, series2Lab
             )
           })()}
 
+          {/* Series 4 (with opportunity) — drawn furthest back, least certain */}
+          {s4 && (
+            <>
+              {s4.histPath && <path d={s4.histPath} fill="none" stroke={OPP_COLOR} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" opacity={0.4} />}
+              {s4.projPath && <path d={s4.projPath} fill="none" stroke={OPP_COLOR} strokeWidth={1.5} strokeDasharray="6,4" strokeLinejoin="round" strokeLinecap="round" opacity={0.28} />}
+              {series4!.map((p, i) => (
+                <circle key={i} cx={toX(i)} cy={toY(p.value)} r={2.5} fill={p.projected ? "#fff" : OPP_COLOR} stroke={OPP_COLOR} strokeWidth={1.5} opacity={0.4} />
+              ))}
+            </>
+          )}
+
           {/* Series 2 (with potential) — drawn behind series 1 */}
           {s2 && (
             <>
@@ -243,6 +260,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
             const p1 = points[hover]
             const p2 = series2?.[hover]
             const p3 = series3?.[hover]
+            const p4 = series4?.[hover]
             const newRev = flowBars?.newRevenue[hover] ?? 0
             const churnRev = flowBars?.churnedRevenue[hover] ?? 0
             const anchor = p1 ?? p2
@@ -254,6 +272,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
             const rows: { label: string; value: number; color: string }[] = []
             if (p1) rows.push({ label: hasBothSeries ? "Contracted" : p3 ? "MRR" : "", value: p1.value, color: "#FF8B6A" })
             if (p2) rows.push({ label: "Qualified", value: p2.value, color: "#93C5FD" })
+            if (p4) rows.push({ label: "Opportunity", value: p4.value, color: "#C4B5FD" })
             if (p3) rows.push({ label: "Cash", value: p3.value, color: "#2DD4BF" })
             if (newRev) rows.push({ label: "New", value: newRev, color: "#4ADE80" })
             if (churnRev) rows.push({ label: "Churn", value: churnRev, color: "#F87171" })
@@ -287,7 +306,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
       </div>
 
       {/* Legend */}
-      {(hasBothSeries || hasProjected || flowBars || hasSeries3 || (goalValue != null && goalValue > 0)) && (
+      {(hasBothSeries || hasProjected || flowBars || hasSeries3 || hasSeries4 || (goalValue != null && goalValue > 0)) && (
         <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#9C9590", marginTop: 6, flexWrap: "wrap" }}>
           {hasBothSeries ? (
             <>
@@ -312,6 +331,12 @@ export default function MetricChart({ points, format, label, series2, series2Lab
               </span>
             </>
           ) : null}
+          {hasSeries4 && (
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke={OPP_COLOR} strokeWidth={2} opacity={0.5} /></svg>
+              {series4Label ?? "With Opportunity"}
+            </span>
+          )}
           {hasSeries3 && (
             <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#0D9488" strokeWidth={2} /></svg>

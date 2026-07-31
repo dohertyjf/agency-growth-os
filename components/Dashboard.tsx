@@ -8,7 +8,7 @@ import MonthTable, { BulkMetricsModal } from "./MonthTable"
 import GrowthProjection from "./GrowthProjection"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
-  projectMetric, ymAdd, ymLabel, currentMRR, bookedActive, bookedPotential, bookedAhead,
+  projectMetric, ymAdd, ymLabel, currentMRR, bookedActive, bookedPotential, bookedOpportunity, bookedAhead,
   mrrGoal, goalProgress,
   type ContractRow, type ProjectionInput, type ProjectableMetric,
 } from "@/lib/calc"
@@ -340,6 +340,17 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCard, contracts, range, nowYM])
 
+  // Third funnel line: contracted + qualified + opportunity (contractMRR card only)
+  const chartPoints4: ChartPoint[] | undefined = useMemo(() => {
+    if (selectedCard !== "contractMRR") return undefined
+    const withOpp = (ym: string) => bookedActive(contractRows, ym) + bookedPotential(contractRows, ym) + bookedOpportunity(contractRows, ym)
+    const pts: ChartPoint[] = []
+    for (let i = range - 1; i >= 0; i--) { const ym = ymAdd(nowYM, -i); pts.push({ label: ymLabel(ym), value: withOpp(ym) }) }
+    for (let j = 1; j <= 6; j++) { const ym = ymAdd(nowYM, j); pts.push({ label: ymLabel(ym), value: withOpp(ym), projected: true }) }
+    return pts
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCard, contracts, range, nowYM])
+
   // New vs churned MRR flow bars
   const flowBars: FlowBars | undefined = useMemo(() => {
     if (!showMRRFlow) return undefined
@@ -554,6 +565,8 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
           series2Label="With Qualified"
           series3={cashCollectedPoints}
           series3Label="Cash Collected"
+          series4={chartPoints4}
+          series4Label="With Opportunity"
           format={selectedCard === "contractMRR" ? "currency" : (CARDS.find(c => c.key === selectedCard)?.fmt ?? "currency")}
           label={selectedCard === "contractMRR" ? "Contracted MRR" : rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
           flowBars={flowBars}
