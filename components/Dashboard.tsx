@@ -370,11 +370,15 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showMRRFlow, contracts, range, nowYM])
 
-  // Cash collected per month: explicit payments if entered, otherwise default to MRR (actuals/retainer)
+  // Cash collected per month: explicit payments if entered, otherwise default to MRR.
+  // Projects 6 months forward like the MRR lines, so future payment schedules that
+  // differ from MRR (deposits, milestone billing, late pay) show as a diverging line.
+  // Restricted to signed (active/finished) work — speculative schedules stay out.
   const cashCollectedPoints: ChartPoint[] | undefined = useMemo(() => {
     if (!showCashCollected) return undefined
+    const signedIds = new Set(contracts.filter(c => c.status === "active" || c.status === "finished").map(c => c.id))
     const paymentByMonth = new Map<string, number>()
-    payments.forEach(p => paymentByMonth.set(p.month, (paymentByMonth.get(p.month) ?? 0) + p.amount))
+    payments.forEach(p => { if (signedIds.has(p.contractId)) paymentByMonth.set(p.month, (paymentByMonth.get(p.month) ?? 0) + p.amount) })
     const mrrByMonth = new Map(rawMetrics.map(m => [m.month, m.revenue]))
     const pts: ChartPoint[] = []
     for (let i = range - 1; i >= 0; i--) {
@@ -383,9 +387,15 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
       const value = explicit !== undefined ? explicit : (mrrByMonth.get(ym) ?? currentMRR(contractRows, ym))
       pts.push({ label: ymLabel(ym), value })
     }
+    for (let j = 1; j <= 6; j++) {
+      const ym = ymAdd(nowYM, j)
+      const explicit = paymentByMonth.get(ym)
+      const value = explicit !== undefined ? explicit : currentMRR(contractRows, ym)
+      pts.push({ label: ymLabel(ym), value, projected: true })
+    }
     return pts
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showCashCollected, payments, rawMetrics, contractRows, range, nowYM])
+  }, [showCashCollected, payments, rawMetrics, contractRows, contracts, range, nowYM])
 
   // Goals
   const mrr = currentMRR(contractRows, currentYM)
