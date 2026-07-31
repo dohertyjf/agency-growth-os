@@ -285,7 +285,7 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
             <div style={{ padding: "28px 28px 12px", textAlign: "center" }}>
               <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 26, fontWeight: 600, margin: "0 0 8px", color: "#1A1916" }}>Your results are ready 🎉</h3>
               <p style={{ fontSize: 14, color: "#6F6B64", margin: "0 auto", maxWidth: 520, lineHeight: 1.55 }}>
-                Book a free Growth Projection Review Call and John will walk you through your numbers and the fastest path to your goal — or close this to explore the results yourself.
+                Book a free Leads Strategy Call and John will walk you through your numbers and the fastest path to your goal — or close this to explore the results yourself.
               </p>
             </div>
             <div style={{ padding: "8px 20px 22px" }}>
