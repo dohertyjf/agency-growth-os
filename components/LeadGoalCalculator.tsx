@@ -115,16 +115,18 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
           honeypot,
         }),
       })
-      if (res.ok) {
-        setCaptured(true)
-        setModalOpen(true)
-      } else {
-        setError("Something went wrong saving your results. Please try again in a moment.")
+      if (!res.ok) {
+        // Lead capture failed (e.g. the database is unreachable). Don't punish
+        // the visitor — they've handed over their email, so still show results
+        // and the booking modal. Log the miss so it isn't silently invisible.
+        console.error("lead-goal: save failed with status", res.status)
       }
-    } catch {
-      setError("We couldn't reach the server. Please check your connection and try again.")
+    } catch (err) {
+      console.error("lead-goal: save request failed", err)
     } finally {
       setSubmitting(false)
+      setCaptured(true)
+      setModalOpen(true)
     }
   }
 
