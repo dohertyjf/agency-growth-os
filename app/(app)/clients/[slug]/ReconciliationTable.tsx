@@ -11,6 +11,12 @@ interface Contract {
   contractedThrough: string | null
   status: string
   type: string
+  accountId?: string | null
+}
+
+interface Account {
+  id: string
+  name: string
 }
 
 interface AccountMonth {
@@ -27,6 +33,7 @@ interface Payment {
 
 interface Props {
   contracts: Contract[]
+  accounts: Account[]
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
   onRevenueUpdate: (month: string, revenue: number) => void
@@ -68,7 +75,7 @@ function ymAdd(ym: string, months: number): string {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`
 }
 
-export default function ReconciliationTable({ contracts, initialAccountMonths, initialPayments, onRevenueUpdate, onPaymentsChange }: Props) {
+export default function ReconciliationTable({ contracts, accounts, initialAccountMonths, initialPayments, onRevenueUpdate, onPaymentsChange }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [accountMonths, setAccountMonths] = useState<AccountMonth[]>(initialAccountMonths)
   const [payments, setPayments] = useState<Payment[]>(initialPayments)
@@ -213,7 +220,10 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
                 {/* Actuals row */}
                 <tr key={contract.id}>
                   <td style={labelStyle}>
-                    <span style={{ opacity: STATUS_TAG[contract.status] ? 0.75 : 1 }}>{contract.name}</span>
+                    <span style={{ opacity: STATUS_TAG[contract.status] ? 0.75 : 1 }}>
+                      {contract.name}
+                      {(() => { const an = contract.accountId ? accounts.find(a => a.id === contract.accountId)?.name : null; return an ? ` - ${an}` : "" })()}
+                    </span>
                     {STATUS_TAG[contract.status] && (
                       <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 8, background: STATUS_TAG[contract.status].bg, color: STATUS_TAG[contract.status].color, textTransform: "uppercase", letterSpacing: "0.03em", verticalAlign: "middle" }}>
                         {STATUS_TAG[contract.status].label}

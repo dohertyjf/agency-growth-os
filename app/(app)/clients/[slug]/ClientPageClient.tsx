@@ -305,6 +305,7 @@ export default function ClientPageClient({
           {reconView === "reconcile" ? (
             <ReconciliationTable
               contracts={contracts}
+              accounts={accounts}
               initialAccountMonths={initialAccountMonths}
               initialPayments={initialPayments}
               onRevenueUpdate={handleRevenueUpdate}
