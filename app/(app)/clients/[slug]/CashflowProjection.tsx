@@ -26,6 +26,7 @@ function activeInMonth(c: Contract, ym: string) {
 export default function CashflowProjection({ contracts }: { contracts: Contract[] }) {
   const fmt$ = useFmtCurrency()
   const [horizon, setHorizon] = useState<"6" | "12" | "eoy">("eoy")
+  const [hover, setHover] = useState<{ mi: number; band: string } | null>(null)
 
   const months: string[] = (() => {
     if (horizon === "eoy") {
@@ -100,15 +101,42 @@ export default function CashflowProjection({ contracts }: { contracts: Contract[
           </div>
 
           <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: CHART_H, borderBottom: "1px solid #ECE7DE" }}>
-            {monthData.map(d => (
-              <div key={d.ym} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", height: "100%", minWidth: 0 }}>
-                <div title={`${ymLabel(d.ym)} · ${fmt$(d.total)}`} style={{ width: "100%", maxWidth: 46, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%" }}>
-                  <div style={{ height: (d.opportunity / maxTotal) * CHART_H, background: OPPORTUNITY }} />
-                  <div style={{ height: (d.qualified / maxTotal) * CHART_H, background: QUALIFIED }} />
-                  <div style={{ height: (d.active / maxTotal) * CHART_H, background: CONTRACTED }} />
+            {monthData.map((d, i) => {
+              const segs = [
+                { band: "opportunity", label: "Opportunity", val: d.opportunity, color: OPPORTUNITY },
+                { band: "qualified", label: "Qualified", val: d.qualified, color: QUALIFIED },
+                { band: "contracted", label: "Contracted", val: d.active, color: CONTRACTED },
+              ]
+              const isHover = hover?.mi === i
+              return (
+                <div key={d.ym} style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", height: "100%", minWidth: 0 }}>
+                  {isHover && (
+                    <div style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 8, background: "#1A1916", color: "#fff", borderRadius: 8, padding: "8px 11px", fontSize: 11, whiteSpace: "nowrap", zIndex: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.22)", minWidth: 158, pointerEvents: "none" }}>
+                      <div style={{ fontWeight: 700, marginBottom: 5 }}>{ymLabel(d.ym)}</div>
+                      {segs.filter(s => s.val > 0).map(s => (
+                        <div key={s.band} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3, fontWeight: hover?.band === s.band ? 700 : 400 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, display: "inline-block", flexShrink: 0 }} />
+                          <span style={{ color: "#C9C4BC" }}>{s.label}</span>
+                          <span style={{ marginLeft: "auto", paddingLeft: 14, fontVariantNumeric: "tabular-nums" }}>{fmt$(s.val)}</span>
+                        </div>
+                      ))}
+                      <div style={{ borderTop: "1px solid #3A3833", marginTop: 6, paddingTop: 5, display: "flex", fontWeight: 700 }}>
+                        <span style={{ color: "#C9C4BC" }}>Total</span>
+                        <span style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>{fmt$(d.total)}</span>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ width: "100%", maxWidth: 46, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%" }}>
+                    {segs.map(s => (
+                      <div key={s.band}
+                        onMouseEnter={() => setHover({ mi: i, band: s.band })}
+                        onMouseLeave={() => setHover(null)}
+                        style={{ height: (s.val / maxTotal) * CHART_H, background: s.color, opacity: isHover && hover?.band !== s.band ? 0.5 : 1, transition: "opacity 0.12s", cursor: s.val > 0 ? "default" : "auto" }} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
           <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
             {monthData.map(d => (
