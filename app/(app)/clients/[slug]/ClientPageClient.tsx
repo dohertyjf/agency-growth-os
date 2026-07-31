@@ -4,6 +4,7 @@ import Link from "next/link"
 import Dashboard from "@/components/Dashboard"
 import ContractsPanel from "./ContractsPanel"
 import ReconciliationTable from "./ReconciliationTable"
+import CashflowProjection from "./CashflowProjection"
 import AccountsPanel from "./AccountsPanel"
 import ProductsPanel from "./ProductsPanel"
 import ProgressPanel from "./ProgressPanel"
@@ -163,6 +164,7 @@ export default function ClientPageClient({
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
+  const [reconView, setReconView] = useState<"reconcile" | "projection">("reconcile")
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
   const totalHoursWorked = people.filter(p => !p.isExternal).reduce((s, p) => s + p.billableHours, 0)
@@ -291,13 +293,27 @@ export default function ClientPageClient({
       )}
 
       {currentTab === "reconciliation" && (
-        <ReconciliationTable
-          contracts={contracts}
-          initialAccountMonths={initialAccountMonths}
-          initialPayments={initialPayments}
-          onRevenueUpdate={handleRevenueUpdate}
-          onPaymentsChange={setPayments}
-        />
+        <div>
+          <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 16 }}>
+            {([["reconcile", "Reconcile"], ["projection", "Projection"]] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setReconView(v)}
+                style={{ padding: "4px 14px", fontSize: 12, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: reconView === v ? "#fff" : "transparent", color: reconView === v ? "#1A1916" : "#9C9590", boxShadow: reconView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {reconView === "reconcile" ? (
+            <ReconciliationTable
+              contracts={contracts}
+              initialAccountMonths={initialAccountMonths}
+              initialPayments={initialPayments}
+              onRevenueUpdate={handleRevenueUpdate}
+              onPaymentsChange={setPayments}
+            />
+          ) : (
+            <CashflowProjection contracts={contracts} />
+          )}
+        </div>
       )}
 
       {currentTab === "progress" && (
