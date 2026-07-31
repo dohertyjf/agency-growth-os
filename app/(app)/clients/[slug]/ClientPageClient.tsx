@@ -163,7 +163,7 @@ export default function ClientPageClient({
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
-  const totalHoursWorked = people.filter(p => !p.isExternal).reduce((s, p) => s + (p.isFullTime ? 160 : p.billableHours), 0)
+  const totalHoursWorked = people.filter(p => !p.isExternal).reduce((s, p) => s + p.billableHours, 0)
 
   // Per-month payroll: for each metric month, sum each active person's salary override
   // or fall back to annualSalary / 12, respecting start/end dates.

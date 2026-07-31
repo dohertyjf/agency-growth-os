@@ -650,7 +650,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                 <div>
                   <label style={labelStyle}>Employment Type</label>
                   <div style={{ display: "flex", gap: 0, border: "1px solid #ECE7DE", borderRadius: 6, overflow: "hidden" }}>
-                    {[{ value: true, label: "Full Time (160h)" }, { value: false, label: "Part Time / Contractor" }].map(opt => (
+                    {[{ value: true, label: "Full Time" }, { value: false, label: "Part Time / Contractor" }].map(opt => (
                       <button key={String(opt.value)} type="button"
                         onClick={() => setAddForm(f => ({ ...f, isFullTime: opt.value, billableHours: opt.value ? "128" : "" }))}
                         style={{ flex: 1, padding: "7px 10px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", background: addForm.isFullTime === opt.value ? "#E9532A" : "#fff", color: addForm.isFullTime === opt.value ? "#fff" : "#6B6760", borderRight: opt.value ? "1px solid #ECE7DE" : "none" }}>
@@ -741,7 +741,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                 <div>
                   <label style={labelStyle}>Employment Type</label>
                   <div style={{ display: "flex", gap: 0, border: "1px solid #ECE7DE", borderRadius: 6, overflow: "hidden" }}>
-                    {[{ value: true, label: "Full Time (160h)" }, { value: false, label: "Part Time / Contractor" }].map(opt => (
+                    {[{ value: true, label: "Full Time" }, { value: false, label: "Part Time / Contractor" }].map(opt => (
                       <button key={String(opt.value)} type="button"
                         onClick={() => setEditForm(f => ({ ...f, isFullTime: opt.value, billableHours: opt.value && (!f.billableHours || parseFloat(f.billableHours) === 0) ? "128" : f.billableHours }))}
                         style={{ flex: 1, padding: "7px 10px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", background: editForm.isFullTime === opt.value ? "#E9532A" : "#fff", color: editForm.isFullTime === opt.value ? "#fff" : "#6B6760", borderRight: opt.value ? "1px solid #ECE7DE" : "none" }}>
@@ -1274,7 +1274,7 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
   const [saving, setSaving] = useState(false)
 
   function baseMonthlySalary(p: Person) { return p.annualSalary > 0 ? Math.round(p.annualSalary / 12) : 0 }
-  function baseMonthlyHours(p: Person) { return p.isFullTime ? 160 : p.billableHours }
+  function baseMonthlyHours(p: Person) { return p.billableHours }
 
   function isActive(p: Person, mo: string) {
     const start = toYM(p.startDate)
