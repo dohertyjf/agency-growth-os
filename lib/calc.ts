@@ -214,16 +214,23 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
 }
 
 // ── 9.6b Leads goal ("how many leads to hit a revenue goal") ─────────────────
-// Revenue-based (not MRR). Churn is derived from how much revenue recurs, so
-// callers only supply dollar figures — never a churn %.
+// Revenue-based (not MRR). The average client's monthly value is derived from
+// their current client count (revenue ÷ clients), and churn from how long the
+// average client stays (1 ÷ months). Churn is optional — omit avgMonthsStay and
+// we assume zero churn, giving a best-case "floor" number. Older submissions
+// stored avgDealValue + recurringRevenue instead; those are still accepted as a
+// fallback so saved reports keep recomputing.
 export interface LeadsGoalInputs {
-  currentRevenue: number     // R0 — collected last month
-  goalRevenue: number        // G  — target monthly revenue
-  closeRate: number          // fraction 0–1 (qualified prospects → clients)
-  avgDealValue: number       // k  — revenue a new client brings their first month
-  recurringRevenue: number   // of R0, how much bills again next month (no new sale)
+  currentRevenue: number            // R0 — collected last month
+  goalRevenue: number               // G  — target monthly revenue
+  closeRate: number                 // fraction 0–1 (qualified prospects → clients)
+  currentClients?: number | null    // avg client value k = R0 / currentClients
+  avgMonthsStay?: number | null     // churn c = 1 / avgMonthsStay; omit ⇒ no churn (floor)
   currentLeads?: number | null
-  months: number             // scenario timeframe
+  months: number                    // scenario timeframe
+  // Legacy inputs (older saved submissions) — used only when the new fields are absent:
+  avgDealValue?: number             // k  — revenue a new client brings their first month
+  recurringRevenue?: number         // of R0, how much bills again next month (no new sale)
 }
 
 export interface LeadsGoalResult {
@@ -249,11 +256,25 @@ export function leadsGoal(inp: LeadsGoalInputs): LeadsGoalResult {
   const R0 = Math.max(0, inp.currentRevenue)
   const G = Math.max(0, inp.goalRevenue)
   const cr = inp.closeRate
-  const k = inp.avgDealValue
   const N = Math.max(1, Math.round(inp.months))
-  const rec = Math.min(Math.max(0, inp.recurringRevenue), R0)
-  const rollOff = R0 - rec
-  const churnRate = R0 > 0 ? rollOff / R0 : 0
+
+  // Average revenue per client per month (k). Prefer the current-client count
+  // (revenue ÷ clients); fall back to the legacy avg-deal field for old records.
+  const clients = inp.currentClients != null && inp.currentClients > 0 ? inp.currentClients : null
+  const k = clients != null ? R0 / clients : Math.max(0, inp.avgDealValue ?? 0)
+
+  // Monthly churn. Prefer avg client lifespan (1 ÷ months). Fall back to the
+  // legacy recurring-revenue figure. Absent both ⇒ assume none (best-case floor).
+  let churnRate: number
+  if (inp.avgMonthsStay != null && inp.avgMonthsStay > 0) {
+    churnRate = Math.min(1, 1 / inp.avgMonthsStay)
+  } else if (inp.recurringRevenue != null) {
+    const rec = Math.min(Math.max(0, inp.recurringRevenue), R0)
+    churnRate = R0 > 0 ? (R0 - rec) / R0 : 0
+  } else {
+    churnRate = 0
+  }
+  const rollOff = R0 * churnRate
   const revenuePerLead = cr * k
 
   const base: LeadsGoalResult = {

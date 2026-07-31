@@ -9,9 +9,12 @@ interface Inputs {
   currentRevenue: number
   goalRevenue: number
   closeRate: number
-  avgDealValue: number
-  recurringRevenue: number
+  currentClients?: number | null
+  avgMonthsStay?: number | null
   currentLeads: number | null
+  // Legacy (older submissions) — still parsed so old reports render:
+  avgDealValue?: number
+  recurringRevenue?: number
 }
 
 export default async function LeadGoalReportPage({

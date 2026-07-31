@@ -20,7 +20,7 @@ export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, 
   if (!r.valid) {
     return (
       <div style={{ background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: 20, fontSize: 14, color: "#9A3412" }}>
-        Enter a close rate and an average deal size to calculate.
+        Enter your close rate and current client count to calculate.
       </div>
     )
   }

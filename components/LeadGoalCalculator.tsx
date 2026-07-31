@@ -40,8 +40,8 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
   const [currentRevenueStr, setCurrentRevenueStr] = useState("10000")
   const [goalRevenueStr, setGoalRevenueStr] = useState("25000")
   const [closedPer10Str, setClosedPer10Str] = useState("3")
-  const [avgDealStr, setAvgDealStr] = useState("2500")
-  const [recurringStr, setRecurringStr] = useState("8000")
+  const [currentClientsStr, setCurrentClientsStr] = useState("4")
+  const [monthsStayStr, setMonthsStayStr] = useState("")
   const [salesConvosStr, setSalesConvosStr] = useState("")
   const [months, setMonths] = useState(12)
 
@@ -58,16 +58,15 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
   const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
   const currentRevenue = num(currentRevenueStr)
   const goalRevenue = num(goalRevenueStr)
-  const avgDeal = num(avgDealStr)
-  const recurring = num(recurringStr)
+  const currentClients = currentClientsStr.trim() === "" ? null : num(currentClientsStr)
+  const avgMonthsStay = monthsStayStr.trim() === "" ? null : num(monthsStayStr)
   const cr = Math.min(10, Math.max(0, num(closedPer10Str))) / 10
   const currentLeads = salesConvosStr.trim() === "" ? null : num(salesConvosStr)
 
-  const clampRecurring = () => {
-    if (num(recurringStr) > currentRevenue) setRecurringStr(String(currentRevenue))
-  }
+  // Reflected back to the user so they can sanity-check the derived average.
+  const avgClientValue = currentClients != null && currentClients > 0 ? currentRevenue / currentClients : null
 
-  const r = leadsGoal({ currentRevenue, goalRevenue, closeRate: cr, avgDealValue: avgDeal, recurringRevenue: recurring, currentLeads, months })
+  const r = leadsGoal({ currentRevenue, goalRevenue, closeRate: cr, currentClients, avgMonthsStay, currentLeads, months })
 
   // ── Embed: auto-report height to the parent page ──────────────────────────
   const rootRef = useRef<HTMLDivElement>(null)
@@ -112,7 +111,7 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email, name: name || undefined, agency: agency || undefined, currency,
-          inputs: { currentRevenue, goalRevenue, closeRate: cr, avgDealValue: avgDeal, recurringRevenue: recurring, currentLeads: currentLeads ?? 0 },
+          inputs: { currentRevenue, goalRevenue, closeRate: cr, currentClients, avgMonthsStay, currentLeads: currentLeads ?? 0 },
           honeypot,
         }),
       })
@@ -150,7 +149,7 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 }}>
             <div style={fieldStyle}>
               <label style={labelStyle}>What did you collect in revenue last month?</label>
-              <div style={inputWrap}><MoneyInput sym={sym} value={currentRevenueStr} onChange={setCurrentRevenueStr} onBlur={clampRecurring} /></div>
+              <div style={inputWrap}><MoneyInput sym={sym} value={currentRevenueStr} onChange={setCurrentRevenueStr} /></div>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>What&apos;s your target monthly revenue?</label>
@@ -164,12 +163,23 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
               </div>
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>Avg revenue a new client brings their first month?</label>
-              <div style={inputWrap}><MoneyInput sym={sym} value={avgDealStr} onChange={setAvgDealStr} step={250} /></div>
+              <label style={labelStyle}>How many clients do you have right now?</label>
+              <div style={inputWrap}>
+                <input style={inputStyle} type="number" min={0} step={1} value={currentClientsStr}
+                  onChange={e => setCurrentClientsStr(e.target.value)} placeholder="e.g. 8" />
+              </div>
+              {avgClientValue != null && (
+                <div style={{ fontSize: 11, color: "#9C9590", marginTop: 4 }}>
+                  ≈ {sym}{Math.round(avgClientValue).toLocaleString()}/mo per client
+                </div>
+              )}
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>How much of last month&apos;s revenue bills again this month?</label>
-              <div style={inputWrap}><MoneyInput sym={sym} value={recurringStr} onChange={setRecurringStr} onBlur={clampRecurring} /></div>
+              <label style={labelStyle}>How many months does your average client stay? <span style={{ color: "#B8B2A8", fontWeight: 400 }}>(optional)</span></label>
+              <div style={inputWrap}>
+                <input style={inputStyle} type="number" min={0} step={1} value={monthsStayStr}
+                  onChange={e => setMonthsStayStr(e.target.value)} placeholder="Leave blank for best case" />
+              </div>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Sales conversations per month <span style={{ color: "#B8B2A8", fontWeight: 400 }}>(your qualified leads)</span></label>
@@ -235,6 +245,12 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
                   style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "11px 20px", cursor: "pointer" }}>
                   Book a call →
                 </button>
+              </div>
+            )}
+
+            {avgMonthsStay == null && (
+              <div style={{ background: "#FBF7EF", border: "1px solid #ECD9B8", borderRadius: 12, padding: "14px 18px", marginBottom: 16, fontSize: 14, color: "#7A5B1E", lineHeight: 1.5 }}>
+                <strong>This is your best case</strong> — it assumes none of your clients cancel. Enter <strong>how many months your average client stays</strong> above and we&apos;ll factor in churn to give you a more accurate number.
               </div>
             )}
 

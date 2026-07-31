@@ -22,9 +22,12 @@ const inputsSchema = z.object({
   currentRevenue: z.number(),
   goalRevenue: z.number(),
   closeRate: z.number(),          // fraction 0–1
-  avgDealValue: z.number(),
-  recurringRevenue: z.number(),
+  currentClients: z.number().nullable().optional(),
+  avgMonthsStay: z.number().nullable().optional(),
   currentLeads: z.number().nullable().optional(),
+  // Legacy fields — still accepted from older embeds so nothing breaks mid-rollout.
+  avgDealValue: z.number().optional(),
+  recurringRevenue: z.number().optional(),
 })
 
 const schema = z.object({

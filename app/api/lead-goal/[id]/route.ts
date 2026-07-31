@@ -6,9 +6,12 @@ const inputsSchema = z.object({
   currentRevenue: z.number(),
   goalRevenue: z.number(),
   closeRate: z.number(),
-  avgDealValue: z.number(),
-  recurringRevenue: z.number(),
+  currentClients: z.number().nullable().optional(),
+  avgMonthsStay: z.number().nullable().optional(),
   currentLeads: z.number().nullable().optional(),
+  // Legacy fields — kept so older submissions can still be adjusted and saved.
+  avgDealValue: z.number().optional(),
+  recurringRevenue: z.number().optional(),
 })
 
 const schema = z.object({
