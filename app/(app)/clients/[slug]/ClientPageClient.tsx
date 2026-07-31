@@ -139,8 +139,8 @@ interface Props {
 const TABS: { key: Tab; label: string }[] = [
   { key: "dashboard", label: "Overview" },
   { key: "accounts", label: "Accounts" },
-  { key: "pipeline", label: "Pipeline" },
   { key: "projects", label: "Projects" },
+  { key: "pipeline", label: "Pipeline" },
   { key: "team", label: "Team" },
   { key: "products", label: "Products" },
   { key: "progress", label: "Progress" },
