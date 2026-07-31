@@ -118,7 +118,11 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
       if (res.ok) {
         setCaptured(true)
         setModalOpen(true)
+      } else {
+        setError("Something went wrong saving your results. Please try again in a moment.")
       }
+    } catch {
+      setError("We couldn't reach the server. Please check your connection and try again.")
     } finally {
       setSubmitting(false)
     }
