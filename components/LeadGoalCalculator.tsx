@@ -9,9 +9,11 @@ function currSym(c: Currency) { return c === "GBP" ? "£" : c === "EUR" ? "€" 
 const accent = "#E9532A"
 // John's Google Appointment Scheduling page, embedded in the booking modal.
 const BOOKING_URL = "https://calendar.google.com/calendar/appointments/schedules/AcZssZ1KAcVxnxyAbVyWshakSOwQcGXhbYtzndKY1NBI0cP79r8QjDOZoI1xJMVy8KkdEEjXcwkO8sAy?gv=true"
-const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
+// minHeight reserves room for a two-line label so every input starts at the
+// same vertical position whether its label wraps or not.
+const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", lineHeight: 1.3, minHeight: 30, marginBottom: 4 }
 const fieldStyle: React.CSSProperties = { display: "flex", flexDirection: "column" }
-const inputWrap: React.CSSProperties = { marginTop: "auto" }
+const inputWrap: React.CSSProperties = {}
 const inputStyle: React.CSSProperties = {
   padding: "8px 11px", border: "1px solid #ECE7DE", borderRadius: 8, fontSize: 14,
   background: "#FCFBF8", color: "#1A1916", width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none",
@@ -40,8 +42,8 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
   const [currentRevenueStr, setCurrentRevenueStr] = useState("10000")
   const [goalRevenueStr, setGoalRevenueStr] = useState("25000")
   const [closedPer10Str, setClosedPer10Str] = useState("3")
-  const [avgDealStr, setAvgDealStr] = useState("2500")
-  const [recurringStr, setRecurringStr] = useState("8000")
+  const [currentClientsStr, setCurrentClientsStr] = useState("4")
+  const [monthsStayStr, setMonthsStayStr] = useState("")
   const [salesConvosStr, setSalesConvosStr] = useState("")
   const [months, setMonths] = useState(12)
 
@@ -58,16 +60,15 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
   const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
   const currentRevenue = num(currentRevenueStr)
   const goalRevenue = num(goalRevenueStr)
-  const avgDeal = num(avgDealStr)
-  const recurring = num(recurringStr)
+  const currentClients = currentClientsStr.trim() === "" ? null : num(currentClientsStr)
+  const avgMonthsStay = monthsStayStr.trim() === "" ? null : num(monthsStayStr)
   const cr = Math.min(10, Math.max(0, num(closedPer10Str))) / 10
   const currentLeads = salesConvosStr.trim() === "" ? null : num(salesConvosStr)
 
-  const clampRecurring = () => {
-    if (num(recurringStr) > currentRevenue) setRecurringStr(String(currentRevenue))
-  }
+  // Reflected back to the user so they can sanity-check the derived average.
+  const avgClientValue = currentClients != null && currentClients > 0 ? currentRevenue / currentClients : null
 
-  const r = leadsGoal({ currentRevenue, goalRevenue, closeRate: cr, avgDealValue: avgDeal, recurringRevenue: recurring, currentLeads, months })
+  const r = leadsGoal({ currentRevenue, goalRevenue, closeRate: cr, currentClients, avgMonthsStay, currentLeads, months })
 
   // ── Embed: auto-report height to the parent page ──────────────────────────
   const rootRef = useRef<HTMLDivElement>(null)
@@ -112,18 +113,72 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email, name: name || undefined, agency: agency || undefined, currency,
-          inputs: { currentRevenue, goalRevenue, closeRate: cr, avgDealValue: avgDeal, recurringRevenue: recurring, currentLeads: currentLeads ?? 0 },
+          inputs: { currentRevenue, goalRevenue, closeRate: cr, currentClients, avgMonthsStay, currentLeads: currentLeads ?? 0 },
           honeypot,
         }),
       })
-      if (res.ok) {
-        setCaptured(true)
-        setModalOpen(true)
+      if (!res.ok) {
+        // Lead capture failed (e.g. the database is unreachable). Don't punish
+        // the visitor — they've handed over their email, so still show results
+        // and the booking modal. Log the miss so it isn't silently invisible.
+        console.error("lead-goal: save failed with status", res.status)
       }
+    } catch (err) {
+      console.error("lead-goal: save request failed", err)
     } finally {
       setSubmitting(false)
+      setCaptured(true)
+      setModalOpen(true)
     }
   }
+
+  const inputsGrid = (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 }}>
+      <div style={fieldStyle}>
+        <label style={labelStyle}>What did you collect in revenue last month?</label>
+        <div style={inputWrap}><MoneyInput sym={sym} value={currentRevenueStr} onChange={setCurrentRevenueStr} /></div>
+      </div>
+      <div style={fieldStyle}>
+        <label style={labelStyle}>What&apos;s your target monthly revenue?</label>
+        <div style={inputWrap}><MoneyInput sym={sym} value={goalRevenueStr} onChange={setGoalRevenueStr} step={1000} /></div>
+      </div>
+      <div style={fieldStyle}>
+        <label style={labelStyle}>Out of 10 sales conversations, how many do you close?</label>
+        <div style={inputWrap}>
+          <input style={inputStyle} type="number" min={0} max={10} step={0.5} value={closedPer10Str}
+            onChange={e => setClosedPer10Str(e.target.value)} />
+        </div>
+      </div>
+      <div style={fieldStyle}>
+        <label style={labelStyle}>How many clients do you have right now?</label>
+        <div style={inputWrap}>
+          <input style={inputStyle} type="number" min={0} step={1} value={currentClientsStr}
+            onChange={e => setCurrentClientsStr(e.target.value)} placeholder="e.g. 8" />
+        </div>
+        {avgClientValue != null && (
+          <div style={{ fontSize: 11, color: "#9C9590", marginTop: 4 }}>
+            ≈ {sym}{Math.round(avgClientValue).toLocaleString()}/mo per client
+          </div>
+        )}
+      </div>
+      <div style={fieldStyle}>
+        <label style={labelStyle}>How many months does your average client stay? <span style={{ color: "#B8B2A8", fontWeight: 400 }}>(optional)</span></label>
+        <div style={inputWrap}>
+          <input style={inputStyle} type="number" min={0} step={1} value={monthsStayStr}
+            onChange={e => setMonthsStayStr(e.target.value)} placeholder="Leave blank for best case" />
+        </div>
+      </div>
+      <div style={fieldStyle}>
+        <label style={labelStyle}>Sales conversations per month <span style={{ color: "#B8B2A8", fontWeight: 400 }}>(your qualified leads)</span></label>
+        <div style={inputWrap}>
+          <input style={inputStyle} type="number" min={0} step={1} value={salesConvosStr}
+            onChange={e => { setSalesConvosStr(e.target.value); setError("") }} placeholder="e.g. 8" />
+        </div>
+      </div>
+    </div>
+  )
+
+  const inputsCardStyle: React.CSSProperties = { background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }
 
   return (
     <div ref={rootRef} style={{ background: "#FBFAF7", padding: embed ? "24px 18px" : "40px 24px" }}>
@@ -145,45 +200,12 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
           </select>
         </div>
 
-        {/* Inputs (always editable) */}
-        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 }}>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>What did you collect in revenue last month?</label>
-              <div style={inputWrap}><MoneyInput sym={sym} value={currentRevenueStr} onChange={setCurrentRevenueStr} onBlur={clampRecurring} /></div>
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>What&apos;s your target monthly revenue?</label>
-              <div style={inputWrap}><MoneyInput sym={sym} value={goalRevenueStr} onChange={setGoalRevenueStr} step={1000} /></div>
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Out of 10 sales conversations, how many do you close?</label>
-              <div style={inputWrap}>
-                <input style={inputStyle} type="number" min={0} max={10} step={0.5} value={closedPer10Str}
-                  onChange={e => setClosedPer10Str(e.target.value)} />
-              </div>
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Avg revenue a new client brings their first month?</label>
-              <div style={inputWrap}><MoneyInput sym={sym} value={avgDealStr} onChange={setAvgDealStr} step={250} /></div>
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>How much of last month&apos;s revenue bills again this month?</label>
-              <div style={inputWrap}><MoneyInput sym={sym} value={recurringStr} onChange={setRecurringStr} onBlur={clampRecurring} /></div>
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Sales conversations per month <span style={{ color: "#B8B2A8", fontWeight: 400 }}>(your qualified leads)</span></label>
-              <div style={inputWrap}>
-                <input style={inputStyle} type="number" min={0} step={1} value={salesConvosStr}
-                  onChange={e => { setSalesConvosStr(e.target.value); setError("") }} placeholder="e.g. 8" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Pre-capture gate, or post-capture results */}
+        {/* Before results: inputs up top. After results: results lead, inputs below. */}
         {!captured ? (
-          !showCapture ? (
+          <>
+            <div style={{ ...inputsCardStyle, marginBottom: 20 }}>{inputsGrid}</div>
+
+            {!showCapture ? (
             <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
               <button onClick={openCapture}
                 style={{ fontSize: 16, fontWeight: 600, color: "#fff", background: accent, border: "none", borderRadius: 10, padding: "15px 34px", cursor: "pointer" }}>
@@ -222,31 +244,44 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
                 {submitting ? "Sending…" : "Show my results →"}
               </button>
             </form>
-          )
-        ) : (
-          <>
-            {/* Book-a-call banner (public only) */}
-            {!live && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
-                <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.45 }}>
-                  <strong>Want to walk through this live with John?</strong> Book a free Leads Strategy Call.
-                </div>
-                <button onClick={() => setModalOpen(true)}
-                  style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "11px 20px", cursor: "pointer" }}>
-                  Book a call →
-                </button>
-              </div>
             )}
-
-            <LeadGoalResults
-              r={r}
-              goalRevenue={goalRevenue}
-              currentLeads={currentLeads}
-              months={months}
-              setMonths={setMonths}
-              currency={currency}
-            />
           </>
+        ) : (
+          // Order: slider + reality-check (from results), then inputs + CTA
+          // (the middle slot), then the big number + gap + ceiling + roll-off.
+          <LeadGoalResults
+            r={r}
+            goalRevenue={goalRevenue}
+            currentLeads={currentLeads}
+            months={months}
+            setMonths={setMonths}
+            currency={currency}
+            middle={
+              <>
+                {avgMonthsStay == null && (
+                  <div style={{ background: "#FBF7EF", border: "1px solid #ECD9B8", borderRadius: 12, padding: "14px 18px", marginBottom: 16, fontSize: 14, color: "#7A5B1E", lineHeight: 1.5 }}>
+                    <strong>This is your best case</strong> — it assumes none of your clients cancel. Enter <strong>how many months your average client stays</strong> below and we&apos;ll factor in churn to give you a more accurate number.
+                  </div>
+                )}
+
+                {/* Inputs — editable, between the teaser and the full breakdown */}
+                <div style={{ ...inputsCardStyle, margin: "16px 0" }}>{inputsGrid}</div>
+
+                {/* Book-a-call banner */}
+                {!live && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
+                    <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.45 }}>
+                      <strong>Want to walk through this live with John?</strong> Book a free Leads Strategy Call.
+                    </div>
+                    <button onClick={() => setModalOpen(true)}
+                      style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "11px 20px", cursor: "pointer" }}>
+                      Book a call →
+                    </button>
+                  </div>
+                )}
+              </>
+            }
+          />
         )}
       </div>
 
@@ -263,7 +298,7 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
             <div style={{ padding: "28px 28px 12px", textAlign: "center" }}>
               <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 26, fontWeight: 600, margin: "0 0 8px", color: "#1A1916" }}>Your results are ready 🎉</h3>
               <p style={{ fontSize: 14, color: "#6F6B64", margin: "0 auto", maxWidth: 520, lineHeight: 1.55 }}>
-                Book a free Growth Projection Review Call and John will walk you through your numbers and the fastest path to your goal — or close this to explore the results yourself.
+                Book a free Leads Strategy Call and John will walk you through your numbers and the fastest path to your goal — or close this to explore the results yourself.
               </p>
             </div>
             <div style={{ padding: "8px 20px 22px" }}>

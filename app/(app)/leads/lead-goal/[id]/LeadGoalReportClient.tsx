@@ -11,9 +11,12 @@ interface Inputs {
   currentRevenue: number
   goalRevenue: number
   closeRate: number
-  avgDealValue: number
-  recurringRevenue: number
+  currentClients?: number | null
+  avgMonthsStay?: number | null
   currentLeads: number | null
+  // Legacy (older submissions) — still parsed so old reports render:
+  avgDealValue?: number
+  recurringRevenue?: number
 }
 
 interface Lead {
@@ -30,13 +33,25 @@ interface Lead {
   createdAt: string
 }
 
-const FIELDS: { key: keyof Inputs; label: string; money?: boolean; pct?: boolean; step?: number }[] = [
+type Field = { key: keyof Inputs; label: string; money?: boolean; pct?: boolean; step?: number; optional?: boolean }
+
+const NEW_FIELDS: Field[] = [
+  { key: "currentRevenue", label: "Current revenue / mo", money: true, step: 500 },
+  { key: "goalRevenue", label: "Goal revenue / mo", money: true, step: 1000 },
+  { key: "closeRate", label: "Close rate", pct: true, step: 1 },
+  { key: "currentClients", label: "Current clients", step: 1 },
+  { key: "avgMonthsStay", label: "Avg months a client stays", step: 1, optional: true },
+  { key: "currentLeads", label: "Sales conversations / mo", step: 1, optional: true },
+]
+
+// Older submissions were captured with avg-deal + recurring-revenue instead.
+const LEGACY_FIELDS: Field[] = [
   { key: "currentRevenue", label: "Current revenue / mo", money: true, step: 500 },
   { key: "goalRevenue", label: "Goal revenue / mo", money: true, step: 1000 },
   { key: "closeRate", label: "Close rate", pct: true, step: 1 },
   { key: "avgDealValue", label: "Avg revenue / new client", money: true, step: 250 },
   { key: "recurringRevenue", label: "Recurring / mo", money: true, step: 500 },
-  { key: "currentLeads", label: "Sales conversations / mo", step: 1 },
+  { key: "currentLeads", label: "Sales conversations / mo", step: 1, optional: true },
 ]
 
 export default function LeadGoalReportClient({ lead, schedulingUrl }: { lead: Lead; schedulingUrl: string }) {
@@ -65,9 +80,13 @@ export default function LeadGoalReportClient({ lead, schedulingUrl }: { lead: Le
     JSON.stringify(inputs) !== JSON.stringify(lead.adjustedInputs ?? lead.inputs) ||
     takeaways !== (lead.takeaways ?? "")
 
-  function setField(key: keyof Inputs, value: number) {
+  function setField(key: keyof Inputs, value: number | null) {
     setInputs(prev => ({ ...prev, [key]: value }))
   }
+
+  // Show the field set that matches how this submission was captured.
+  const isLegacy = lead.inputs.currentClients == null && lead.inputs.avgDealValue != null
+  const FIELDS = isLegacy ? LEGACY_FIELDS : NEW_FIELDS
 
   async function save() {
     setSaving(true)
@@ -175,11 +194,11 @@ export default function LeadGoalReportClient({ lead, schedulingUrl }: { lead: Le
               Ready to hit your goal?
             </div>
             <div style={{ fontSize: 13, color: "#6F6B64", margin: "0 auto 14px", maxWidth: 480, lineHeight: 1.5 }}>
-              Book a Growth Projection Review Call and we&apos;ll walk through your numbers and the fastest path to your target.
+              Book a Leads Strategy Call and we&apos;ll walk through your numbers and the fastest path to your target.
             </div>
             <a href={schedulingUrl} target="_blank" rel="noopener noreferrer"
               style={{ display: "inline-block", background: accent, color: "#fff", fontSize: 15, fontWeight: 700, textDecoration: "none", borderRadius: 10, padding: "12px 26px" }}>
-              Schedule your Growth Projection Review Call →
+              Schedule your Leads Strategy Call →
             </a>
             <div style={{ fontSize: 12, color: "#9C9590", marginTop: 10 }}>{schedulingUrl}</div>
           </div>
@@ -199,15 +218,22 @@ export default function LeadGoalReportClient({ lead, schedulingUrl }: { lead: Le
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", margin: "26px 0 10px" }}>Inputs</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 4 }}>
           {FIELDS.map(f => {
-            const raw = (inputs[f.key] as number) ?? 0
-            const display = f.pct ? Math.round(raw * 100) : raw
+            const rawVal = inputs[f.key]
+            const isBlank = rawVal == null
+            const display = isBlank ? "" : f.pct ? Math.round((rawVal as number) * 100) : (rawVal as number)
             return (
               <div key={f.key}>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }}>
                   {f.label}{f.money ? ` ${sym}` : ""}{f.pct ? " %" : ""}
                 </label>
                 <input type="number" step={f.step} value={display}
-                  onChange={e => { const v = parseFloat(e.target.value) || 0; setField(f.key, f.pct ? v / 100 : v) }}
+                  placeholder={f.optional ? "—" : undefined}
+                  onChange={e => {
+                    const s = e.target.value
+                    if (s === "" && f.optional) { setField(f.key, null); return }
+                    const v = parseFloat(s) || 0
+                    setField(f.key, f.pct ? v / 100 : v)
+                  }}
                   style={{ padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, background: "#FCFBF8", color: "#1A1916", width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none", fontVariantNumeric: "tabular-nums" }} />
               </div>
             )

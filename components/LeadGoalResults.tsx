@@ -1,4 +1,5 @@
 "use client"
+import type { ReactNode } from "react"
 import { fmtCurrency, type LeadsGoalResult } from "@/lib/calc"
 
 const accent = "#E9532A"
@@ -10,9 +11,12 @@ interface Props {
   months: number
   setMonths: (n: number) => void
   currency: string
+  // Rendered between the reality-check teaser and the headline number, so the
+  // caller can slot the inputs + a CTA into the middle of the results.
+  middle?: ReactNode
 }
 
-export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, setMonths, currency }: Props) {
+export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, setMonths, currency, middle }: Props) {
   const fmt$ = (v: number) => fmtCurrency(v, currency)
   const needed = Math.ceil(r.leadsToReachGoal)
   const treadmill = Math.round(r.leadsToHoldCurrent)
@@ -20,7 +24,7 @@ export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, 
   if (!r.valid) {
     return (
       <div style={{ background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: 20, fontSize: 14, color: "#9A3412" }}>
-        Enter a close rate and an average deal size to calculate.
+        Enter your close rate and current client count to calculate.
       </div>
     )
   }
@@ -34,6 +38,31 @@ export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, 
           style={{ flex: 1, minWidth: 160, accentColor: accent }} />
         <span style={{ fontSize: 14, fontWeight: 700, color: accent, minWidth: 78, textAlign: "right" }}>{months} months</span>
       </div>
+
+      {/* When they'll actually reach the goal at their current lead pace */}
+      {currentLeads != null && currentLeads > 0 && !r.goalBelowCurrent && (() => {
+        const reachN = r.monthsToReachAtCurrentLeads != null ? Math.ceil(r.monthsToReachAtCurrentLeads) : null
+        if (r.reachesGoalAtCurrentLeads && reachN != null) {
+          const ahead = reachN <= months
+          return (
+            <div style={{ background: ahead ? "#EAF3EC" : "#FBF0EB", border: `1px solid ${ahead ? "#C9E0CF" : "#F0C3B0"}`, borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
+              You&apos;re targeting <strong>{months} months</strong> — at your current <strong>{currentLeads} qualified leads/mo</strong>, you&apos;ll actually reach{" "}
+              <strong>{fmt$(goalRevenue)}/mo</strong> in about{" "}
+              <strong style={{ color: ahead ? "#1F7A4D" : "#C2410C" }}>{reachN} month{reachN === 1 ? "" : "s"}</strong>.
+            </div>
+          )
+        }
+        return (
+          <div style={{ background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
+            At your current <strong>{currentLeads} qualified leads/mo</strong> you won&apos;t reach{" "}
+            <strong>{fmt$(goalRevenue)}/mo</strong> — you&apos;d plateau at{" "}
+            <strong style={{ color: "#C2410C" }}>{fmt$(r.ceilingAtCurrentLeads ?? 0)}/mo</strong>. You&apos;d need{" "}
+            <strong>{needed} qualified leads/mo</strong> to hit it in {months} months.
+          </div>
+        )
+      })()}
+
+      {middle}
 
       {/* Headline */}
       <div style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff", marginBottom: 16 }}>
@@ -67,33 +96,10 @@ export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, 
         )}
       </div>
 
-      {/* When they'll actually reach the goal at their current lead pace */}
-      {currentLeads != null && currentLeads > 0 && !r.goalBelowCurrent && (() => {
-        const reachN = r.monthsToReachAtCurrentLeads != null ? Math.ceil(r.monthsToReachAtCurrentLeads) : null
-        if (r.reachesGoalAtCurrentLeads && reachN != null) {
-          const ahead = reachN <= months
-          return (
-            <div style={{ background: ahead ? "#EAF3EC" : "#FBF0EB", border: `1px solid ${ahead ? "#C9E0CF" : "#F0C3B0"}`, borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
-              You&apos;re targeting <strong>{months} months</strong> — at your current <strong>{currentLeads} qualified leads/mo</strong>, you&apos;ll actually reach{" "}
-              <strong>{fmt$(goalRevenue)}/mo</strong> in about{" "}
-              <strong style={{ color: ahead ? "#1F7A4D" : "#C2410C" }}>{reachN} month{reachN === 1 ? "" : "s"}</strong>.
-            </div>
-          )
-        }
-        return (
-          <div style={{ background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "16px 18px", marginBottom: 16, fontSize: 15, color: "#1A1916", lineHeight: 1.5 }}>
-            At your current <strong>{currentLeads} qualified leads/mo</strong> you won&apos;t reach{" "}
-            <strong>{fmt$(goalRevenue)}/mo</strong> — you&apos;d plateau at{" "}
-            <strong style={{ color: "#C2410C" }}>{fmt$(r.ceilingAtCurrentLeads ?? 0)}/mo</strong>. You&apos;d need{" "}
-            <strong>{needed} qualified leads/mo</strong> to hit it in {months} months.
-          </div>
-        )
-      })()}
-
-      {/* Gap + ceiling (only when current leads provided) */}
+      {/* Gap, then ceiling (only when current leads provided) — stacked, full-width */}
       {currentLeads != null && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 16 }}>
-          <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 18 }}>
+        <>
+          <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 18, marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#9C9590", marginBottom: 6 }}>The gap</div>
             {r.alreadyEnoughLeads ? (
               <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.5 }}>
@@ -106,7 +112,7 @@ export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, 
               </div>
             )}
           </div>
-          <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 18 }}>
+          <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 18, marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#9C9590", marginBottom: 6 }}>Your ceiling at {currentLeads} leads/mo</div>
             {r.ceilingAtCurrentLeads == null ? (
               <div style={{ fontSize: 14, color: "#1F7A4D", lineHeight: 1.5 }}>No ceiling — with nothing rolling off, your revenue compounds.</div>
@@ -117,7 +123,7 @@ export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, 
               </div>
             )}
           </div>
-        </div>
+        </>
       )}
 
       {/* Roll-off + runway */}

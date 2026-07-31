@@ -22,9 +22,12 @@ const inputsSchema = z.object({
   currentRevenue: z.number(),
   goalRevenue: z.number(),
   closeRate: z.number(),          // fraction 0–1
-  avgDealValue: z.number(),
-  recurringRevenue: z.number(),
+  currentClients: z.number().nullable().optional(),
+  avgMonthsStay: z.number().nullable().optional(),
   currentLeads: z.number().nullable().optional(),
+  // Legacy fields — still accepted from older embeds so nothing breaks mid-rollout.
+  avgDealValue: z.number().optional(),
+  recurringRevenue: z.number().optional(),
 })
 
 const schema = z.object({
@@ -37,15 +40,20 @@ const schema = z.object({
 })
 
 async function notifySlack(args: {
-  id: string; name?: string; agency?: string; email: string
+  id: string | null; name?: string; agency?: string; email: string
   currency: string; leadsNeeded: number; goal: number
 }) {
   const url = process.env.SLACK_WEBHOOK_URL
   if (!url) return
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || ""
   const who = [args.name, args.agency].filter(Boolean).join(" · ") || args.email
-  const link = appUrl ? `${appUrl}/leads/lead-goal/${args.id}` : `/leads/lead-goal/${args.id}`
-  const text = `📈 New lead-goal submission: *${who}* (${args.email})\nNeeds ~${args.leadsNeeded} leads/mo to hit ${fmtCurrency(args.goal, args.currency)}/mo\n<${link}|Review in Agency Growth OS →>`
+  // When the DB write failed there's no record to link to — flag it so the
+  // lead can be captured manually instead of quietly lost.
+  const link = args.id ? (appUrl ? `${appUrl}/leads/lead-goal/${args.id}` : `/leads/lead-goal/${args.id}`) : null
+  const reviewLine = link
+    ? `\n<${link}|Review in Agency Growth OS →>`
+    : `\n⚠️ Not saved to the database — capture this lead manually.`
+  const text = `📈 New lead-goal submission: *${who}* (${args.email})\nNeeds ~${args.leadsNeeded} leads/mo to hit ${fmtCurrency(args.goal, args.currency)}/mo${reviewLine}`
   try {
     await fetch(url, {
       method: "POST",
@@ -73,22 +81,30 @@ export async function POST(req: NextRequest) {
   const { email, name, agency, currency, inputs } = parsed.data
   const result = leadsGoal({ ...inputs, currentLeads: inputs.currentLeads ?? null, months: 12 } as LeadsGoalInputs)
 
-  const lead = await prisma.leadGoalSubmission.create({
-    data: {
-      email,
-      name: name ?? null,
-      agency: agency ?? null,
-      currency,
-      inputs: JSON.stringify(inputs),
-      result: JSON.stringify(result),
-    },
-  })
+  // Persist the lead. If the write fails (e.g. the database is unreachable),
+  // log it and fall through — we still notify Slack so the lead isn't lost, and
+  // the visitor still gets their results.
+  let lead: { id: string } | null = null
+  try {
+    lead = await prisma.leadGoalSubmission.create({
+      data: {
+        email,
+        name: name ?? null,
+        agency: agency ?? null,
+        currency,
+        inputs: JSON.stringify(inputs),
+        result: JSON.stringify(result),
+      },
+    })
+  } catch (err) {
+    console.error("lead-goal: failed to persist submission", err)
+  }
 
   await notifySlack({
-    id: lead.id, name, agency, email, currency,
+    id: lead?.id ?? null, name, agency, email, currency,
     leadsNeeded: Math.ceil(result.leadsToReachGoal),
     goal: inputs.goalRevenue,
   })
 
-  return Response.json({ id: lead.id }, { status: 201, headers: corsHeaders() })
+  return Response.json({ id: lead?.id ?? null, saved: lead != null }, { status: 201, headers: corsHeaders() })
 }
