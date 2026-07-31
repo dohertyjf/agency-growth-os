@@ -33,6 +33,7 @@ interface Contract {
   name: string
   monthly: number
   hoursPerMonth: number
+  actualHours?: number | null
   start: string
   contractedThrough: string | null
   status: string
@@ -96,6 +97,7 @@ interface Goal {
   closeRatePct: number
   peoplePct?: number
   currency?: string
+  minHourlyRate?: number | null
 }
 
 interface Product {
@@ -282,6 +284,7 @@ export default function ClientPageClient({
           initialContracts={initialContracts}
           accounts={accounts}
           products={clientProducts}
+          minHourlyRate={goal?.minHourlyRate ?? null}
           onContractsChange={updated => setContracts(updated)}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
         />

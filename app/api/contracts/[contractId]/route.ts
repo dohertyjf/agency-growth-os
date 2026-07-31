@@ -6,6 +6,7 @@ const schema = z.object({
   name: z.string().min(1).optional(),
   monthly: z.number().min(0).optional(),
   hoursPerMonth: z.number().min(0).optional(),
+  actualHours: z.number().min(0).nullable().optional(),
   start: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
   status: z.enum(["opportunity", "potential", "active", "lost", "finished"]).optional(),

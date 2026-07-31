@@ -60,3 +60,29 @@ export async function PUT(
   })
   return Response.json(goal)
 }
+
+// Partial update for standalone goal fields (e.g. the yield table's minimum $/hr),
+// so callers don't need to resend the whole goal.
+const patchSchema = z.object({
+  minHourlyRate: z.number().min(0).nullable().optional(),
+})
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  const { id } = await params
+  if (!authorize(session, id)) return Response.json({ error: "Forbidden" }, { status: 403 })
+
+  const body = await req.json().catch(() => null)
+  const parsed = patchSchema.safeParse(body)
+  if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
+
+  const goal = await prisma.goal.upsert({
+    where: { clientId: id },
+    update: parsed.data,
+    create: { clientId: id, ...parsed.data },
+  })
+  return Response.json(goal)
+}

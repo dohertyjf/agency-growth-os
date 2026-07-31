@@ -107,6 +107,7 @@ model Goal {
   closeRatePct   Float  @default(0)
   peoplePct      Float  @default(30)
   currency       String @default("USD")
+  minHourlyRate  Float? // minimum acceptable $/hr, used to flag projects on the yield table
 }
 
 model Contract {
@@ -116,6 +117,7 @@ model Contract {
   name              String
   monthly           Float
   hoursPerMonth     Float          @default(0)
+  actualHours       Float?         // one-offs: real hours spent, vs hoursPerMonth (sold/projected)
   start             String
   contractedThrough String?
   status            ContractStatus @default(active)

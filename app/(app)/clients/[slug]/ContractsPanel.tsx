@@ -9,6 +9,7 @@ interface Contract {
   name: string
   monthly: number
   hoursPerMonth: number
+  actualHours?: number | null
   start: string
   contractedThrough: string | null
   status: string
@@ -36,6 +37,7 @@ interface Props {
   initialContracts: Contract[]
   accounts?: Account[]
   products?: Product[]
+  minHourlyRate?: number | null
   onContractsChange?: (contracts: Contract[]) => void
   onAccountCreated?: (account: Account) => void
 }
@@ -472,10 +474,11 @@ const contractsResponsiveStyle = `
   }
 `
 
-export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
+export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
+  const [minHourlyRate, setMinHourlyRate] = useState<number | null>(minHourlyRateProp ?? null)
   const [adding, setAdding] = useState(false)
 
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
@@ -545,13 +548,30 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     updateContracts([...contracts, created])
   }
 
-  // Inline hours edit from the yield table — optimistic, persisted via PATCH.
-  function handleHoursChange(contractId: string, hours: number) {
-    updateContracts(contracts.map(c => c.id === contractId ? { ...c, hoursPerMonth: hours } : c))
-    fetch(`/api/contracts/${contractId}`, {
+  // Inline hours edits from the yield table — optimistic, persisted via PATCH.
+  // Returns whether the save succeeded, so the table can show a saved ✓.
+  async function patchContract(contractId: string, patch: Partial<Contract>): Promise<boolean> {
+    updateContracts(contracts.map(c => c.id === contractId ? { ...c, ...patch } : c))
+    try {
+      const res = await fetch(`/api/contracts/${contractId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  }
+  const handleHoursChange = (contractId: string, hours: number) => patchContract(contractId, { hoursPerMonth: hours })
+  const handleActualHoursChange = (contractId: string, hours: number | null) => patchContract(contractId, { actualHours: hours })
+
+  async function handleMinRateChange(rate: number | null) {
+    setMinHourlyRate(rate)
+    await fetch(`/api/clients/${clientId}/goal`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hoursPerMonth: hours }),
+      body: JSON.stringify({ minHourlyRate: rate }),
     })
   }
 
@@ -698,7 +718,10 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
             <HourlyYieldTable
               contracts={contracts}
               accounts={localAccounts}
+              minHourlyRate={minHourlyRate}
               onHoursChange={handleHoursChange}
+              onActualHoursChange={handleActualHoursChange}
+              onMinRateChange={handleMinRateChange}
             />
           )}
 
@@ -821,95 +844,185 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
   )
 }
 
-function HourlyYieldTable({ contracts, accounts, onHoursChange }: {
-  contracts: Contract[]
-  accounts: Account[]
-  onHoursChange: (id: string, hours: number) => void
-}) {
-  const fmtCurrency = useFmtCurrency()
-  const [editingId, setEditingId] = useState<string | null>(null)
+// Editable hours cell with a transient saved ✓. onSave returns whether it persisted.
+function HoursCell({ value, onSave }: { value: number | null; onSave: (v: number | null) => Promise<boolean> }) {
+  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
+  const [saved, setSaved] = useState(false)
 
-  const rows = contracts
-    .filter(c => c.status === "active" && c.type !== "oneoff")
-    .map(c => {
-      const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name ?? null : null
-      const perHr = c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null
-      return { c, accountName, perHr }
-    })
-    .sort((a, b) => {
-      if (a.perHr == null && b.perHr == null) return 0
-      if (a.perHr == null) return 1
-      if (b.perHr == null) return -1
-      return b.perHr - a.perHr
-    })
-
-  const totalMonthly = rows.reduce((s, r) => s + (r.perHr != null ? r.c.monthly : 0), 0)
-  const totalHours = rows.reduce((s, r) => s + (r.perHr != null ? r.c.hoursPerMonth : 0), 0)
-  const blended = totalHours > 0 ? totalMonthly / totalHours : null
-
-  function yieldColor(v: number | null) {
-    if (v == null || blended == null) return "#9C9590"
-    if (v >= blended * 1.15) return "#1F7A4D"
-    if (v <= blended * 0.7) return "#C2410C"
-    return "#1A1916"
-  }
-
-  function startEdit(c: Contract) { setEditingId(c.id); setDraft(c.hoursPerMonth > 0 ? String(c.hoursPerMonth) : "") }
-  function commit(id: string) {
-    const v = parseFloat(draft)
-    setEditingId(null)
-    if (!isNaN(v) && v >= 0) onHoursChange(id, v)
-  }
-
-  if (rows.length === 0) {
-    return <div style={{ fontSize: 12, color: "#9C9590", padding: "8px 0" }}>No active retainers to measure yet.</div>
+  function start() { setDraft(value != null && value > 0 ? String(value) : ""); setEditing(true) }
+  async function commit() {
+    setEditing(false)
+    const raw = draft.trim()
+    const v = raw === "" ? null : parseFloat(raw)
+    if (v != null && (isNaN(v) || v < 0)) return
+    if ((v ?? null) === (value ?? null)) return
+    const ok = await onSave(v)
+    if (ok) { setSaved(true); setTimeout(() => setSaved(false), 1600) }
   }
 
   return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+      {editing ? (
+        <input
+          autoFocus type="number" min={0} step={0.5} value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(false) }}
+          style={{ width: 60, padding: "5px 8px", border: "1px solid #E9532A", borderRadius: 6, fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none", background: "#FFF7ED", fontFamily: "inherit" }}
+        />
+      ) : (
+        <button onClick={start} title="Click to edit"
+          style={{ background: "none", border: "1px dashed #E0DAD0", borderRadius: 6, padding: "4px 9px", fontSize: 13, color: value != null && value > 0 ? "#1A1916" : "#C4BFB8", cursor: "pointer", fontVariantNumeric: "tabular-nums" }}>
+          {value != null && value > 0 ? `${value}h` : "set"}
+        </button>
+      )}
+      <span style={{ color: "#1F7A4D", fontSize: 13, fontWeight: 700, width: 10, opacity: saved ? 1 : 0, transition: "opacity 0.2s" }}>✓</span>
+    </div>
+  )
+}
+
+function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange, onActualHoursChange, onMinRateChange }: {
+  contracts: Contract[]
+  accounts: Account[]
+  minHourlyRate: number | null
+  onHoursChange: (id: string, hours: number) => Promise<boolean>
+  onActualHoursChange: (id: string, hours: number | null) => Promise<boolean>
+  onMinRateChange: (rate: number | null) => void
+}) {
+  const fmtCurrency = useFmtCurrency()
+  const [minDraft, setMinDraft] = useState(minHourlyRate != null ? String(minHourlyRate) : "")
+
+  const nameFor = (c: Contract) => c.accountId ? accounts.find(a => a.id === c.accountId)?.name ?? null : null
+  const hasMin = minHourlyRate != null && minHourlyRate > 0
+
+  const retainers = contracts
+    .filter(c => c.status === "active" && c.type !== "oneoff")
+    .map(c => ({ c, accountName: nameFor(c), perHr: c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null }))
+    .sort((a, b) => (b.perHr ?? -1) - (a.perHr ?? -1))
+
+  const oneoffs = contracts
+    .filter(c => c.type === "oneoff" && (c.status === "active" || c.status === "finished"))
+    .map(c => {
+      const actual = c.actualHours != null && c.actualHours > 0 ? c.actualHours : null
+      const soldPerHr = c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null
+      const actualPerHr = actual != null ? c.monthly / actual : null
+      return { c, accountName: nameFor(c), soldPerHr, actualPerHr, effective: actualPerHr ?? soldPerHr }
+    })
+    .sort((a, b) => (b.effective ?? -1) - (a.effective ?? -1))
+
+  const totalMonthly = retainers.reduce((s, r) => s + (r.perHr != null ? r.c.monthly : 0), 0)
+  const totalHours = retainers.reduce((s, r) => s + (r.perHr != null ? r.c.hoursPerMonth : 0), 0)
+  const blended = totalHours > 0 ? totalMonthly / totalHours : null
+
+  function commitMin() {
+    const raw = minDraft.trim()
+    if (raw === "") { onMinRateChange(null); return }
+    const v = parseFloat(raw)
+    onMinRateChange(isNaN(v) || v < 0 ? null : v)
+  }
+
+  function RatePerHr({ v }: { v: number | null }) {
+    if (v == null) return <span style={{ color: "#C4BFB8", fontWeight: 700 }}>—</span>
+    const color = hasMin ? (v >= (minHourlyRate as number) ? "#1F7A4D" : "#C2410C") : "#1A1916"
+    return (
+      <span style={{ color, fontWeight: 700, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+        {hasMin && <span style={{ fontSize: 10 }}>{v >= (minHourlyRate as number) ? "▲" : "▼"} </span>}
+        {fmtCurrency(v)}
+      </span>
+    )
+  }
+
+  if (retainers.length === 0 && oneoffs.length === 0) {
+    return <div style={{ fontSize: 12, color: "#9C9590", padding: "8px 0" }}>No active projects to measure yet.</div>
+  }
+
+  const th: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#9C9590", padding: "6px 10px", borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }
+  const sectionLabel: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: "#9C9590", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4, marginTop: 18 }
+
+  return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 2 }}>
-        <div style={{ fontSize: 12, color: "#9C9590" }}>Active retainers · click hrs/mo to set your real monthly average</div>
-        {blended != null && <div style={{ fontSize: 12, color: "#6B6760" }}>Blended <strong style={{ color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(blended)}/hr</strong></div>}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 12, color: "#9C9590" }}>Click hrs to set your real numbers · {hasMin ? "▲ above / ▼ below your minimum" : "set a minimum $/hr to flag projects"}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {blended != null && <div style={{ fontSize: 12, color: "#6B6760" }}>Blended <strong style={{ color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(blended)}/hr</strong></div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, whiteSpace: "nowrap" }}>Min $/hr</span>
+            <input type="number" min={0} value={minDraft} placeholder="—"
+              onChange={e => setMinDraft(e.target.value)}
+              onBlur={commitMin}
+              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
+              style={{ width: 72, padding: "4px 8px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, textAlign: "right", outline: "none", fontFamily: "inherit", background: "#fff", fontVariantNumeric: "tabular-nums" }} />
+          </div>
+        </div>
       </div>
+
       <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 460 }}>
-          <thead>
-            <tr>
-              {["Project", "Client", "Monthly", "Hrs / mo", "$ / hr"].map((h, i) => (
-                <th key={h} style={{ textAlign: i >= 2 ? "right" : "left", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#9C9590", padding: "6px 10px", borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ c, accountName, perHr }) => (
-              <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC" }}>
-                <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}</td>
-                <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
-                <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(c.monthly)}</td>
-                <td style={{ padding: "4px 10px", textAlign: "right" }}>
-                  {editingId === c.id ? (
-                    <input
-                      autoFocus type="number" min={0} step={0.5} value={draft}
-                      onChange={e => setDraft(e.target.value)}
-                      onBlur={() => commit(c.id)}
-                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditingId(null) }}
-                      style={{ width: 62, padding: "5px 8px", border: "1px solid #E9532A", borderRadius: 6, fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none", background: "#FFF7ED", fontFamily: "inherit" }}
-                    />
-                  ) : (
-                    <button onClick={() => startEdit(c)} title="Click to edit"
-                      style={{ background: "none", border: "1px dashed #E0DAD0", borderRadius: 6, padding: "4px 9px", fontSize: 13, color: c.hoursPerMonth > 0 ? "#1A1916" : "#C4BFB8", cursor: "pointer", fontVariantNumeric: "tabular-nums" }}>
-                      {c.hoursPerMonth > 0 ? `${c.hoursPerMonth}h` : "set"}
-                    </button>
-                  )}
-                </td>
-                <td style={{ padding: "8px 10px", fontSize: 14, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums", color: yieldColor(perHr) }}>
-                  {perHr != null ? fmtCurrency(perHr) : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {retainers.length > 0 && (
+          <>
+            {oneoffs.length > 0 && <div style={sectionLabel}>Retainers</div>}
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 460 }}>
+              <thead>
+                <tr>
+                  {["Project", "Client", "Monthly", "Hrs / mo", "$ / hr"].map((h, i) => (
+                    <th key={h} style={{ ...th, textAlign: i >= 2 ? "right" : "left" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {retainers.map(({ c, accountName, perHr }) => (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC" }}>
+                    <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(c.monthly)}</td>
+                    <td style={{ padding: "4px 10px", textAlign: "right" }}>
+                      <HoursCell value={c.hoursPerMonth} onSave={v => onHoursChange(c.id, v ?? 0)} />
+                    </td>
+                    <td style={{ padding: "8px 10px", fontSize: 14, textAlign: "right" }}><RatePerHr v={perHr} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {oneoffs.length > 0 && (
+          <>
+            <div style={sectionLabel}>One-offs · sold vs actual</div>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 520 }}>
+              <thead>
+                <tr>
+                  {["Project", "Client", "Value", "Sold hrs", "Actual hrs", "$ / hr"].map((h, i) => (
+                    <th key={h} style={{ ...th, textAlign: i >= 2 ? "right" : "left" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {oneoffs.map(({ c, accountName, soldPerHr, actualPerHr, effective }) => (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC" }}>
+                    <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(c.monthly)}</td>
+                    <td style={{ padding: "4px 10px", textAlign: "right" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
+                        <HoursCell value={c.hoursPerMonth} onSave={v => onHoursChange(c.id, v ?? 0)} />
+                        {soldPerHr != null && <span style={{ fontSize: 10, color: "#B0A9A0", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(soldPerHr)}/hr</span>}
+                      </div>
+                    </td>
+                    <td style={{ padding: "4px 10px", textAlign: "right" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
+                        <HoursCell value={c.actualHours ?? null} onSave={v => onActualHoursChange(c.id, v)} />
+                        {actualPerHr != null && <span style={{ fontSize: 10, color: "#B0A9A0", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(actualPerHr)}/hr</span>}
+                      </div>
+                    </td>
+                    <td style={{ padding: "8px 10px", fontSize: 14, textAlign: "right" }}><RatePerHr v={effective} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ fontSize: 10, color: "#B0A9A0", marginTop: 6 }}>$/hr uses actual hours once entered, otherwise sold/projected.</div>
+          </>
+        )}
       </div>
     </div>
   )
