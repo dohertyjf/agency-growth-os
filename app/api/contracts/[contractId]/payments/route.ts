@@ -30,3 +30,29 @@ export async function POST(
 
   return Response.json(payment)
 }
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ contractId: string }> }
+) {
+  const session = await auth()
+  if (!session || session.user.role !== "coach") return Response.json({ error: "Forbidden" }, { status: 403 })
+  const { contractId } = await params
+  const payments = await prisma.contractPayment.findMany({
+    where: { contractId }, orderBy: { month: "asc" },
+  })
+  return Response.json(payments)
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ contractId: string }> }
+) {
+  const session = await auth()
+  if (!session || session.user.role !== "coach") return Response.json({ error: "Forbidden" }, { status: 403 })
+  const { contractId } = await params
+  const month = new URL(req.url).searchParams.get("month")
+  if (!month) return Response.json({ error: "month required" }, { status: 400 })
+  await prisma.contractPayment.deleteMany({ where: { contractId, month } })
+  return Response.json({ ok: true })
+}
