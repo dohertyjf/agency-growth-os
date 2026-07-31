@@ -668,6 +668,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
           <div className="contract-gantt-wrap">
             <ContractGantt
               contracts={showAllGantt ? contracts : contracts.filter(c => c.status !== "finished")}
+              accounts={localAccounts}
               now={now}
               showAll={showAllGantt}
               onToggleShowAll={() => setShowAllGantt(v => !v)}
@@ -795,7 +796,7 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
   )
 }
 
-function ContractGantt({ contracts, now, showAll, onToggleShowAll }: { contracts: Contract[]; now: string; showAll: boolean; onToggleShowAll: () => void }) {
+function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: { contracts: Contract[]; accounts: Account[]; now: string; showAll: boolean; onToggleShowAll: () => void }) {
   if (!contracts.length) return null
 
   const allYMs = contracts.flatMap(c => [c.start, ...(c.contractedThrough ? [c.contractedThrough] : [])])
@@ -857,6 +858,8 @@ function ContractGantt({ contracts, now, showAll, onToggleShowAll }: { contracts
           const effectiveThrough = c.contractedThrough ?? maxYM
           const left = ((toMonths(c.start) - startMo) / totalMo) * 100
           const width = ((toMonths(effectiveThrough) - toMonths(c.start) + 1) / totalMo) * 100
+          const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name : null
+          const label = accountName ? `${c.name} - ${accountName}` : c.name
           return (
             <div key={c.id} style={{
               position: "absolute", top: AXIS_H + i * ROW_H + 4, left: `${left}%`, width: `${width}%`,
@@ -864,7 +867,7 @@ function ContractGantt({ contracts, now, showAll, onToggleShowAll }: { contracts
               borderRadius: isOngoing ? "4px 0 0 4px" : 4, opacity: 0.85, display: "flex", alignItems: "center",
               paddingLeft: 6, overflow: "hidden",
             }}>
-              <span style={{ fontSize: 9, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{c.name}</span>
+              <span style={{ fontSize: 9, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }} title={label}>{label}</span>
               {isOngoing && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, paddingRight: 4, flexShrink: 0 }}>→</span>}
             </div>
           )
