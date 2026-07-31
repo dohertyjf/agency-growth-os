@@ -485,6 +485,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [showAllGantt, setShowAllGantt] = useState(false)
+  const [view, setView] = useState<"timeline" | "yield">("timeline")
 
   function handleAccountCreated(account: Account) {
     setLocalAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))
@@ -542,6 +543,16 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
 
   function handleDuplicated(created: Contract) {
     updateContracts([...contracts, created])
+  }
+
+  // Inline hours edit from the yield table — optimistic, persisted via PATCH.
+  function handleHoursChange(contractId: string, hours: number) {
+    updateContracts(contracts.map(c => c.id === contractId ? { ...c, hoursPerMonth: hours } : c))
+    fetch(`/api/contracts/${contractId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hoursPerMonth: hours }),
+    })
   }
 
   return (
@@ -665,15 +676,31 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
         <div style={{ color: "#9C9590", fontSize: 13 }}>No contracts yet.</div>
       ) : (
         <>
-          <div className="contract-gantt-wrap">
-            <ContractGantt
-              contracts={showAllGantt ? contracts : contracts.filter(c => c.status !== "finished")}
-              accounts={localAccounts}
-              now={now}
-              showAll={showAllGantt}
-              onToggleShowAll={() => setShowAllGantt(v => !v)}
-            />
+          <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 12 }}>
+            {([["timeline", "Timeline"], ["yield", "Hourly yield"]] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setView(v)}
+                style={{ padding: "4px 12px", fontSize: 11, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: view === v ? "#fff" : "transparent", color: view === v ? "#1A1916" : "#9C9590", boxShadow: view === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+                {label}
+              </button>
+            ))}
           </div>
+          {view === "timeline" ? (
+            <div className="contract-gantt-wrap">
+              <ContractGantt
+                contracts={showAllGantt ? contracts : contracts.filter(c => c.status !== "finished")}
+                accounts={localAccounts}
+                now={now}
+                showAll={showAllGantt}
+                onToggleShowAll={() => setShowAllGantt(v => !v)}
+              />
+            </div>
+          ) : (
+            <HourlyYieldTable
+              contracts={contracts}
+              accounts={localAccounts}
+              onHoursChange={handleHoursChange}
+            />
+          )}
 
           {/* Active */}
           {byStatus.active.length > 0 && (
@@ -790,6 +817,100 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function HourlyYieldTable({ contracts, accounts, onHoursChange }: {
+  contracts: Contract[]
+  accounts: Account[]
+  onHoursChange: (id: string, hours: number) => void
+}) {
+  const fmtCurrency = useFmtCurrency()
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState("")
+
+  const rows = contracts
+    .filter(c => c.status === "active" && c.type !== "oneoff")
+    .map(c => {
+      const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name ?? null : null
+      const perHr = c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null
+      return { c, accountName, perHr }
+    })
+    .sort((a, b) => {
+      if (a.perHr == null && b.perHr == null) return 0
+      if (a.perHr == null) return 1
+      if (b.perHr == null) return -1
+      return b.perHr - a.perHr
+    })
+
+  const totalMonthly = rows.reduce((s, r) => s + (r.perHr != null ? r.c.monthly : 0), 0)
+  const totalHours = rows.reduce((s, r) => s + (r.perHr != null ? r.c.hoursPerMonth : 0), 0)
+  const blended = totalHours > 0 ? totalMonthly / totalHours : null
+
+  function yieldColor(v: number | null) {
+    if (v == null || blended == null) return "#9C9590"
+    if (v >= blended * 1.15) return "#1F7A4D"
+    if (v <= blended * 0.7) return "#C2410C"
+    return "#1A1916"
+  }
+
+  function startEdit(c: Contract) { setEditingId(c.id); setDraft(c.hoursPerMonth > 0 ? String(c.hoursPerMonth) : "") }
+  function commit(id: string) {
+    const v = parseFloat(draft)
+    setEditingId(null)
+    if (!isNaN(v) && v >= 0) onHoursChange(id, v)
+  }
+
+  if (rows.length === 0) {
+    return <div style={{ fontSize: 12, color: "#9C9590", padding: "8px 0" }}>No active retainers to measure yet.</div>
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 2 }}>
+        <div style={{ fontSize: 12, color: "#9C9590" }}>Active retainers · click hrs/mo to set your real monthly average</div>
+        {blended != null && <div style={{ fontSize: 12, color: "#6B6760" }}>Blended <strong style={{ color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(blended)}/hr</strong></div>}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 460 }}>
+          <thead>
+            <tr>
+              {["Project", "Client", "Monthly", "Hrs / mo", "$ / hr"].map((h, i) => (
+                <th key={h} style={{ textAlign: i >= 2 ? "right" : "left", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#9C9590", padding: "6px 10px", borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ c, accountName, perHr }) => (
+              <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC" }}>
+                <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
+                <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(c.monthly)}</td>
+                <td style={{ padding: "4px 10px", textAlign: "right" }}>
+                  {editingId === c.id ? (
+                    <input
+                      autoFocus type="number" min={0} step={0.5} value={draft}
+                      onChange={e => setDraft(e.target.value)}
+                      onBlur={() => commit(c.id)}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditingId(null) }}
+                      style={{ width: 62, padding: "5px 8px", border: "1px solid #E9532A", borderRadius: 6, fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none", background: "#FFF7ED", fontFamily: "inherit" }}
+                    />
+                  ) : (
+                    <button onClick={() => startEdit(c)} title="Click to edit"
+                      style={{ background: "none", border: "1px dashed #E0DAD0", borderRadius: 6, padding: "4px 9px", fontSize: 13, color: c.hoursPerMonth > 0 ? "#1A1916" : "#C4BFB8", cursor: "pointer", fontVariantNumeric: "tabular-nums" }}>
+                      {c.hoursPerMonth > 0 ? `${c.hoursPerMonth}h` : "set"}
+                    </button>
+                  )}
+                </td>
+                <td style={{ padding: "8px 10px", fontSize: 14, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums", color: yieldColor(perHr) }}>
+                  {perHr != null ? fmtCurrency(perHr) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
