@@ -1,4 +1,5 @@
 "use client"
+import type { ReactNode } from "react"
 import { fmtCurrency, type LeadsGoalResult } from "@/lib/calc"
 
 const accent = "#E9532A"
@@ -10,9 +11,12 @@ interface Props {
   months: number
   setMonths: (n: number) => void
   currency: string
+  // Rendered between the reality-check teaser and the headline number, so the
+  // caller can slot the inputs + a CTA into the middle of the results.
+  middle?: ReactNode
 }
 
-export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, setMonths, currency }: Props) {
+export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, setMonths, currency, middle }: Props) {
   const fmt$ = (v: number) => fmtCurrency(v, currency)
   const needed = Math.ceil(r.leadsToReachGoal)
   const treadmill = Math.round(r.leadsToHoldCurrent)
@@ -57,6 +61,8 @@ export default function LeadGoalResults({ r, goalRevenue, currentLeads, months, 
           </div>
         )
       })()}
+
+      {middle}
 
       {/* Headline */}
       <div style={{ background: "#1A1916", borderRadius: 14, padding: "26px 24px", color: "#fff", marginBottom: 16 }}>

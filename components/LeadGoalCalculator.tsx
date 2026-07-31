@@ -247,42 +247,41 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
             )}
           </>
         ) : (
-          <>
-            {/* Results lead the page — slider + the numbers first */}
-            {avgMonthsStay == null && (
-              <div style={{ background: "#FBF7EF", border: "1px solid #ECD9B8", borderRadius: 12, padding: "14px 18px", marginBottom: 16, fontSize: 14, color: "#7A5B1E", lineHeight: 1.5 }}>
-                <strong>This is your best case</strong> — it assumes none of your clients cancel. Enter <strong>how many months your average client stays</strong> below and we&apos;ll factor in churn to give you a more accurate number.
-              </div>
-            )}
+          // Order: slider + reality-check (from results), then inputs + CTA
+          // (the middle slot), then the big number + gap + ceiling + roll-off.
+          <LeadGoalResults
+            r={r}
+            goalRevenue={goalRevenue}
+            currentLeads={currentLeads}
+            months={months}
+            setMonths={setMonths}
+            currency={currency}
+            middle={
+              <>
+                {avgMonthsStay == null && (
+                  <div style={{ background: "#FBF7EF", border: "1px solid #ECD9B8", borderRadius: 12, padding: "14px 18px", marginBottom: 16, fontSize: 14, color: "#7A5B1E", lineHeight: 1.5 }}>
+                    <strong>This is your best case</strong> — it assumes none of your clients cancel. Enter <strong>how many months your average client stays</strong> below and we&apos;ll factor in churn to give you a more accurate number.
+                  </div>
+                )}
 
-            <LeadGoalResults
-              r={r}
-              goalRevenue={goalRevenue}
-              currentLeads={currentLeads}
-              months={months}
-              setMonths={setMonths}
-              currency={currency}
-            />
+                {/* Inputs — editable, between the teaser and the full breakdown */}
+                <div style={{ ...inputsCardStyle, margin: "16px 0" }}>{inputsGrid}</div>
 
-            {/* Inputs below the results so people can tweak and watch them move */}
-            <div style={{ ...inputsCardStyle, margin: "20px 0" }}>{inputsGrid}</div>
-
-            {/* Schedule-a-call CTA, right below the inputs */}
-            {!live && (
-              <div style={{ textAlign: "center", background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "22px 22px" }}>
-                <div style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 21, fontWeight: 600, color: "#1A1916", marginBottom: 6 }}>
-                  Want to hit your number faster?
-                </div>
-                <div style={{ fontSize: 14, color: "#6F6B64", margin: "0 auto 16px", maxWidth: 500, lineHeight: 1.5 }}>
-                  Book a free Leads Strategy Call and John will walk you through your numbers and the fastest path to your goal.
-                </div>
-                <button onClick={() => setModalOpen(true)}
-                  style={{ fontSize: 15, fontWeight: 700, color: "#fff", background: accent, border: "none", borderRadius: 10, padding: "13px 30px", cursor: "pointer" }}>
-                  Book a call with John →
-                </button>
-              </div>
-            )}
-          </>
+                {/* Book-a-call banner */}
+                {!live && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", background: "#FBF0EB", border: "1px solid #F0C3B0", borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
+                    <div style={{ fontSize: 14, color: "#1A1916", lineHeight: 1.45 }}>
+                      <strong>Want to walk through this live with John?</strong> Book a free Leads Strategy Call.
+                    </div>
+                    <button onClick={() => setModalOpen(true)}
+                      style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: "#fff", background: accent, border: "none", borderRadius: 9, padding: "11px 20px", cursor: "pointer" }}>
+                      Book a call →
+                    </button>
+                  </div>
+                )}
+              </>
+            }
+          />
         )}
       </div>
 
