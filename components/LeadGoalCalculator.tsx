@@ -9,9 +9,11 @@ function currSym(c: Currency) { return c === "GBP" ? "£" : c === "EUR" ? "€" 
 const accent = "#E9532A"
 // John's Google Appointment Scheduling page, embedded in the booking modal.
 const BOOKING_URL = "https://calendar.google.com/calendar/appointments/schedules/AcZssZ1KAcVxnxyAbVyWshakSOwQcGXhbYtzndKY1NBI0cP79r8QjDOZoI1xJMVy8KkdEEjXcwkO8sAy?gv=true"
-const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
+// minHeight reserves room for a two-line label so every input starts at the
+// same vertical position whether its label wraps or not.
+const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", lineHeight: 1.3, minHeight: 30, marginBottom: 4 }
 const fieldStyle: React.CSSProperties = { display: "flex", flexDirection: "column" }
-const inputWrap: React.CSSProperties = { marginTop: "auto" }
+const inputWrap: React.CSSProperties = {}
 const inputStyle: React.CSSProperties = {
   padding: "8px 11px", border: "1px solid #ECE7DE", borderRadius: 8, fontSize: 14,
   background: "#FCFBF8", color: "#1A1916", width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none",
