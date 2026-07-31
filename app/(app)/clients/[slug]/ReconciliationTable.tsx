@@ -54,6 +54,14 @@ function monthLabel(ym: string): string {
 
 const now = new Date().toISOString().slice(0, 7)
 
+// Confidence bands shown in the grid, in display order. Signed work (active/
+// finished) first, then speculative (qualified/opportunity) which is tagged.
+const BAND_ORDER: Record<string, number> = { active: 0, finished: 1, potential: 2, opportunity: 3 }
+const STATUS_TAG: Record<string, { label: string; bg: string; color: string }> = {
+  potential: { label: "Qualified", bg: "#FEF3C7", color: "#92400E" },
+  opportunity: { label: "Opportunity", bg: "#DBEAFE", color: "#1D4ED8" },
+}
+
 function ymAdd(ym: string, months: number): string {
   const [y, m] = ym.split("-").map(Number)
   const total = y * 12 + m - 1 + months
@@ -70,14 +78,22 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
   const [savingPayment, setSavingPayment] = useState<string | null>(null)
   const [range, setRange] = useState<3 | 6 | 12 | "all">("all")
 
-  const activeContracts = contracts.filter(c => c.status === "active" || c.status === "finished")
-  if (activeContracts.length === 0) return null
+  const shownContracts = contracts
+    .filter(c => c.status in BAND_ORDER)
+    .sort((a, b) => (BAND_ORDER[a.status] - BAND_ORDER[b.status]) || a.start.localeCompare(b.start))
+  const signedContracts = shownContracts.filter(c => c.status === "active" || c.status === "finished")
+  if (shownContracts.length === 0) return null
 
-  const allEnds = activeContracts.map(c => c.contractedThrough ?? now)
+  // Extend the window forward so ongoing/future work (e.g. a qualified continuation
+  // starting next month) is visible — ongoing contracts have no end date, so cap them
+  // at the later of year-end and ~6 months out.
+  const yearEnd = `${now.slice(0, 4)}-12`
+  const forwardHorizon = [yearEnd, ymAdd(now, 5)].reduce((a, b) => a > b ? a : b)
+  const allEnds = shownContracts.map(c => c.contractedThrough ?? forwardHorizon)
   const rangeEnd = [now, ...allEnds].reduce((a, b) => a > b ? a : b)
 
   const windowStart = range === "all"
-    ? activeContracts.map(c => c.start).reduce((a, b) => a < b ? a : b)
+    ? shownContracts.map(c => c.start).reduce((a, b) => a < b ? a : b)
     : ymAdd(now, -(range - 1))
 
   // Extend one month back if there are early cash payments
@@ -86,7 +102,7 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
 
   const allMonths = monthsBetween(effectiveStart, rangeEnd)
   // Only show months where at least one contract is active
-  const months = allMonths.filter(m => activeContracts.some(c => contractActiveInMonth(c, m)))
+  const months = allMonths.filter(m => shownContracts.some(c => contractActiveInMonth(c, m)))
 
   function getActual(contractId: string, month: string) {
     return accountMonths.find(am => am.contractId === contractId && am.month === month)
@@ -167,7 +183,7 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Monthly Reconciliation</div>
           <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
-            Forecast in muted · click to enter actual · teal row = cash received
+            Muted = forecast · click any cell to set the amount · teal = cash received · tagged rows are Qualified / Opportunity (excluded from signed totals)
           </div>
         </div>
         <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2 }}>
@@ -192,11 +208,18 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
             </tr>
           </thead>
           <tbody>
-            {activeContracts.map(contract => (
+            {shownContracts.map(contract => (
               <>
                 {/* Actuals row */}
                 <tr key={contract.id}>
-                  <td style={labelStyle}>{contract.name}</td>
+                  <td style={labelStyle}>
+                    <span style={{ opacity: STATUS_TAG[contract.status] ? 0.75 : 1 }}>{contract.name}</span>
+                    {STATUS_TAG[contract.status] && (
+                      <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 8, background: STATUS_TAG[contract.status].bg, color: STATUS_TAG[contract.status].color, textTransform: "uppercase", letterSpacing: "0.03em", verticalAlign: "middle" }}>
+                        {STATUS_TAG[contract.status].label}
+                      </span>
+                    )}
+                  </td>
                   {months.map(month => {
                     const active = contractActiveInMonth(contract, month)
                     const am = getActual(contract.id, month)
@@ -304,12 +327,12 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
               </>
             ))}
 
-            {/* Total MRR row */}
+            {/* Total MRR row — signed (contracted) only */}
             <tr style={{ background: "#F8F6F2" }}>
               <td style={{ ...labelStyle, fontWeight: 700, color: "#1A1916", background: "#F8F6F2" }}>Total MRR</td>
               {months.map(month => {
                 let total = 0
-                for (const c of activeContracts) {
+                for (const c of signedContracts) {
                   if (!contractActiveInMonth(c, month)) continue
                   const am = getActual(c.id, month)
                   total += am ? am.actual : c.monthly
@@ -322,16 +345,36 @@ export default function ReconciliationTable({ contracts, initialAccountMonths, i
               })}
             </tr>
 
+            {/* Projected row — all bands, incl. Qualified + Opportunity (shown only if any exist) */}
+            {shownContracts.length > signedContracts.length && (
+              <tr style={{ background: "#FBFAF7" }}>
+                <td style={{ ...labelStyle, fontWeight: 600, color: "#6B6760", background: "#FBFAF7" }}>Projected · all bands</td>
+                {months.map(month => {
+                  let total = 0
+                  for (const c of shownContracts) {
+                    if (!contractActiveInMonth(c, month)) continue
+                    const am = getActual(c.id, month)
+                    total += am ? am.actual : c.monthly
+                  }
+                  return (
+                    <td key={month} style={{ padding: "7px 10px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "#6B6760", fontVariantNumeric: "tabular-nums", borderRight: "1px solid #F5F1EC", background: month === now ? "#FFF8F5" : "transparent" }}>
+                      {fmtCurrency(total)}
+                    </td>
+                  )
+                })}
+              </tr>
+            )}
+
             {/* Total Cash row */}
             <tr style={{ background: "#F0FDFA" }}>
               <td style={{ ...labelStyle, fontWeight: 700, color: "#0D9488", background: "#F0FDFA" }}>Total Cash In</td>
               {months.map(month => {
-                const total = activeContracts.reduce((sum, c) => {
+                const total = signedContracts.reduce((sum, c) => {
                   if (!contractActiveInMonth(c, month)) return sum
                   const pm = getPayment(c.id, month)
                   return sum + (pm ? pm.amount : (getActual(c.id, month)?.actual ?? c.monthly))
                 }, 0)
-                const isOverridden = activeContracts.some(c => contractActiveInMonth(c, month) && getPayment(c.id, month))
+                const isOverridden = signedContracts.some(c => contractActiveInMonth(c, month) && getPayment(c.id, month))
                 return (
                   <td key={month} style={{ padding: "7px 10px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isOverridden ? "#0D9488" : "#99D6CE", fontVariantNumeric: "tabular-nums", borderRight: "1px solid #CCFBF1", background: "transparent" }}>
                     {fmtCurrency(total)}
