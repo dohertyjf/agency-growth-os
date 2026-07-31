@@ -542,7 +542,7 @@ export default function AccountsPanel({ clientId, initialAccounts, contracts, pr
                       <div>
                         <label style={labelStyle}>Status</label>
                         <select style={{ ...inputStyle, fontSize: 12 }} value={projectForm.status} onChange={e => setProjectForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
-                          <option value="potential">Potential</option>
+                          <option value="potential">Qualified</option>
                           <option value="active">Active</option>
                           <option value="finished">Finished</option>
                         </select>

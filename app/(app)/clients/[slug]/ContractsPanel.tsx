@@ -44,7 +44,7 @@ interface Props {
 
 type ContractStatus = "opportunity" | "potential" | "active" | "lost" | "finished"
 
-const STATUS_LABELS: Record<ContractStatus, string> = { opportunity: "Opportunity", potential: "Potential", active: "Active", lost: "Lost", finished: "Finished" }
+const STATUS_LABELS: Record<ContractStatus, string> = { opportunity: "Opportunity", potential: "Qualified", active: "Active", lost: "Lost", finished: "Finished" }
 const STATUS_COLORS: Record<ContractStatus, { bg: string; text: string }> = {
   opportunity: { bg: "#EFF6FF", text: "#1D4ED8" },
   potential: { bg: "#FFF7ED", text: "#92400E" },
@@ -267,7 +267,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
               <label style={labelStyle}>Status</label>
               <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
                 <option value="opportunity">Opportunity</option>
-                <option value="potential">Potential</option>
+                <option value="potential">Qualified</option>
                 <option value="active">Active</option>
                 <option value="lost">Lost</option>
                 <option value="finished">Finished</option>
@@ -397,7 +397,7 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
               <label style={labelStyle}>Status</label>
               <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
                 <option value="opportunity">Opportunity</option>
-                <option value="potential">Potential</option>
+                <option value="potential">Qualified</option>
                 <option value="active">Active</option>
                 <option value="lost">Lost</option>
                 <option value="finished">Finished</option>
@@ -647,7 +647,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Status</label>
               <select style={{ ...inputStyle, background: "#FBFAF7" }} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
                 <option value="opportunity">Opportunity</option>
-                <option value="potential">Potential</option>
+                <option value="potential">Qualified</option>
                 <option value="active">Active</option>
                 <option value="lost">Lost</option>
                 <option value="finished">Finished</option>

@@ -446,7 +446,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
                   setStatus(next)
                   if (next === "active" && !startDate) setStartDate(new Date().toISOString().slice(0, 10))
                 }}>
-                  <option value="potential">Potential</option>
+                  <option value="potential">Qualified</option>
                   <option value="active">Active</option>
                   <option value="paused">Paused</option>
                 </select>
@@ -551,7 +551,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
         <MetricChart
           points={chartPoints}
           series2={chartPoints2}
-          series2Label="With Potential"
+          series2Label="With Qualified"
           series3={cashCollectedPoints}
           series3Label="Cash Collected"
           format={selectedCard === "contractMRR" ? "currency" : (CARDS.find(c => c.key === selectedCard)?.fmt ?? "currency")}

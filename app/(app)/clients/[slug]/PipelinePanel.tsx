@@ -457,7 +457,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           subtitle="Initial contact made"
           deals={opportunityDeals}
           accounts={localAccounts}
-          advanceLabel="→ Potential"
+          advanceLabel="→ Qualified"
           onAdvance={id => updateContract(id, { status: "potential" })}
           onLost={id => updateContract(id, { status: "lost" })}
           onEdit={openEdit}
@@ -465,7 +465,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         />
 
         <DealGroup
-          title="Potential"
+          title="Qualified"
           subtitle="In negotiation"
           deals={potentialDeals}
           accounts={localAccounts}
@@ -507,14 +507,14 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 0 6px 4px" }}>
               <span style={{ fontSize: 11, color: "#C0BAB2" }}>↓</span>
               <span style={{ fontSize: 11, color: "#9C9590" }}>
-                {oppToProposalPct !== null ? `${oppToProposalPct}% moved to Potential` : "—"}
+                {oppToProposalPct !== null ? `${oppToProposalPct}% moved to Qualified` : "—"}
               </span>
             </div>
 
             {/* Potential */}
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 11 }}>
-                <span style={{ color: "#6B6760", fontWeight: 600 }}>Potential</span>
+                <span style={{ color: "#6B6760", fontWeight: 600 }}>Qualified</span>
                 <span style={{ color: "#1A1916", fontWeight: 700 }}>{totalProposal}</span>
               </div>
               <div style={{ height: 10, background: "#F5F1EC", borderRadius: 5, overflow: "hidden" }}>
@@ -603,7 +603,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                   <select style={inputStyle} value={addForm.stage}
                     onChange={e => setAddForm(f => ({ ...f, stage: e.target.value as "opportunity" | "potential" }))}>
                     <option value="opportunity">Opportunity</option>
-                    <option value="potential">Potential</option>
+                    <option value="potential">Qualified</option>
                   </select>
                 </div>
               </div>
