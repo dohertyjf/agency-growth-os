@@ -229,6 +229,12 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     return [...allDerived].filter(m => m.month < latest.month).at(-1) ?? null
   }, [allDerived, latest])
 
+  // Sparkline window for the metric cards: the `range` months ending at the selected month
+  const cardWindow = useMemo(
+    () => allDerived.filter(m => m.month <= cardMonth).slice(-range),
+    [allDerived, cardMonth, range]
+  )
+
   // Contract rows for projections
   const contractRows: ContractRow[] = contracts.map(c => ({
     monthly: c.monthly,
@@ -640,7 +646,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
           const val = latest ? (latest[card.key] as number) : 0
           const prevVal = prev ? (prev[card.key] as number) : null
           const delta = prevVal !== null ? momDelta(val, prevVal) : null
-          const sparkline = metrics.map(m => m[card.key] as number)
+          const sparkline = cardWindow.map(m => m[card.key] as number)
           return (
             <MetricCard
               key={card.key}
