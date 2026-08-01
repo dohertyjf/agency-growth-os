@@ -249,11 +249,11 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     currentYM,
   }
 
-  // Contract MRR sparkline over range months
+  // Contract MRR sparkline over range months, ending at the selected month
   const contractMRRSparkline = useMemo(() => {
-    return Array.from({ length: range }, (_, i) => currentMRR(contractRows, ymAdd(nowYM, i - range + 1)))
+    return Array.from({ length: range }, (_, i) => currentMRR(contractRows, ymAdd(cardMonth, i - range + 1)))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, range, nowYM])
+  }, [contracts, range, cardMonth])
 
   // Build chart points for selected metric
   const chartPoints: ChartPoint[] = useMemo(() => {
@@ -630,7 +630,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 24 }}>
         <MetricCard
           label="Contracted MRR"
-          value={fmt$(currentMRR(contractRows, nowYM))}
+          value={fmt$(currentMRR(contractRows, cardMonth))}
           delta={contractMRRSparkline.length >= 2 ? momDelta(contractMRRSparkline[contractMRRSparkline.length - 1], contractMRRSparkline[contractMRRSparkline.length - 2]) : null}
           sparkline={contractMRRSparkline}
           selected={selectedCard === "contractMRR"}
