@@ -25,12 +25,18 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function ContractEditModal({ contract, accounts, onClose, onSaved }: {
+export default function ContractEditModal({ contract, accounts, clientId, onClose, onSaved, onAccountCreated }: {
   contract: Contract
   accounts: Account[]
+  clientId: string
   onClose: () => void
   onSaved: (updated: Contract) => void
+  onAccountCreated: (account: Account) => void
 }) {
+  const [localAccounts, setLocalAccounts] = useState<Account[]>(accounts)
+  const [creatingAccount, setCreatingAccount] = useState(false)
+  const [newAccountName, setNewAccountName] = useState("")
+  const [creatingSaving, setCreatingSaving] = useState(false)
   const uiType: ContractTypeField = !contract.contractedThrough && contract.type === "retainer" ? "ongoing" : ((contract.type as ContractTypeField) ?? "retainer")
   const [form, setForm] = useState({
     name: contract.name,
@@ -72,6 +78,25 @@ export default function ContractEditModal({ contract, accounts, onClose, onSaved
     onClose()
   }
 
+  async function createAccount() {
+    const name = newAccountName.trim()
+    if (!name) return
+    setCreatingSaving(true)
+    const res = await fetch(`/api/clients/${clientId}/accounts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    })
+    setCreatingSaving(false)
+    if (!res.ok) return
+    const account: Account = await res.json()
+    setLocalAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))
+    setForm(f => ({ ...f, accountId: account.id }))
+    onAccountCreated(account)
+    setCreatingAccount(false)
+    setNewAccountName("")
+  }
+
   return (
     <div
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
@@ -102,10 +127,37 @@ export default function ContractEditModal({ contract, accounts, onClose, onSaved
           </div>
           <div>
             <label style={labelStyle}>Client Account</label>
-            <select style={inputStyle} value={form.accountId ?? ""} onChange={e => setForm(f => ({ ...f, accountId: e.target.value || null }))}>
-              <option value="">Unassigned</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            {creatingAccount ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  autoFocus
+                  value={newAccountName}
+                  onChange={e => setNewAccountName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); createAccount() } if (e.key === "Escape") { setCreatingAccount(false); setNewAccountName("") } }}
+                  placeholder="New account name"
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <button type="button" onClick={createAccount} disabled={creatingSaving || !newAccountName.trim()}
+                  style={{ padding: "7px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", opacity: creatingSaving || !newAccountName.trim() ? 0.6 : 1 }}>
+                  {creatingSaving ? "…" : "Add"}
+                </button>
+                <button type="button" onClick={() => { setCreatingAccount(false); setNewAccountName("") }}
+                  style={{ padding: "7px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 8 }}>
+                <select style={{ ...inputStyle, flex: 1 }} value={form.accountId ?? ""} onChange={e => setForm(f => ({ ...f, accountId: e.target.value || null }))}>
+                  <option value="">Unassigned</option>
+                  {localAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                <button type="button" onClick={() => setCreatingAccount(true)}
+                  style={{ padding: "7px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760", whiteSpace: "nowrap" }}>
+                  + New
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <label style={labelStyle}>Project Name</label>

@@ -36,11 +36,13 @@ interface Payment {
 interface Props {
   contracts: Contract[]
   accounts: Account[]
+  clientId: string
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
   onRevenueUpdate: (month: string, revenue: number) => void
   onPaymentsChange: (payments: Payment[]) => void
   onContractUpdate: (updated: Contract) => void
+  onAccountCreated: (account: Account) => void
 }
 
 function monthsBetween(start: string, end: string): string[] {
@@ -84,7 +86,7 @@ function ymAdd(ym: string, months: number): string {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`
 }
 
-export default function ReconciliationTable({ contracts, accounts, initialAccountMonths, initialPayments, onRevenueUpdate, onPaymentsChange, onContractUpdate }: Props) {
+export default function ReconciliationTable({ contracts, accounts, clientId, initialAccountMonths, initialPayments, onRevenueUpdate, onPaymentsChange, onContractUpdate, onAccountCreated }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [accountMonths, setAccountMonths] = useState<AccountMonth[]>(initialAccountMonths)
@@ -204,8 +206,10 @@ export default function ReconciliationTable({ contracts, accounts, initialAccoun
         <ContractEditModal
           contract={editingContract}
           accounts={accounts}
+          clientId={clientId}
           onClose={() => setEditingContract(null)}
           onSaved={onContractUpdate}
+          onAccountCreated={onAccountCreated}
         />
       )}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>

@@ -323,11 +323,13 @@ export default function ClientPageClient({
             <ReconciliationTable
               contracts={contracts}
               accounts={accounts}
+              clientId={clientId}
               initialAccountMonths={initialAccountMonths}
               initialPayments={initialPayments}
               onRevenueUpdate={handleRevenueUpdate}
               onPaymentsChange={setPayments}
               onContractUpdate={updated => setContracts(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c))}
+              onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
             />
           ) : (
             <CashflowProjection contracts={contracts} />
