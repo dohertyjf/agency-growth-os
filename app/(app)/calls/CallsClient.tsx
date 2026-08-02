@@ -101,13 +101,21 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
       body: JSON.stringify({ q: qForm.q }),
     })
     const data = await res.json()
-    if (res.ok && data.question) {
-      const updatedCall = { ...selected, questions: [...selected.questions, data.question] }
+    if (res.ok && data.id) {
+      const updatedCall = { ...selected, questions: [...selected.questions, data] }
       setCalls(prev => prev.map(c => c.id === selected.id ? updatedCall : c))
       setSelected(updatedCall)
       setQForm({ q: "" })
       setAddingQ(false)
     }
+  }
+
+  async function handleDeleteQuestion(questionId: string) {
+    if (!selected) return
+    const updatedCall = { ...selected, questions: selected.questions.filter(q => q.id !== questionId) }
+    setCalls(prev => prev.map(c => c.id === selected.id ? updatedCall : c))
+    setSelected(updatedCall)
+    await fetch(`/api/questions/${questionId}`, { method: "DELETE" })
   }
 
   async function handleAnswerBlur(questionId: string, answer: string) {
@@ -290,7 +298,12 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
             <Section label="Questions & Actions">
               {selected.questions.map(q => (
                 <div key={q.id} style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 4 }}>{q.q}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 4, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <span style={{ flex: 1 }}>{q.q}</span>
+                    {isCoach && (
+                      <button onClick={() => handleDeleteQuestion(q.id)} title="Delete" style={{ background: "none", border: "none", color: "#C4BFBA", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
+                    )}
+                  </div>
                   <textarea
                     defaultValue={q.a ?? ""}
                     placeholder="Answer / action…"
