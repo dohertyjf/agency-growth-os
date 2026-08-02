@@ -9,8 +9,9 @@ export default async function CallsPage() {
 
   const clientId = session.user.role === "client" ? (session.user.clientId ?? undefined) : undefined
 
+  // Clients see their own 1:1 calls plus every group call.
   const calls = await prisma.call.findMany({
-    where: clientId ? { clientId } : {},
+    where: clientId ? { OR: [{ clientId }, { isGroupCall: true }] } : {},
     include: { questions: { orderBy: { order: "asc" } } },
     orderBy: { date: "desc" },
   })

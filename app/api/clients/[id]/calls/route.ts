@@ -31,6 +31,7 @@ const schema = z.object({
   video: z.string().optional(),
   synopsis: z.string().optional(),
   notes: z.string().optional(),
+  isGroupCall: z.boolean().optional(),
 })
 
 export async function POST(

@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import ClientPageClient from "../ClientPageClient"
 
-const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "products", "goals", "team"] as const
+const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "products", "goals", "team", "calls"] as const
 type Tab = typeof VALID_TABS[number]
 
 export default async function ClientTabPage({ params }: { params: Promise<{ slug: string; tab: string }> }) {
@@ -33,6 +33,13 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
     prisma.personHoursMonth.findMany({ where: { person: { clientId: id } } }),
   ])
 
+  // This client's 1:1 calls plus every group call (group calls are shared).
+  const calls = await prisma.call.findMany({
+    where: { OR: [{ clientId: id }, { isGroupCall: true }] },
+    include: { questions: { orderBy: { order: "asc" } } },
+    orderBy: { date: "desc" },
+  })
+
   return (
     <ClientPageClient
       clientId={id}
@@ -53,6 +60,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
       goal={goal}
+      initialCalls={calls.map(c => ({ id: c.id, clientId: c.clientId, date: c.date, title: c.title, transcript: c.transcript ?? null, video: c.video ?? null, synopsis: c.synopsis ?? null, notes: c.notes ?? null, isGroupCall: c.isGroupCall, questions: c.questions.map(q => ({ id: q.id, q: q.q, a: q.a ?? null, order: q.order })) }))}
       products={products.map(p => ({ id: p.id, name: p.name, description: p.description ?? null, type: p.type as "retainer" | "ongoing" | "oneoff", monthly: p.monthly }))}
       initialRoadmap={roadmapItems.map(r => ({ key: r.key, status: r.status as "none" | "red" | "yellow" | "green" }))}
     />

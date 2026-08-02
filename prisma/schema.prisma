@@ -199,14 +199,15 @@ model Call {
   id         String     @id @default(cuid())
   clientId   String
   client     Client     @relation(fields: [clientId], references: [id])
-  date       String
-  title      String
-  transcript String?
-  video      String?
-  synopsis   String?
-  notes      String?
-  questions  Question[]
-  createdAt  DateTime   @default(now())
+  date        String
+  title       String
+  transcript  String?
+  video       String?
+  synopsis    String?
+  notes       String?
+  isGroupCall Boolean    @default(false) // group call → visible to every client
+  questions   Question[]
+  createdAt   DateTime   @default(now())
 }
 
 model Question {

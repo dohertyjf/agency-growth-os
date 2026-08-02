@@ -11,6 +11,7 @@ import ProgressPanel from "./ProgressPanel"
 import GoalsPanel from "./GoalsPanel"
 import PeoplePanel from "./PeoplePanel"
 import PipelinePanel from "./PipelinePanel"
+import CallsClient from "../../calls/CallsClient"
 import { CurrencyProvider } from "@/lib/CurrencyContext"
 
 interface Metric {
@@ -114,7 +115,21 @@ interface RoadmapItem {
   status: "none" | "red" | "yellow" | "green"
 }
 
-type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "team"
+interface CallQuestion { id: string; q: string; a: string | null; order: number }
+interface Call {
+  id: string
+  clientId: string
+  date: string
+  title: string
+  transcript: string | null
+  video: string | null
+  synopsis: string | null
+  notes: string | null
+  isGroupCall: boolean
+  questions: CallQuestion[]
+}
+
+type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "team" | "calls"
 
 interface Props {
   clientId: string
@@ -132,6 +147,7 @@ interface Props {
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
   goal: Goal | null
+  initialCalls: Call[]
   products: Product[]
   initialRoadmap: RoadmapItem[]
   initialPeople: Person[]
@@ -145,6 +161,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "projects", label: "Projects" },
   { key: "pipeline", label: "Pipeline" },
   { key: "team", label: "Team" },
+  { key: "calls", label: "Calls" },
   { key: "products", label: "Products" },
   { key: "progress", label: "Progress" },
   { key: "goals", label: "Settings" },
@@ -154,7 +171,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -316,6 +333,16 @@ export default function ClientPageClient({
             <CashflowProjection contracts={contracts} />
           )}
         </div>
+      )}
+
+      {currentTab === "calls" && (
+        <CallsClient
+          calls={initialCalls}
+          clients={[{ id: clientId, name: clientName }]}
+          isCoach={true}
+          defaultClientId={clientId}
+          embedded
+        />
       )}
 
       {currentTab === "progress" && (

@@ -9,6 +9,7 @@ const schema = z.object({
   video: z.string().optional(),
   synopsis: z.string().optional(),
   notes: z.string().optional(),
+  isGroupCall: z.boolean().optional(),
 })
 
 async function authorizeCall(session: import("next-auth").Session | null, callId: string) {

@@ -11,6 +11,7 @@ interface Call {
   video: string | null
   synopsis: string | null
   notes: string | null
+  isGroupCall: boolean
   questions: Question[]
 }
 interface Client { id: string; name: string }
@@ -20,13 +21,33 @@ interface Props {
   clients: Client[]
   isCoach: boolean
   defaultClientId?: string
+  embedded?: boolean
 }
 
-export default function CallsClient({ calls: initialCalls, clients, isCoach, defaultClientId }: Props) {
+// Convert a share link into an embeddable player URL. Falls back to null (plain link).
+function videoEmbedUrl(url: string): string | null {
+  const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/)
+  if (yt) return `https://www.youtube.com/embed/${yt[1]}`
+  const loom = url.match(/loom\.com\/(?:share|embed)\/([\w-]+)/)
+  if (loom) return `https://www.loom.com/embed/${loom[1]}`
+  const vimeo = url.match(/vimeo\.com\/(\d+)/)
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`
+  return null
+}
+
+function GroupBadge() {
+  return (
+    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 8, background: "#EDE9FE", color: "#6D28D9", textTransform: "uppercase", letterSpacing: "0.04em", verticalAlign: "middle" }}>
+      Group
+    </span>
+  )
+}
+
+export default function CallsClient({ calls: initialCalls, clients, isCoach, defaultClientId, embedded }: Props) {
   const [calls, setCalls] = useState<Call[]>(initialCalls)
   const [selected, setSelected] = useState<Call | null>(calls[0] ?? null)
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ clientId: defaultClientId ?? clients[0]?.id ?? "", date: new Date().toISOString().slice(0, 10), title: "" })
+  const [form, setForm] = useState({ clientId: defaultClientId ?? clients[0]?.id ?? "", date: new Date().toISOString().slice(0, 10), title: "", isGroupCall: false })
   const [saving, setSaving] = useState(false)
   const [editingNote, setEditingNote] = useState<{ callId: string; field: "synopsis" | "notes"; value: string } | null>(null)
   const [addingQ, setAddingQ] = useState(false)
@@ -38,15 +59,15 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
     const res = await fetch(`/api/clients/${form.clientId}/calls`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: form.date, title: form.title, questions: [] }),
+      body: JSON.stringify({ date: form.date, title: form.title, isGroupCall: form.isGroupCall }),
     })
     const data = await res.json()
-    if (res.ok && data.call) {
-      const newCall = { ...data.call, questions: [] }
+    if (res.ok && data.id) {
+      const newCall: Call = { ...data, questions: data.questions ?? [] }
       setCalls(prev => [newCall, ...prev])
       setSelected(newCall)
       setAdding(false)
-      setForm(f => ({ ...f, title: "" }))
+      setForm(f => ({ ...f, title: "", isGroupCall: false }))
     }
     setSaving(false)
   }
@@ -59,6 +80,16 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
     })
     setCalls(prev => prev.map(c => c.id === callId ? { ...c, [field]: value } : c))
     if (selected?.id === callId) setSelected(s => s ? { ...s, [field]: value } : s)
+  }
+
+  async function patchCall(callId: string, patch: Partial<Call>) {
+    setCalls(prev => prev.map(c => c.id === callId ? { ...c, ...patch } : c))
+    if (selected?.id === callId) setSelected(s => s ? { ...s, ...patch } : s)
+    await fetch(`/api/calls/${callId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    })
   }
 
   async function handleAddQuestion(e: React.FormEvent) {
@@ -104,8 +135,8 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, color: "#1A1916", margin: 0 }}>Calls</h1>
+      <div style={{ display: "flex", justifyContent: embedded ? "flex-end" : "space-between", alignItems: "center", marginBottom: 20 }}>
+        {!embedded && <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, color: "#1A1916", margin: 0 }}>Calls</h1>}
         {isCoach && (
           <button onClick={() => setAdding(a => !a)} style={{ padding: "7px 16px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             + New Call
@@ -115,8 +146,8 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
 
       {/* Add call form */}
       {adding && isCoach && (
-        <form onSubmit={handleAddCall} style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 10, padding: 16, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-end" }}>
-          <div style={{ flex: 1 }}>
+        <form onSubmit={handleAddCall} style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 10, padding: 16, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 180 }}>
             <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Title</label>
             <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required placeholder="Monthly strategy call" style={{ width: "100%", padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 13, boxSizing: "border-box" }} />
           </div>
@@ -132,6 +163,10 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
               </select>
             </div>
           )}
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#1A1916", cursor: "pointer", padding: "7px 0" }}>
+            <input type="checkbox" checked={form.isGroupCall} onChange={e => setForm(f => ({ ...f, isGroupCall: e.target.checked }))} style={{ accentColor: "#E9532A" }} />
+            Group call
+          </label>
           <button type="submit" disabled={saving} style={{ padding: "7px 16px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Save</button>
         </form>
       )}
@@ -154,7 +189,10 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
                   borderBottom: "1px solid #F5F1EC",
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>{call.title}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>{call.title}</span>
+                  {call.isGroupCall && <GroupBadge />}
+                </div>
                 <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>{call.date}</div>
               </div>
             ))
@@ -163,12 +201,51 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
 
         {/* Call detail */}
         {selected && (
-          <div style={{ flex: 1, background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 24 }}>
-            <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px" }}>{selected.title}</h2>
-            <div style={{ fontSize: 12, color: "#9C9590", marginBottom: 20 }}>{selected.date}</div>
+          <div style={{ flex: 1, background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 24, minWidth: 0 }}>
+            <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
+              {selected.title}
+              {selected.isGroupCall && <GroupBadge />}
+            </h2>
+            <div style={{ fontSize: 12, color: "#9C9590", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
+              <span>{selected.date}</span>
+              {isCoach && (
+                <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                  <input type="checkbox" checked={selected.isGroupCall} onChange={e => patchCall(selected.id, { isGroupCall: e.target.checked })} style={{ accentColor: "#E9532A" }} />
+                  Group call (all clients can view)
+                </label>
+              )}
+            </div>
+
+            {/* Recording */}
+            <Section label="Recording">
+              {(() => {
+                const embed = selected.video ? videoEmbedUrl(selected.video) : null
+                return (
+                  <>
+                    {embed && (
+                      <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, marginBottom: 10, borderRadius: 8, overflow: "hidden", background: "#000" }}>
+                        <iframe src={embed} title="Call recording" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: 0 }} />
+                      </div>
+                    )}
+                    {selected.video && !embed && (
+                      <a href={selected.video} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#E9532A" }}>Open recording ↗</a>
+                    )}
+                    {isCoach ? (
+                      <input
+                        key={selected.id + (selected.video ?? "")}
+                        defaultValue={selected.video ?? ""}
+                        placeholder="Paste YouTube / Loom / Vimeo link…"
+                        onBlur={e => { const v = e.target.value.trim(); if (v !== (selected.video ?? "")) patchCall(selected.id, { video: v || null }) }}
+                        style={{ width: "100%", marginTop: embed || selected.video ? 8 : 0, padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
+                      />
+                    ) : (!selected.video && <span style={{ fontSize: 13, color: "#C0BAB2" }}>No recording yet.</span>)}
+                  </>
+                )
+              })()}
+            </Section>
 
             {/* Synopsis */}
-            <Section label="Synopsis">
+            <Section label="Recap">
               {editingNote?.callId === selected.id && editingNote.field === "synopsis" ? (
                 <div>
                   <textarea
@@ -182,9 +259,9 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
               ) : (
                 <div
                   onClick={() => isCoach && setEditingNote({ callId: selected.id, field: "synopsis", value: selected.synopsis ?? "" })}
-                  style={{ fontSize: 13, color: selected.synopsis ? "#1A1916" : "#C0BAB2", cursor: isCoach ? "text" : "default", minHeight: 32, lineHeight: 1.6 }}
+                  style={{ fontSize: 13, color: selected.synopsis ? "#1A1916" : "#C0BAB2", cursor: isCoach ? "text" : "default", minHeight: 32, lineHeight: 1.6, whiteSpace: "pre-wrap" }}
                 >
-                  {selected.synopsis || (isCoach ? "Click to add synopsis…" : "—")}
+                  {selected.synopsis || (isCoach ? "Click to add a recap…" : "—")}
                 </div>
               )}
             </Section>
@@ -202,7 +279,7 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
               ) : (
                 <div
                   onClick={() => isCoach && setEditingNote({ callId: selected.id, field: "notes", value: selected.notes ?? "" })}
-                  style={{ fontSize: 13, color: selected.notes ? "#1A1916" : "#C0BAB2", cursor: isCoach ? "text" : "default", minHeight: 32, lineHeight: 1.6 }}
+                  style={{ fontSize: 13, color: selected.notes ? "#1A1916" : "#C0BAB2", cursor: isCoach ? "text" : "default", minHeight: 32, lineHeight: 1.6, whiteSpace: "pre-wrap" }}
                 >
                   {selected.notes || (isCoach ? "Click to add notes…" : "—")}
                 </div>
@@ -246,16 +323,6 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
                 )
               )}
             </Section>
-
-            {/* Video link */}
-            {(selected.video || isCoach) && (
-              <Section label="Recording">
-                {selected.video
-                  ? <a href={selected.video} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#E9532A" }}>Open recording ↗</a>
-                  : <span style={{ fontSize: 13, color: "#C0BAB2" }}>No recording linked.</span>
-                }
-              </Section>
-            )}
           </div>
         )}
       </div>
