@@ -253,46 +253,48 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
             </Section>
 
             {/* Synopsis */}
-            <Section label="Recap">
-              {editingNote?.callId === selected.id && editingNote.field === "synopsis" ? (
-                <div>
-                  <textarea
-                    autoFocus
-                    defaultValue={editingNote.value}
-                    rows={4}
-                    style={{ width: "100%", border: "1px solid #ECE7DE", borderRadius: 6, padding: 10, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
-                    onBlur={e => { saveField(selected.id, "synopsis", e.target.value); setEditingNote(null) }}
-                  />
-                </div>
-              ) : (
-                <div
-                  onClick={() => isCoach && setEditingNote({ callId: selected.id, field: "synopsis", value: selected.synopsis ?? "" })}
-                  style={{ fontSize: 13, color: selected.synopsis ? "#1A1916" : "#C0BAB2", cursor: isCoach ? "text" : "default", minHeight: 32, lineHeight: 1.6, whiteSpace: "pre-wrap" }}
-                >
-                  {selected.synopsis || (isCoach ? "Click to add a recap…" : "—")}
-                </div>
-              )}
-            </Section>
+            {(() => {
+              const editing = editingNote?.callId === selected.id && editingNote.field === "synopsis"
+              return (
+                <Section label="Recap" action={isCoach && !editing && <EditButton onClick={() => setEditingNote({ callId: selected.id, field: "synopsis", value: selected.synopsis ?? "" })} />}>
+                  {editing ? (
+                    <textarea
+                      autoFocus
+                      defaultValue={editingNote!.value}
+                      rows={4}
+                      style={{ width: "100%", border: "1px solid #ECE7DE", borderRadius: 6, padding: 10, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+                      onBlur={e => { saveField(selected.id, "synopsis", e.target.value); setEditingNote(null) }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 13, color: selected.synopsis ? "#1A1916" : "#C0BAB2", minHeight: 20, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                      {selected.synopsis || (isCoach ? "No recap yet — click Edit to add one." : "—")}
+                    </div>
+                  )}
+                </Section>
+              )
+            })()}
 
             {/* Notes */}
-            <Section label="Coach Notes">
-              {editingNote?.callId === selected.id && editingNote.field === "notes" ? (
-                <textarea
-                  autoFocus
-                  defaultValue={editingNote.value}
-                  rows={4}
-                  style={{ width: "100%", border: "1px solid #ECE7DE", borderRadius: 6, padding: 10, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
-                  onBlur={e => { saveField(selected.id, "notes", e.target.value); setEditingNote(null) }}
-                />
-              ) : (
-                <div
-                  onClick={() => isCoach && setEditingNote({ callId: selected.id, field: "notes", value: selected.notes ?? "" })}
-                  style={{ fontSize: 13, color: selected.notes ? "#1A1916" : "#C0BAB2", cursor: isCoach ? "text" : "default", minHeight: 32, lineHeight: 1.6, whiteSpace: "pre-wrap" }}
-                >
-                  {selected.notes || (isCoach ? "Click to add notes…" : "—")}
-                </div>
-              )}
-            </Section>
+            {(() => {
+              const editing = editingNote?.callId === selected.id && editingNote.field === "notes"
+              return (
+                <Section label="Coach Notes" action={isCoach && !editing && <EditButton onClick={() => setEditingNote({ callId: selected.id, field: "notes", value: selected.notes ?? "" })} />}>
+                  {editing ? (
+                    <textarea
+                      autoFocus
+                      defaultValue={editingNote!.value}
+                      rows={4}
+                      style={{ width: "100%", border: "1px solid #ECE7DE", borderRadius: 6, padding: 10, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+                      onBlur={e => { saveField(selected.id, "notes", e.target.value); setEditingNote(null) }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 13, color: selected.notes ? "#1A1916" : "#C0BAB2", minHeight: 20, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                      {selected.notes || (isCoach ? "No notes yet — click Edit to add." : "—")}
+                    </div>
+                  )}
+                </Section>
+              )
+            })()}
 
             {/* Q&A */}
             <Section label="Questions & Actions">
@@ -343,13 +345,24 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
   )
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 10, color: "#9C9590", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-        {label}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 24, marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: "#9C9590", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {label}
+        </div>
+        {action}
       </div>
       {children}
     </div>
+  )
+}
+
+function EditButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>
+      Edit
+    </button>
   )
 }
