@@ -161,9 +161,9 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "projects", label: "Projects" },
   { key: "pipeline", label: "Pipeline" },
   { key: "team", label: "Team" },
-  { key: "calls", label: "Calls" },
   { key: "products", label: "Products" },
   { key: "progress", label: "Progress" },
+  { key: "calls", label: "Calls" },
   { key: "goals", label: "Settings" },
   { key: "reconciliation", label: "Reconciliation" },
 ]
