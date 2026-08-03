@@ -478,7 +478,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   const fmtCurrency = useFmtCurrency()
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
-  const [minHourlyRate, setMinHourlyRate] = useState<number | null>(minHourlyRateProp ?? null)
+  const minHourlyRate = minHourlyRateProp ?? null
   const [adding, setAdding] = useState(false)
 
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
@@ -564,15 +564,6 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     }
   }
   const handleHoursChange = (contractId: string, hours: number) => patchContract(contractId, { hoursPerMonth: hours })
-
-  async function handleMinRateChange(rate: number | null) {
-    setMinHourlyRate(rate)
-    await fetch(`/api/clients/${clientId}/goal`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ minHourlyRate: rate }),
-    })
-  }
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
@@ -719,7 +710,6 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               accounts={localAccounts}
               minHourlyRate={minHourlyRate}
               onHoursChange={handleHoursChange}
-              onMinRateChange={handleMinRateChange}
             />
           )}
 
@@ -880,15 +870,13 @@ function HoursCell({ value, onSave }: { value: number | null; onSave: (v: number
   )
 }
 
-function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange, onMinRateChange }: {
+function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }: {
   contracts: Contract[]
   accounts: Account[]
   minHourlyRate: number | null
   onHoursChange: (id: string, hours: number) => Promise<boolean>
-  onMinRateChange: (rate: number | null) => void
 }) {
   const fmtCurrency = useFmtCurrency()
-  const [minDraft, setMinDraft] = useState(minHourlyRate != null ? String(minHourlyRate) : "")
 
   const nameFor = (c: Contract) => c.accountId ? accounts.find(a => a.id === c.accountId)?.name ?? null : null
   const hasMin = minHourlyRate != null && minHourlyRate > 0
@@ -906,13 +894,6 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange, o
   const totalMonthly = retainers.reduce((s, r) => s + (r.perHr != null ? r.c.monthly : 0), 0)
   const totalHours = retainers.reduce((s, r) => s + (r.perHr != null ? r.c.hoursPerMonth : 0), 0)
   const blended = totalHours > 0 ? totalMonthly / totalHours : null
-
-  function commitMin() {
-    const raw = minDraft.trim()
-    if (raw === "") { onMinRateChange(null); return }
-    const v = parseFloat(raw)
-    onMinRateChange(isNaN(v) || v < 0 ? null : v)
-  }
 
   function RatePerHr({ v }: { v: number | null }) {
     if (v == null) return <span style={{ color: "#C4BFB8", fontWeight: 700 }}>—</span>
@@ -935,16 +916,14 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange, o
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 12, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 12, color: "#9C9590" }}>Click hrs to set your real numbers · {hasMin ? "▲ above / ▼ below your minimum" : "set a minimum $/hr to flag projects"}</div>
+        <div style={{ fontSize: 12, color: "#9C9590" }}>Click hrs to set your real numbers · {hasMin ? "▲ above / ▼ below your minimum" : "set a minimum $/hr in Settings to flag projects"}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {blended != null && <div style={{ fontSize: 12, color: "#6B6760" }}>Blended <strong style={{ color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(blended)}/hr</strong></div>}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }} title="Set in Settings">
             <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, whiteSpace: "nowrap" }}>Min $/hr</span>
-            <input type="number" min={0} value={minDraft} placeholder="—"
-              onChange={e => setMinDraft(e.target.value)}
-              onBlur={commitMin}
-              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
-              style={{ width: 72, padding: "4px 8px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, textAlign: "right", outline: "none", fontFamily: "inherit", background: "#fff", fontVariantNumeric: "tabular-nums" }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: hasMin ? "#1A1916" : "#C4BFB8", fontVariantNumeric: "tabular-nums" }}>
+              {hasMin ? fmtCurrency(minHourlyRate as number) : "not set"}
+            </span>
           </div>
         </div>
       </div>
