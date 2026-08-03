@@ -49,6 +49,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
   const [month, setMonth] = useState(now)
   const [editing, setEditing] = useState<string | null>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null)
 
   const hasMin = minHourlyRate != null && minHourlyRate > 0
 
@@ -73,7 +74,35 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
       const overBudget = sold != null && actual != null && actual > sold
       return { c, accountName, money, sold, actual, perHr, overBudget }
     })
-    .sort((a, b) => (a.perHr ?? Infinity) - (b.perHr ?? Infinity))
+
+  type Row = (typeof rows)[number]
+  const sortVal = (r: Row, key: string): number | string | null => {
+    switch (key) {
+      case "project": return r.c.name
+      case "client": return r.accountName
+      case "money": return r.money
+      case "sold": return r.sold
+      case "actual": return r.actual
+      case "perHr": return r.perHr
+      default: return null
+    }
+  }
+  // Default (no column chosen): lowest yield first, to surface under-performers.
+  const sortedRows = sort
+    ? [...rows].sort((a, b) => {
+        const av = sortVal(a, sort.key), bv = sortVal(b, sort.key)
+        if (av == null && bv == null) return 0
+        if (av == null) return 1  // blanks always last
+        if (bv == null) return -1
+        const d = typeof av === "string" ? av.localeCompare(bv as string) : (av as number) - (bv as number)
+        return sort.dir === "desc" ? -d : d
+      })
+    : [...rows].sort((a, b) => (a.perHr ?? Infinity) - (b.perHr ?? Infinity))
+
+  // First click on a column sorts largest→smallest; click again flips it.
+  function clickHeader(key: string) {
+    setSort(prev => (prev?.key === key ? { key, dir: prev.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" }))
+  }
 
   const underMin = hasMin ? rows.filter(r => r.perHr != null && r.perHr < (minHourlyRate as number)).length : 0
 
@@ -129,13 +158,16 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
           <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
             <thead>
               <tr>
-                {["Project", "Client", "Money", "Sold hrs", "Actual hrs", "$ / hr"].map((h, i) => (
-                  <th key={h} style={{ ...th, textAlign: i >= 2 ? "right" : "left" }}>{h}</th>
+                {([["Project", "project", "left"], ["Client", "client", "left"], ["Money", "money", "right"], ["Sold hrs", "sold", "right"], ["Actual hrs", "actual", "right"], ["$ / hr", "perHr", "right"]] as const).map(([label, key, align]) => (
+                  <th key={key} onClick={() => clickHeader(key)}
+                    style={{ ...th, textAlign: align, cursor: "pointer", userSelect: "none", color: sort?.key === key ? "#1A1916" : "#9C9590" }}>
+                    {label}{sort?.key === key ? (sort.dir === "desc" ? " ↓" : " ↑") : ""}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ c, accountName, money, sold, actual, perHr, overBudget }) => (
+              {sortedRows.map(({ c, accountName, money, sold, actual, perHr, overBudget }) => (
                 <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC" }}>
                   <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}</td>
                   <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
@@ -168,7 +200,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
               ))}
             </tbody>
           </table>
-          <div style={{ fontSize: 10, color: "#B0A9A0", marginTop: 8 }}>Sold hrs = the hours this revenue affords at your minimum yield (set in Settings). Actual over budget shows red. Sorted lowest yield first.</div>
+          <div style={{ fontSize: 10, color: "#B0A9A0", marginTop: 8 }}>Sold hrs = the hours this revenue affords at your minimum yield (set in Settings). Actual over budget shows red. Click a column to sort (default: lowest yield first).</div>
         </div>
       )}
     </div>
