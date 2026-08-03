@@ -106,12 +106,13 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
 
   const underMin = hasMin ? rows.filter(r => r.perHr != null && r.perHr < (minHourlyRate as number)).length : 0
 
-  // Over-delivery summary — only over projects with actual hours logged, so it's apples-to-apples.
+  // Over-delivery summary — only over projects with actual hours logged.
   const logged = rows.filter(r => r.actual != null && r.sold != null)
   const totalSold = logged.reduce((s, r) => s + (r.sold as number), 0)
   const totalWorked = logged.reduce((s, r) => s + (r.actual as number), 0)
-  const gap = totalWorked - totalSold
-  const recoverable = hasMin && gap > 0 ? gap * (minHourlyRate as number) : 0
+  // Unpaid hours: sum of per-project overage where delivered > sold. Under-delivery ignored.
+  const overHours = logged.reduce((s, r) => s + Math.max(0, (r.actual as number) - (r.sold as number)), 0)
+  const recoverable = hasMin && overHours > 0 ? overHours * (minHourlyRate as number) : 0
   const r1 = (n: number) => Math.round(n * 10) / 10
 
   async function saveHours(contractId: string, raw: string) {
@@ -221,16 +222,16 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
                 <div style={{ fontSize: 20, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", marginTop: 3 }}>{r1(totalWorked)}h</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9C9590" }}>Over-delivery gap</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: gap > 0 ? "#C2410C" : "#1F7A4D", fontVariantNumeric: "tabular-nums", marginTop: 3 }}>{gap > 0 ? "+" : ""}{r1(gap)}h</div>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9C9590" }}>Over-delivered hrs (unpaid)</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: overHours > 0 ? "#C2410C" : "#1F7A4D", fontVariantNumeric: "tabular-nums", marginTop: 3 }}>{overHours > 0 ? "+" : ""}{r1(overHours)}h</div>
               </div>
               <div style={{ marginLeft: "auto", textAlign: "right", background: "#FBF0EB", border: "1px solid #F3D3C6", borderRadius: 10, padding: "10px 16px" }}>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9C5A3C" }}>Could bill if reined in</div>
                 <div style={{ fontSize: 26, fontWeight: 800, color: "#E9532A", fontVariantNumeric: "tabular-nums", marginTop: 2 }}>{fmt$(recoverable)}</div>
                 <div style={{ fontSize: 10, color: "#B0857A", marginTop: 2 }}>
-                  {gap > 0
-                    ? `${r1(gap)} over-delivered hrs × ${fmt$(minHourlyRate as number)}/hr`
-                    : "at or under budget this month — nice"}
+                  {overHours > 0
+                    ? `${r1(overHours)} unpaid hrs × ${fmt$(minHourlyRate as number)}/hr`
+                    : "no over-delivery this month — nice"}
                 </div>
               </div>
             </div>
