@@ -44,6 +44,7 @@ interface Goal {
   monthlyRevenue: number
   netProfitPct: number
   closeRatePct: number
+  minHourlyRate?: number | null
 }
 
 interface Payment {
@@ -51,6 +52,9 @@ interface Payment {
   month: string
   amount: number
 }
+
+interface ContractHours { contractId: string; month: string; hours: number }
+interface AccountMonthRow { contractId: string; month: string; actual: number }
 
 type ClientStatus = "potential" | "active" | "paused"
 
@@ -66,6 +70,8 @@ interface Props {
   contracts: Contract[]
   goal: Goal | null
   payments?: Payment[]
+  contractHours?: ContractHours[]
+  accountMonths?: AccountMonthRow[]
   initialStatus?: ClientStatus
   initialStartDate?: string | null
   initialEndDate?: string | null
@@ -117,7 +123,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, projectionState, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, totalHoursWorked = 0, payrollByMonth }: Props) {
+export default function Dashboard({ clientId, projectionState, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, contractHours = [], accountMonths = [], initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, totalHoursWorked = 0, payrollByMonth }: Props) {
   const router = useRouter()
   const fmt$ = useFmtCurrency()
   const currency = useCurrency()
@@ -427,6 +433,27 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     ? activeContracts.reduce((s, c) => s + (c.hoursPerMonth ?? 0), 0) / activeContracts.length
     : 0
 
+  // Revenue lost to over-delivery in the selected month: for each project with actual
+  // hours logged, hours worked beyond budget (revenue ÷ min yield) × min yield. Under-
+  // delivery ignored — this is only hours worked that weren't paid for.
+  const overdelivery = useMemo(() => {
+    const min = goal?.minHourlyRate ?? 0
+    if (!min) return null
+    const hoursMap = new Map(contractHours.filter(h => h.month === cardMonth).map(h => [h.contractId, h.hours]))
+    const moneyMap = new Map(accountMonths.filter(a => a.month === cardMonth).map(a => [a.contractId, a.actual]))
+    let overHours = 0
+    for (const c of contracts) {
+      const active = c.start <= cardMonth && (c.contractedThrough === null || c.contractedThrough >= cardMonth)
+      if (!active) continue
+      const actual = hoursMap.get(c.id)
+      if (actual == null) continue
+      const money = moneyMap.get(c.id) ?? c.monthly
+      const sold = money / min
+      if (actual > sold) overHours += actual - sold
+    }
+    return { overHours, revenue: overHours * min }
+  }, [contracts, contractHours, accountMonths, goal, cardMonth])
+
   // Avg Client Monthly Value: reported revenue / active contracts (falls back to contract MRR)
   const revenueForACMV = (latest?.revenue ?? 0) > 0 ? latest!.revenue : currentMRR(contractRows, nowYM)
   const acmv = activeClientCount > 0 ? revenueForACMV / activeClientCount : 0
@@ -685,6 +712,13 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
             label="CAC"
             value={fmt$(Math.round(cac))}
             sub={`per new client · ${cacMonths.length}mo avg`}
+          />
+        )}
+        {overdelivery && (
+          <InsightCard
+            label="Lost to Overdelivery"
+            value={fmt$(Math.round(overdelivery.revenue))}
+            sub={`${Math.round(overdelivery.overHours * 10) / 10}h unpaid · ${ymLabel(cardMonth)}`}
           />
         )}
       </div>

@@ -274,6 +274,8 @@ export default function ClientPageClient({
           contracts={contracts}
           goal={goal}
           payments={payments}
+          contractHours={initialContractHours}
+          accountMonths={initialAccountMonths}
           initialStatus={initialStatus}
           initialStartDate={initialStartDate}
           initialEndDate={initialEndDate}
