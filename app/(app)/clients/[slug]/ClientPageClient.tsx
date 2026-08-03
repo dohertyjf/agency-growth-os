@@ -5,6 +5,7 @@ import Dashboard from "@/components/Dashboard"
 import ContractsPanel from "./ContractsPanel"
 import ReconciliationTable from "./ReconciliationTable"
 import CashflowProjection from "./CashflowProjection"
+import YieldByMonth from "./YieldByMonth"
 import AccountsPanel from "./AccountsPanel"
 import ProductsPanel from "./ProductsPanel"
 import ProgressPanel from "./ProgressPanel"
@@ -91,6 +92,12 @@ interface Payment {
   amount: number
 }
 
+interface ContractHours {
+  contractId: string
+  month: string
+  hours: number
+}
+
 interface Goal {
   annualRevenue: number
   profit: number
@@ -146,6 +153,7 @@ interface Props {
   initialAccounts: Account[]
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
+  initialContractHours: ContractHours[]
   goal: Goal | null
   initialCalls: Call[]
   products: Product[]
@@ -171,7 +179,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -181,7 +189,7 @@ export default function ClientPageClient({
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
-  const [reconView, setReconView] = useState<"reconcile" | "projection">("reconcile")
+  const [reconView, setReconView] = useState<"reconcile" | "projection" | "yield">("reconcile")
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
   const totalHoursWorked = people.filter(p => !p.isExternal).reduce((s, p) => s + p.billableHours, 0)
@@ -312,7 +320,7 @@ export default function ClientPageClient({
       {currentTab === "reconciliation" && (
         <div>
           <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 16 }}>
-            {([["reconcile", "Reconcile"], ["projection", "Projection"]] as const).map(([v, label]) => (
+            {([["reconcile", "Reconcile"], ["projection", "Projection"], ["yield", "Yield"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setReconView(v)}
                 style={{ padding: "4px 14px", fontSize: 12, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: reconView === v ? "#fff" : "transparent", color: reconView === v ? "#1A1916" : "#9C9590", boxShadow: reconView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
                 {label}
@@ -331,8 +339,16 @@ export default function ClientPageClient({
               onContractUpdate={updated => setContracts(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c))}
               onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
             />
-          ) : (
+          ) : reconView === "projection" ? (
             <CashflowProjection contracts={contracts} />
+          ) : (
+            <YieldByMonth
+              contracts={contracts}
+              accounts={accounts}
+              accountMonths={initialAccountMonths}
+              initialHours={initialContractHours}
+              minHourlyRate={goal?.minHourlyRate ?? null}
+            />
           )}
         </div>
       )}

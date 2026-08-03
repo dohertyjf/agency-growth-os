@@ -40,6 +40,8 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
     orderBy: { date: "desc" },
   })
 
+  const contractHours = await prisma.contractHoursMonth.findMany({ where: { contract: { clientId: id } } })
+
   return (
     <ClientPageClient
       clientId={id}
@@ -59,6 +61,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialAccounts={accounts.map(a => ({ id: a.id, name: a.name, contactName: a.contactName, contactEmail: a.contactEmail, notes: a.notes }))}
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
+      initialContractHours={contractHours.map(h => ({ contractId: h.contractId, month: h.month, hours: h.hours }))}
       goal={goal}
       initialCalls={calls.map(c => ({ id: c.id, clientId: c.clientId, date: c.date, title: c.title, transcript: c.transcript ?? null, video: c.video ?? null, synopsis: c.synopsis ?? null, notes: c.notes ?? null, isGroupCall: c.isGroupCall, questions: c.questions.map(q => ({ id: q.id, q: q.q, a: q.a ?? null, order: q.order })) }))}
       products={products.map(p => ({ id: p.id, name: p.name, description: p.description ?? null, type: p.type as "retainer" | "ongoing" | "oneoff", monthly: p.monthly }))}
