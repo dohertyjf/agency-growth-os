@@ -14,6 +14,7 @@ interface Goal {
   closeRatePct: number
   peoplePct?: number
   currency?: string
+  minHourlyRate?: number | null
 }
 
 interface Props {
@@ -58,6 +59,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
   const [netProfitPct, setNetProfitPct] = useState(initialGoal ? String(initialGoal.netProfitPct) : "25")
   const [closeRatePct, setCloseRatePct] = useState(initialGoal ? String(initialGoal.closeRatePct) : "50")
   const [peoplePct, setPeoplePct] = useState(initialGoal?.peoplePct != null ? String(initialGoal.peoplePct) : "30")
+  const [minHourlyRate, setMinHourlyRate] = useState(initialGoal?.minHourlyRate != null ? String(initialGoal.minHourlyRate) : "")
   const [currency, setCurrency] = useState(initialGoal?.currency ?? "USD")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -69,6 +71,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
   const monthlyNetProfit = monthlyNum * (netProfitPctNum / 100)
   const closeRatePctNum = parseFloat(closeRatePct) || 0
   const peoplePctNum = parseFloat(peoplePct) || 0
+  const minHourlyRateNum = parseFloat(minHourlyRate) || 0
 
   function handleAnnualChange(val: string) {
     const n = parseFloat(val) || 0
@@ -90,7 +93,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
       const res = await fetch(`/api/clients/${clientId}/goal`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ monthlyRevenue: monthlyNum, netProfitPct: netProfitPctNum, closeRatePct: closeRatePctNum, peoplePct: peoplePctNum, currency }),
+        body: JSON.stringify({ monthlyRevenue: monthlyNum, netProfitPct: netProfitPctNum, closeRatePct: closeRatePctNum, peoplePct: peoplePctNum, currency, minHourlyRate: minHourlyRateNum > 0 ? minHourlyRateNum : null }),
       })
       if (!res.ok) throw new Error("Save failed")
       setSaved(true)
@@ -102,7 +105,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
     }
   }
 
-  const hasAny = monthlyNum > 0 || netProfitPctNum > 0 || closeRatePctNum > 0 || peoplePctNum > 0
+  const hasAny = monthlyNum > 0 || netProfitPctNum > 0 || closeRatePctNum > 0 || peoplePctNum > 0 || minHourlyRateNum > 0
 
   return (
     <form onSubmit={handleSave}>
@@ -124,6 +127,9 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
               )}
               {closeRatePctNum > 0 && (
                 <Derived label="Close Rate Target" value={closeRatePctNum + "%"} />
+              )}
+              {minHourlyRateNum > 0 && (
+                <Derived label="Minimum Hourly Yield" value={fmtCurrency(minHourlyRateNum, currency) + "/hr"} />
               )}
               {peoplePctNum > 0 && (
                 <Derived
@@ -195,6 +201,22 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
               {netProfitPctNum}% of {fmtCurrency(monthlyNum, currency)} = {fmtCurrency(monthlyNetProfit, currency)}/mo net profit
             </div>
           )}
+        </div>
+
+        {/* Hourly Yield */}
+        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
+          <SectionLabel>Hourly Yield</SectionLabel>
+          <div style={{ maxWidth: 220 }}>
+            <FieldLabel hint="per hour">Minimum Hourly Yield</FieldLabel>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#9C9590" }}>{currencySymbol(currency)}</span>
+              <input style={{ ...inputStyle, paddingLeft: 22 }} type="number" min={0} step="any"
+                value={minHourlyRate} onChange={e => setMinHourlyRate(e.target.value)} placeholder="150" />
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "#9C9590" }}>
+              The floor your projects should earn per hour. Used to flag under-performing projects and to budget hours (revenue ÷ this rate).
+            </div>
+          </div>
         </div>
 
         {/* Sales */}

@@ -28,6 +28,7 @@ const schema = z.object({
   closeRatePct: z.number().min(0).max(100),
   peoplePct: z.number().min(0).max(100).default(30),
   currency: z.enum(["USD", "GBP", "EUR"]).default("USD"),
+  minHourlyRate: z.number().min(0).nullable().optional(),
 })
 
 export async function PUT(
@@ -42,7 +43,7 @@ export async function PUT(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
-  const { monthlyRevenue, netProfitPct, closeRatePct, peoplePct, currency } = parsed.data
+  const { monthlyRevenue, netProfitPct, closeRatePct, peoplePct, currency, minHourlyRate } = parsed.data
   const data = {
     monthlyRevenue,
     netProfitPct,
@@ -51,6 +52,7 @@ export async function PUT(
     currency,
     annualRevenue: monthlyRevenue * 12,
     profit: monthlyRevenue * (netProfitPct / 100) * 12,
+    ...(minHourlyRate !== undefined ? { minHourlyRate } : {}),
   }
 
   const goal = await prisma.goal.upsert({

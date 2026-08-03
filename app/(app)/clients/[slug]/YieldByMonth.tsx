@@ -65,12 +65,13 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
       const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name ?? null : null
       const am = accountMonths.find(a => a.contractId === c.id && a.month === month)
       const money = am ? am.actual : c.monthly
-      const sold = c.hoursPerMonth ?? 0
+      // Sold (budget) hours = the hours this revenue affords at the minimum yield.
+      const sold = hasMin && (minHourlyRate as number) > 0 ? money / (minHourlyRate as number) : null
       const actual = hours.get(`${c.id}:${month}`) ?? null
-      const fromActual = actual != null && actual > 0
-      const basis = fromActual ? actual! : sold > 0 ? sold : null
-      const perHr = basis ? money / basis : null
-      return { c, accountName, money, sold, actual, perHr, fromActual }
+      // Yield needs actual hours logged — no meaningful fallback.
+      const perHr = actual != null && actual > 0 ? money / actual : null
+      const overBudget = sold != null && actual != null && actual > sold
+      return { c, accountName, money, sold, actual, perHr, overBudget }
     })
     .sort((a, b) => (a.perHr ?? Infinity) - (b.perHr ?? Infinity))
 
@@ -110,8 +111,9 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Hourly yield by project</div>
           <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
-            Click actual hrs to log the month · $/hr uses actual once entered
-            {hasMin && underMin > 0 && <> · <strong style={{ color: "#C2410C" }}>{underMin} under {fmt$(minHourlyRate as number)}/hr</strong></>}
+            {hasMin
+              ? <>Sold hrs = budget at {fmt$(minHourlyRate as number)}/hr · log actual hrs to see real $/hr{underMin > 0 && <> · <strong style={{ color: "#C2410C" }}>{underMin} under</strong></>}</>
+              : <>Set a <strong>Minimum Hourly Yield</strong> in Settings to budget hours and flag under-performers</>}
           </div>
         </div>
         <select value={month} onChange={e => setMonth(e.target.value)}
@@ -133,12 +135,12 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ c, accountName, money, sold, actual, perHr, fromActual }) => (
+              {rows.map(({ c, accountName, money, sold, actual, perHr, overBudget }) => (
                 <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC" }}>
                   <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}</td>
                   <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
                   <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt$(money)}</td>
-                  <td style={{ padding: "8px 10px", fontSize: 13, color: "#9C9590", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{sold > 0 ? `${sold}h` : "—"}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 13, color: "#9C9590", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{sold != null ? `${Math.round(sold * 10) / 10}h` : "—"}</td>
                   <td style={{ padding: "4px 10px", textAlign: "right" }}>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
                       {editing === c.id ? (
@@ -150,14 +152,14 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
                         />
                       ) : (
                         <button onClick={() => setEditing(c.id)} title="Click to log"
-                          style={{ background: "none", border: "1px dashed #E0DAD0", borderRadius: 6, padding: "4px 9px", fontSize: 13, color: actual != null ? "#1A1916" : "#C4BFB8", cursor: "pointer", fontVariantNumeric: "tabular-nums" }}>
+                          style={{ background: "none", border: "1px dashed #E0DAD0", borderRadius: 6, padding: "4px 9px", fontSize: 13, fontWeight: overBudget ? 700 : 400, color: actual != null ? (overBudget ? "#C2410C" : "#1A1916") : "#C4BFB8", cursor: "pointer", fontVariantNumeric: "tabular-nums" }}>
                           {actual != null ? `${actual}h` : "log"}
                         </button>
                       )}
                       <span style={{ color: "#1F7A4D", fontSize: 13, fontWeight: 700, width: 10, opacity: savedId === c.id ? 1 : 0, transition: "opacity 0.2s" }}>✓</span>
                     </div>
                   </td>
-                  <td style={{ padding: "8px 10px", fontSize: 14, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums", color: perHrColor(perHr), opacity: fromActual || perHr == null ? 1 : 0.55 }}>
+                  <td style={{ padding: "8px 10px", fontSize: 14, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums", color: perHrColor(perHr) }}>
                     {perHr != null ? (
                       <>{hasMin && <span style={{ fontSize: 10 }}>{perHr >= (minHourlyRate as number) ? "▲" : "▼"} </span>}{fmt$(perHr)}</>
                     ) : "—"}
@@ -166,7 +168,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
               ))}
             </tbody>
           </table>
-          <div style={{ fontSize: 10, color: "#B0A9A0", marginTop: 8 }}>Faded $/hr is based on sold hours (no actual logged yet). Sorted lowest yield first.</div>
+          <div style={{ fontSize: 10, color: "#B0A9A0", marginTop: 8 }}>Sold hrs = the hours this revenue affords at your minimum yield (set in Settings). Actual over budget shows red. Sorted lowest yield first.</div>
         </div>
       )}
     </div>
