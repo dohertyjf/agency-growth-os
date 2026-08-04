@@ -8,7 +8,7 @@ import MonthTable, { BulkMetricsModal } from "./MonthTable"
 import GrowthProjection from "./GrowthProjection"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
-  projectMetric, ymAdd, ymLabel, currentMRR, bookedActive, bookedPotential, bookedOpportunity, bookedAhead,
+  projectMetric, ymAdd, ymLabel, currentMRR, bookedActive, bookedPotential, bookedOpportunity, bookedAhead, BOOKED_AHEAD_MONTHS,
   mrrGoal, goalProgress,
   type ContractRow, type ProjectionInput, type ProjectableMetric,
 } from "@/lib/calc"
@@ -739,7 +739,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
             <div>
               <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 4 }}>Booked ahead</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmt$(booked)}</div>
-              <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>in active contracts</div>
+              <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>next {BOOKED_AHEAD_MONTHS} mo · signed contracts</div>
             </div>
           </div>
         ) : (

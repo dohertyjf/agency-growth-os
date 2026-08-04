@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, type ContractRow } from "@/lib/calc"
+import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, BOOKED_AHEAD_MONTHS, type ContractRow } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import PaymentScheduleModal from "./PaymentScheduleModal"
 
@@ -582,7 +582,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Projects</div>
           <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
-            MRR {fmtCurrency(mrr)} · {fmtCurrency(booked)} booked ahead
+            MRR {fmtCurrency(mrr)} · {fmtCurrency(booked)} booked (next {BOOKED_AHEAD_MONTHS} mo)
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>

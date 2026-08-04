@@ -108,13 +108,21 @@ export function monthsRemaining(contract: ContractRow, now: string) {
   return Math.max(0, ymDiff(now, contract.contractedThrough))
 }
 
-export function bookedAhead(contracts: ContractRow[], now: string) {
+// Horizon (months) for the "Booked ahead" figure.
+export const BOOKED_AHEAD_MONTHS = 6
+
+// Committed revenue over the next `horizon` months, from signed (active) contracts only.
+// Ongoing retainers count `horizon` months; fixed-term count months left, capped at the
+// horizon; one-offs count if they land inside the window.
+export function bookedAhead(contracts: ContractRow[], now: string, horizon = BOOKED_AHEAD_MONTHS) {
   return contracts
-    .filter(c => c.status !== "potential")
+    .filter(c => c.status === "active")
     .reduce((s, c) => {
-      if (c.type === "oneoff") return s + ((c.contractedThrough ?? now) >= now ? c.monthly : 0)
-      if (c.contractedThrough === null) return s  // ongoing — infinite, exclude from booked total
-      return s + c.monthly * monthsRemaining(c, now)
+      if (c.type === "oneoff") {
+        const d = ymDiff(now, c.contractedThrough ?? c.start)
+        return s + (d > 0 && d <= horizon ? c.monthly : 0)
+      }
+      return s + c.monthly * Math.min(monthsRemaining(c, now), horizon)
     }, 0)
 }
 
