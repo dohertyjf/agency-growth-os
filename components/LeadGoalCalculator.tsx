@@ -101,7 +101,12 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
   }
 
   async function submit() {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // Trim before validating — a pasted email with a stray space would
+    // otherwise fail the whitespace-strict check and silently block the submit.
+    const cleanEmail = email.trim()
+    const cleanName = name.trim()
+    const cleanAgency = agency.trim()
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setError("Please enter a valid email address.")
       return
     }
@@ -112,7 +117,7 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email, name: name || undefined, agency: agency || undefined, currency,
+          email: cleanEmail, name: cleanName || undefined, agency: cleanAgency || undefined, currency,
           inputs: { currentRevenue, goalRevenue, closeRate: cr, currentClients, avgMonthsStay, currentLeads: currentLeads ?? 0 },
           honeypot,
         }),
