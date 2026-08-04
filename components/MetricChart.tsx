@@ -73,13 +73,25 @@ export default function MetricChart({ points, format, label, series2, series2Lab
   const allVals = [...points, ...(series2 ?? []), ...(series3 ?? []), ...(series4 ?? [])].map(p => p.value).concat(barVals)
   const dataMin = Math.min(...allVals)
   const dataMax = Math.max(...allVals)
-  const spread = dataMax - dataMin || Math.abs(dataMax) || 1
-  const rawYMin = dataMin - spread * 0.12
-  // Only clamp to 0 when all data is non-negative — allow negatives to show properly
-  const yMin = dataMin >= 0 ? Math.max(0, rawYMin) : rawYMin
-  // When a goal line is present, ensure 30% headroom above it so crossing is visceral
-  const goalCeiling = goalValue ? goalValue * 1.3 : 0
-  const yMax = Math.max(dataMax + spread * 0.12, goalCeiling)
+
+  let yMin: number, yMax: number
+  if (format === "percent") {
+    // Percentages read on a fixed 0–100% frame (extended only if data falls outside it).
+    yMin = Math.min(0, dataMin)
+    yMax = Math.max(100, dataMax)
+  } else if (format === "number") {
+    // Counts are grounded at 0 so heights are honest, with a little headroom on top.
+    yMin = Math.min(0, dataMin)
+    const top = Math.max(dataMax, goalValue ? goalValue * 1.15 : 0)
+    yMax = Math.max(top * 1.12, 1)
+  } else {
+    // Currency: zoom to the data range (with padding) so month-to-month movement shows.
+    const spread = dataMax - dataMin || Math.abs(dataMax) || 1
+    const rawYMin = dataMin - spread * 0.12
+    yMin = dataMin >= 0 ? Math.max(0, rawYMin) : rawYMin
+    const goalCeiling = goalValue ? goalValue * 1.3 : 0
+    yMax = Math.max(dataMax + spread * 0.12, goalCeiling)
+  }
   const yRange = yMax - yMin
   const crossesZero = yMin < 0 && yMax > 0
 
