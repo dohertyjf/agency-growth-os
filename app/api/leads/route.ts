@@ -31,7 +31,7 @@ const inputsSchema = z.object({
 })
 
 const schema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   name: z.string().optional(),
   agency: z.string().optional(),
   currency: z.enum(["USD", "GBP", "EUR"]).default("USD"),
@@ -40,7 +40,7 @@ const schema = z.object({
 })
 
 async function notifySlack(args: {
-  id: string; name?: string; agency?: string; email: string
+  id: string | null; name?: string; agency?: string; email: string
   currency: string; capMonthLabel: string | null; mrrCap: number | null
 }) {
   const url = process.env.SLACK_WEBHOOK_URL
@@ -51,8 +51,13 @@ async function notifySlack(args: {
   const capLine = args.capMonthLabel
     ? `Caps out ${args.capMonthLabel} at ${ceiling}`
     : `Ceiling: ${ceiling}`
-  const link = appUrl ? `${appUrl}/leads/growth-projection/${args.id}` : `/leads/growth-projection/${args.id}`
-  const text = `🎯 New capacity calculator lead: *${who}* (${args.email})\n${capLine}\n<${link}|Review in Agency Growth OS →>`
+  // When the DB write failed there's no record to link to — flag it so the
+  // lead can be captured manually instead of quietly lost.
+  const link = args.id ? (appUrl ? `${appUrl}/leads/growth-projection/${args.id}` : `/leads/growth-projection/${args.id}`) : null
+  const reviewLine = link
+    ? `\n<${link}|Review in Agency Growth OS →>`
+    : `\n⚠️ Not saved to the database — capture this lead manually.`
+  const text = `🎯 New capacity calculator lead: *${who}* (${args.email})\n${capLine}${reviewLine}`
   try {
     await fetch(url, {
       method: "POST",
@@ -81,16 +86,23 @@ export async function POST(req: NextRequest) {
   const { email, name, agency, currency, inputs } = parsed.data
   const result = projectCapacity(inputs as CapacityInputs)
 
-  const lead = await prisma.capacityLead.create({
-    data: {
-      email,
-      name: name ?? null,
-      agency: agency ?? null,
-      currency,
-      inputs: JSON.stringify(inputs),
-      result: JSON.stringify(result),
-    },
-  })
+  // Persist the lead. If the write fails (e.g. the database is unreachable),
+  // log it and fall through — we still notify Slack so the lead isn't lost.
+  let lead: { id: string } | null = null
+  try {
+    lead = await prisma.capacityLead.create({
+      data: {
+        email,
+        name: name ?? null,
+        agency: agency ?? null,
+        currency,
+        inputs: JSON.stringify(inputs),
+        result: JSON.stringify(result),
+      },
+    })
+  } catch (err) {
+    console.error("capacity lead: failed to persist submission", err)
+  }
 
   const now = new Date().toISOString().slice(0, 7)
   const capMonthLabel = result.capacityHitMonth >= 0
@@ -98,9 +110,9 @@ export async function POST(req: NextRequest) {
     : null
 
   await notifySlack({
-    id: lead.id, name, agency, email, currency,
+    id: lead?.id ?? null, name, agency, email, currency,
     capMonthLabel, mrrCap: result.mrrCap,
   })
 
-  return Response.json({ id: lead.id }, { status: 201, headers: corsHeaders() })
+  return Response.json({ id: lead?.id ?? null, saved: lead != null }, { status: 201, headers: corsHeaders() })
 }

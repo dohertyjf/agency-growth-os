@@ -31,7 +31,7 @@ const inputsSchema = z.object({
 })
 
 const schema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   name: z.string().optional(),
   agency: z.string().optional(),
   currency: z.enum(["USD", "GBP", "EUR"]).default("USD"),
