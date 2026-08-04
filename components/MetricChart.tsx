@@ -79,18 +79,12 @@ export default function MetricChart({ points, format, label, series2, series2Lab
     // Percentages read on a fixed 0–100% frame (extended only if data falls outside it).
     yMin = Math.min(0, dataMin)
     yMax = Math.max(100, dataMax)
-  } else if (format === "number") {
-    // Counts are grounded at 0 so heights are honest, with a little headroom on top.
+  } else {
+    // Currency + counts: grounded at 0 so growth reads honestly (no zoom); the top
+    // scales to this client's own data (and goal), with a little headroom.
     yMin = Math.min(0, dataMin)
     const top = Math.max(dataMax, goalValue ? goalValue * 1.15 : 0)
     yMax = Math.max(top * 1.12, 1)
-  } else {
-    // Currency: zoom to the data range (with padding) so month-to-month movement shows.
-    const spread = dataMax - dataMin || Math.abs(dataMax) || 1
-    const rawYMin = dataMin - spread * 0.12
-    yMin = dataMin >= 0 ? Math.max(0, rawYMin) : rawYMin
-    const goalCeiling = goalValue ? goalValue * 1.3 : 0
-    yMax = Math.max(dataMax + spread * 0.12, goalCeiling)
   }
   const yRange = yMax - yMin
   const crossesZero = yMin < 0 && yMax > 0
