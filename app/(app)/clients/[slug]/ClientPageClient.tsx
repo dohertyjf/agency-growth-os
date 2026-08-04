@@ -392,6 +392,7 @@ export default function ClientPageClient({
           initialHoursMonths={hoursMonths}
           contracts={contracts}
           goal={goal}
+          metrics={metrics.map(m => ({ month: m.month, closeRate: m.closeRate, leads: m.leads, newClients: m.newClients }))}
           onPeopleChange={setPeople}
           onSalaryMonthChange={sm => setSalaryMonths(prev => {
             const idx = prev.findIndex(s => s.personId === sm.personId && s.month === sm.month)

@@ -82,6 +82,8 @@ interface Goal {
   closeRatePct?: number
 }
 
+interface Metric { month: string; closeRate: number; leads: number; newClients: number }
+
 interface Props {
   clientId: string
   initialPeople: Person[]
@@ -89,6 +91,7 @@ interface Props {
   initialHoursMonths?: PersonHoursMonth[]
   contracts?: Contract[]
   goal?: Goal | null
+  metrics?: Metric[]
   onPeopleChange?: (people: Person[]) => void
   onSalaryMonthChange?: (sm: PersonSalaryMonth) => void
   onHoursMonthChange?: (hm: PersonHoursMonth) => void
@@ -168,7 +171,7 @@ type AddMode = "none" | "internal" | "external" | "bulk"
 
 const emptyForm = { name: "", role: "", coreRoles: [] as string[], description: "", annualSalary: "", billableHours: "", startDate: "", endDate: "", isFullTime: true }
 
-export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, initialHoursMonths = [], contracts = [], goal, onPeopleChange, onSalaryMonthChange, onHoursMonthChange }: Props) {
+export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, initialHoursMonths = [], contracts = [], goal, metrics = [], onPeopleChange, onSalaryMonthChange, onHoursMonthChange }: Props) {
   const fmt$ = useFmtCurrency()
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
@@ -614,7 +617,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
       )}
 
       {/* Hire Modeler */}
-      <HireModeler people={people} contracts={contracts} goal={goal ?? null} />
+      <HireModeler people={people} contracts={contracts} goal={goal ?? null} metrics={metrics} />
 
       {/* Add Person Modal */}
       {(addMode === "internal" || addMode === "external") && (
@@ -803,7 +806,7 @@ function addMonthsYM(ym: string, n: number): string {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`
 }
 
-function HireModeler({ people, contracts, goal }: { people: Person[]; contracts: Contract[]; goal: Goal | null }) {
+function HireModeler({ people, contracts, goal, metrics }: { people: Person[]; contracts: Contract[]; goal: Goal | null; metrics: Metric[] }) {
   const fmt$ = useFmtCurrency()
   const sym = currSym(useCurrency())
 
@@ -820,8 +823,12 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
   const activeMRR = contracts.filter(c => c.status === "active").reduce((s, c) => s + c.monthly, 0)
   const pipelineMRR = contracts.filter(c => c.status === "opportunity" || c.status === "potential").reduce((s, c) => s + c.monthly, 0)
   const contractedHours = contracts.filter(c => c.status === "active").reduce((s, c) => s + c.hoursPerMonth, 0)
+  const pipelineHours = contracts.filter(c => c.status === "opportunity" || c.status === "potential").reduce((s, c) => s + c.hoursPerMonth, 0)
   const activeClientCount = contracts.filter(c => c.status === "active").length
-  const closeRatePct = goal?.closeRatePct ?? 30
+  // Trailing 3-month close rate (%), falling back to the goal target, then 30.
+  const recentClose = metrics.filter(m => m.closeRate > 0).sort((a, b) => a.month.localeCompare(b.month)).slice(-3)
+  const closeRatePct = recentClose.length ? Math.round(recentClose.reduce((s, m) => s + m.closeRate, 0) / recentClose.length) : (goal?.closeRatePct ?? 30)
+  const closeLabel = recentClose.length ? "trailing 3mo" : "target"
   const peoplePctTarget = goal?.peoplePct ?? 40
   const expectedNewMRR = pipelineMRR * (closeRatePct / 100)
 
@@ -838,9 +845,12 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
   const hasHireInputs = hireMonthlyCost > 0 || hireBillableHrs > 0
 
   const CAPACITY_THRESHOLD = 75
-  const hoursPerRevUnit = activeMRR > 0 ? contractedHours / activeMRR : 0
   const scaledExpectedNewMRR = expectedNewMRR * (1 + growthPct / 100)
-  const scaledFullPipelineMRR = pipelineMRR * (1 + growthPct / 100) // full pipeline, no close-rate weighting
+  // Demand is measured in HOURS: pipeline projects' hours, weighted by close rate (expected)
+  // or unweighted (potential), scaled by the growth scenario.
+  const expectedNewHoursBase = pipelineHours * (closeRatePct / 100)
+  const expectedNewHours = expectedNewHoursBase * (1 + growthPct / 100)
+  const potentialNewHours = pipelineHours * (1 + growthPct / 100)
 
   // 12-month projection
   const projMonths = Array.from({ length: 12 }, (_, i) => addMonthsYM(nowYM, i + 1))
@@ -848,17 +858,17 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
 
   const monthData = projMonths.map((_, i) => {
     const ramp = Math.min((i + 1) / 6, 1)
+    // Hours needed = current contracted hours + pipeline hours (weighted / full), ramping in.
+    const demandHours = contractedHours + expectedNewHours * ramp
+    const capUtil = totalCapacity > 0 ? (demandHours / totalCapacity) * 100 : 0
+    const potentialDemandHours = contractedHours + potentialNewHours * ramp
+    const potentialCapUtil = totalCapacity > 0 ? (potentialDemandHours / totalCapacity) * 100 : 0
+    // Revenue is only used for the budget gate (people-cost %).
     const revenue = activeMRR + scaledExpectedNewMRR * ramp
-    const contracted = activeMRR > 0 ? revenue * hoursPerRevUnit : contractedHours
-    const capUtil = totalCapacity > 0 ? (contracted / totalCapacity) * 100 : 0
-    // Potential: hours needed if the FULL pipeline converts (the ceiling)
-    const potentialRevenue = activeMRR + scaledFullPipelineMRR * ramp
-    const potentialHours = activeMRR > 0 ? potentialRevenue * hoursPerRevUnit : contractedHours
-    const potentialCapUtil = totalCapacity > 0 ? (potentialHours / totalCapacity) * 100 : 0
     const peoplePct = revenue > 0 ? ((currentMonthlyPayroll + hireMonthlyCost) / revenue) * 100 : 100
     const capacityGate = totalCapacity > 0 && contractedHours > 0 && capUtil >= CAPACITY_THRESHOLD
     const budgetGate = revenue > 0 && peoplePct <= peoplePctTarget
-    return { revenue, capUtil, potentialCapUtil, peoplePct, capacityGate, budgetGate }
+    return { revenue, demandHours, potentialDemandHours, capUtil, potentialCapUtil, peoplePct, capacityGate, budgetGate }
   })
 
   const currentCapUtil = totalCapacity > 0 && contractedHours > 0 ? (contractedHours / totalCapacity) * 100 : 0
@@ -909,7 +919,7 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
   const hireRegions = hasHireInputs ? getRegions(d => d.capacityGate && d.budgetGate) : []
   const gapRegions = hasHireInputs ? getRegions(d => d.capacityGate && !d.budgetGate) : []
   const capLine = monthData.map((d, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(d.capUtil)}`).join(" ")
-  const potentialLine = totalCapacity > 0 && contractedHours > 0 && pipelineMRR > 0
+  const potentialLine = totalCapacity > 0 && contractedHours > 0 && pipelineHours > 0
     ? monthData.map((d, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(d.potentialCapUtil)}`).join(" ")
     : null
   const peopleLine = hasHireInputs && activeMRR > 0
@@ -983,9 +993,9 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
             alert: activeMRR > 0 && currentPeoplePct > peoplePctTarget ? "red" : "",
           },
           {
-            label: "Expected pipeline",
-            value: `${fmt$(Math.round(expectedNewMRR))}/mo`,
-            sub: `${fmt$(pipelineMRR)} × ${closeRatePct}% close`,
+            label: "Pipeline demand (expected)",
+            value: pipelineHours > 0 ? `+${Math.round(expectedNewHoursBase)} hrs/mo` : "—",
+            sub: pipelineHours > 0 ? `${Math.round(pipelineHours)} pipeline hrs × ${closeRatePct}% close (${closeLabel})` : "No hours on pipeline projects",
             alert: "",
           },
         ].map(stat => (
@@ -1005,9 +1015,9 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
             {pct === 0 ? "Base" : `+${pct}%`}
           </button>
         ))}
-        {growthPct > 0 && (
+        {growthPct > 0 && pipelineHours > 0 && (
           <span style={{ fontSize: 11, color: "#9C9590" }}>
-            Pipeline projected at {fmt$(Math.round(scaledExpectedNewMRR))}/mo vs {fmt$(Math.round(expectedNewMRR))}/mo base
+            Expected demand at +{Math.round(expectedNewHours)} hrs/mo vs +{Math.round(expectedNewHoursBase)} hrs/mo base
           </span>
         )}
       </div>
@@ -1192,12 +1202,12 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
             )}
             {totalCapacity > 0 && contractedHours > 0 && (
               <div style={{ fontSize: 11, color: "#16A34A", marginBottom: 3 }}>
-                Expected <strong>{Math.round(monthData[hoverIdx].capUtil)}%</strong>
+                Expected <strong>{Math.round(monthData[hoverIdx].demandHours)} hrs</strong> ({Math.round(monthData[hoverIdx].capUtil)}%)
               </div>
             )}
             {potentialLine && (
               <div style={{ fontSize: 11, color: "#D97706", marginBottom: 3 }}>
-                Potential <strong>{Math.round(monthData[hoverIdx].potentialCapUtil)}%</strong>
+                Potential <strong>{Math.round(monthData[hoverIdx].potentialDemandHours)} hrs</strong> ({Math.round(monthData[hoverIdx].potentialCapUtil)}%)
               </div>
             )}
             {hasHireInputs && activeMRR > 0 && (
