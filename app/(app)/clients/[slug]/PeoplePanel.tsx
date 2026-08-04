@@ -840,6 +840,7 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
   const CAPACITY_THRESHOLD = 75
   const hoursPerRevUnit = activeMRR > 0 ? contractedHours / activeMRR : 0
   const scaledExpectedNewMRR = expectedNewMRR * (1 + growthPct / 100)
+  const scaledFullPipelineMRR = pipelineMRR * (1 + growthPct / 100) // full pipeline, no close-rate weighting
 
   // 12-month projection
   const projMonths = Array.from({ length: 12 }, (_, i) => addMonthsYM(nowYM, i + 1))
@@ -850,10 +851,14 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
     const revenue = activeMRR + scaledExpectedNewMRR * ramp
     const contracted = activeMRR > 0 ? revenue * hoursPerRevUnit : contractedHours
     const capUtil = totalCapacity > 0 ? (contracted / totalCapacity) * 100 : 0
+    // Potential: hours needed if the FULL pipeline converts (the ceiling)
+    const potentialRevenue = activeMRR + scaledFullPipelineMRR * ramp
+    const potentialHours = activeMRR > 0 ? potentialRevenue * hoursPerRevUnit : contractedHours
+    const potentialCapUtil = totalCapacity > 0 ? (potentialHours / totalCapacity) * 100 : 0
     const peoplePct = revenue > 0 ? ((currentMonthlyPayroll + hireMonthlyCost) / revenue) * 100 : 100
     const capacityGate = totalCapacity > 0 && contractedHours > 0 && capUtil >= CAPACITY_THRESHOLD
     const budgetGate = revenue > 0 && peoplePct <= peoplePctTarget
-    return { revenue, capUtil, peoplePct, capacityGate, budgetGate }
+    return { revenue, capUtil, potentialCapUtil, peoplePct, capacityGate, budgetGate }
   })
 
   const currentCapUtil = totalCapacity > 0 && contractedHours > 0 ? (contractedHours / totalCapacity) * 100 : 0
@@ -871,7 +876,8 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
   const W = 880, H = 200, PL = 52, PR = 24, PT = 24, PB = 28
   const plotW = W - PL - PR
   const plotH = H - PT - PB
-  const YMAX = 120
+  const peakUtil = Math.max(120, ...monthData.map(d => Math.max(d.capUtil, d.potentialCapUtil, hasHireInputs ? d.peoplePct : 0)))
+  const YMAX = Math.ceil(peakUtil / 25) * 25
   const toX = (i: number) => PL + (i / 11) * plotW
   const toY = (pct: number) => PT + plotH - Math.min(pct, YMAX) / YMAX * plotH
   const slotW = plotW / 11
@@ -903,6 +909,9 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
   const hireRegions = hasHireInputs ? getRegions(d => d.capacityGate && d.budgetGate) : []
   const gapRegions = hasHireInputs ? getRegions(d => d.capacityGate && !d.budgetGate) : []
   const capLine = monthData.map((d, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(d.capUtil)}`).join(" ")
+  const potentialLine = totalCapacity > 0 && contractedHours > 0 && pipelineMRR > 0
+    ? monthData.map((d, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(d.potentialCapUtil)}`).join(" ")
+    : null
   const peopleLine = hasHireInputs && activeMRR > 0
     ? monthData.map((d, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(d.peoplePct)}`).join(" ")
     : null
@@ -1050,7 +1059,7 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
           ))}
 
           {/* Grid + Y labels */}
-          {[0, 25, 50, 75, 100].map(tick => (
+          {Array.from({ length: YMAX / 25 + 1 }, (_, k) => k * 25).map(tick => (
             <g key={tick}>
               <line x1={PL} y1={toY(tick)} x2={W - PR} y2={toY(tick)} stroke="#ECE7DE" strokeWidth={1} />
               <text x={PL - 6} y={toY(tick) + 4} textAnchor="end" fontSize={10} fill="#9C9590">{tick}%</text>
@@ -1073,7 +1082,17 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
             </>
           )}
 
-          {/* Capacity utilization line */}
+          {/* Potential demand line (full pipeline) — drawn behind the expected line */}
+          {potentialLine && (
+            <>
+              <path d={potentialLine} fill="none" stroke="#D97706" strokeWidth={2} strokeDasharray="5,4" opacity={0.85} />
+              {monthData.map((d, i) => (
+                <circle key={`p${i}`} cx={toX(i)} cy={toY(d.potentialCapUtil)} r={2.5} fill="#fff" stroke="#D97706" strokeWidth={1.5} opacity={0.85} />
+              ))}
+            </>
+          )}
+
+          {/* Capacity utilization line (expected) */}
           {totalCapacity > 0 && contractedHours > 0 && (
             <>
               <path d={capLine} fill="none" stroke="#16A34A" strokeWidth={2} />
@@ -1103,25 +1122,31 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
           {totalCapacity > 0 && contractedHours > 0 && (
             <>
               <line x1={PL} y1={PT - 8} x2={PL + 18} y2={PT - 8} stroke="#16A34A" strokeWidth={2} />
-              <text x={PL + 22} y={PT - 4} fontSize={9} fill="#6B6760">Capacity utilization</text>
+              <text x={PL + 22} y={PT - 4} fontSize={9} fill="#6B6760">Expected demand</text>
+            </>
+          )}
+          {potentialLine && (
+            <>
+              <line x1={PL + 120} y1={PT - 8} x2={PL + 138} y2={PT - 8} stroke="#D97706" strokeWidth={2} strokeDasharray="5,4" />
+              <text x={PL + 142} y={PT - 4} fontSize={9} fill="#6B6760">Potential (full pipeline)</text>
             </>
           )}
           {hasHireInputs && activeMRR > 0 && (
             <>
-              <line x1={PL + 145} y1={PT - 8} x2={PL + 163} y2={PT - 8} stroke="#2563EB" strokeWidth={2} />
-              <text x={PL + 167} y={PT - 4} fontSize={9} fill="#6B6760">People % with hire</text>
+              <line x1={PL + 268} y1={PT - 8} x2={PL + 286} y2={PT - 8} stroke="#2563EB" strokeWidth={2} />
+              <text x={PL + 290} y={PT - 4} fontSize={9} fill="#6B6760">People % with hire</text>
             </>
           )}
           {hireRegions.length > 0 && (
             <>
-              <rect x={PL + 290} y={PT - 14} width={12} height={12} fill="#DCFCE7" opacity={0.8} />
-              <text x={PL + 306} y={PT - 4} fontSize={9} fill="#6B6760">Hire window</text>
+              <rect x={PL + 398} y={PT - 14} width={12} height={12} fill="#DCFCE7" opacity={0.8} />
+              <text x={PL + 414} y={PT - 4} fontSize={9} fill="#6B6760">Hire window</text>
             </>
           )}
           {gapRegions.length > 0 && (
             <>
-              <rect x={PL + 380} y={PT - 14} width={12} height={12} fill="#FEF3C7" opacity={0.8} />
-              <text x={PL + 396} y={PT - 4} fontSize={9} fill="#6B6760">Revenue gap</text>
+              <rect x={PL + 488} y={PT - 14} width={12} height={12} fill="#FEF3C7" opacity={0.8} />
+              <text x={PL + 504} y={PT - 4} fontSize={9} fill="#6B6760">Revenue gap</text>
             </>
           )}
 
@@ -1129,6 +1154,9 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
           {hoverIdx !== null && (
             <g pointerEvents="none">
               <line x1={toX(hoverIdx)} y1={PT} x2={toX(hoverIdx)} y2={H - PB} stroke="#9C9590" strokeWidth={1} opacity={0.35} />
+              {potentialLine && (
+                <circle cx={toX(hoverIdx)} cy={toY(monthData[hoverIdx].potentialCapUtil)} r={4.5} fill="#D97706" stroke="#fff" strokeWidth={1.5} />
+              )}
               {totalCapacity > 0 && contractedHours > 0 && (
                 <circle cx={toX(hoverIdx)} cy={toY(monthData[hoverIdx].capUtil)} r={4.5} fill="#16A34A" stroke="#fff" strokeWidth={1.5} />
               )}
@@ -1164,7 +1192,12 @@ function HireModeler({ people, contracts, goal }: { people: Person[]; contracts:
             )}
             {totalCapacity > 0 && contractedHours > 0 && (
               <div style={{ fontSize: 11, color: "#16A34A", marginBottom: 3 }}>
-                Capacity <strong>{Math.round(monthData[hoverIdx].capUtil)}%</strong>
+                Expected <strong>{Math.round(monthData[hoverIdx].capUtil)}%</strong>
+              </div>
+            )}
+            {potentialLine && (
+              <div style={{ fontSize: 11, color: "#D97706", marginBottom: 3 }}>
+                Potential <strong>{Math.round(monthData[hoverIdx].potentialCapUtil)}%</strong>
               </div>
             )}
             {hasHireInputs && activeMRR > 0 && (
