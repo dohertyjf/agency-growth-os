@@ -994,15 +994,16 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
 
   const allYMs = contracts.flatMap(c => [c.start, ...(c.contractedThrough ? [c.contractedThrough] : [])])
   allYMs.push(now)
-  // Start at most 12 months back (previous 12 months incl. current), keeping the
-  // forward runway. Older history is trimmed and its bars clamp to the left edge.
+  // Window: 12 months back through 12 months forward runway. History is trimmed
+  // (bars clamp to the left edge) and the runway is capped at 12 months out.
   const twelveAgo = ymAdd(now, -11)
+  const forwardCap = ymAdd(now, 12)
   const rawMin = allYMs.reduce((a, b) => a < b ? a : b)
   const minYM = rawMin < twelveAgo ? twelveAgo : rawMin
   const hasOngoing = contracts.some(c => !c.contractedThrough)
-  const maxYM = hasOngoing
-    ? ymAdd(allYMs.reduce((a, b) => a > b ? a : b), 6)
-    : allYMs.reduce((a, b) => a > b ? a : b)
+  const rawMax = allYMs.reduce((a, b) => a > b ? a : b)
+  const extendedMax = hasOngoing ? ymAdd(rawMax, 6) : rawMax
+  const maxYM = extendedMax > forwardCap ? forwardCap : extendedMax
 
   const toMonths = (ym: string) => {
     const [y, m] = ym.split("-").map(Number)
@@ -1059,6 +1060,7 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
           const barStartMo = Math.max(toMonths(c.start), startMo)
           const barEndMo = Math.min(toMonths(effectiveThrough), endMo)
           const clippedLeft = toMonths(c.start) < startMo
+          const clippedRight = toMonths(effectiveThrough) > endMo // ends beyond the 12-month window
           const left = ((barStartMo - startMo) / totalMo) * 100
           const width = ((barEndMo - barStartMo + 1) / totalMo) * 100
           const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name : null
@@ -1067,11 +1069,11 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
             <div key={c.id} style={{
               position: "absolute", top: AXIS_H + i * ROW_H + 4, left: `${left}%`, width: `${width}%`,
               height: BAR_H, background: ganttColor[c.status] ?? "#F5C4B4",
-              borderRadius: `${clippedLeft ? "0" : "4px"} ${isOngoing ? "0" : "4px"} ${isOngoing ? "0" : "4px"} ${clippedLeft ? "0" : "4px"}`, opacity: 0.85, display: "flex", alignItems: "center",
+              borderRadius: `${clippedLeft ? "0" : "4px"} ${isOngoing || clippedRight ? "0" : "4px"} ${isOngoing || clippedRight ? "0" : "4px"} ${clippedLeft ? "0" : "4px"}`, opacity: 0.85, display: "flex", alignItems: "center",
               paddingLeft: 6, overflow: "hidden",
             }}>
               <span style={{ fontSize: 9, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }} title={label}>{label}</span>
-              {isOngoing && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, paddingRight: 4, flexShrink: 0 }}>→</span>}
+              {(isOngoing || clippedRight) && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, paddingRight: 4, flexShrink: 0 }}>→</span>}
             </div>
           )
         })}
