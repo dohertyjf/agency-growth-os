@@ -1298,7 +1298,8 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
   const startYMs = people.map(p => toYM(p.startDate)).filter(Boolean) as string[]
   const endYMs = people.map(p => toYM(p.endDate)).filter(Boolean) as string[]
   const tableStart = startYMs.length > 0 ? startYMs.reduce((a, b) => a < b ? a : b) : nowYM
-  const tableEnd = [nowYM, ...endYMs].reduce((a, b) => a > b ? a : b)
+  // Extend 3 months past the current month to project upcoming salary spend.
+  const tableEnd = [addMonthsYM(nowYM, 3), ...endYMs].reduce((a, b) => a > b ? a : b)
   const months = genMonthsRange(tableStart, tableEnd)
 
   useEffect(() => {
@@ -1406,8 +1407,8 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
                 Person
               </th>
               {months.map(mo => (
-                <th key={mo} style={{ textAlign: "right", fontSize: 11, fontWeight: 600, color: mo === nowYM ? "#E9532A" : "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }}>
-                  {fmtYM(mo)}{mo === nowYM ? " ●" : ""}
+                <th key={mo} style={{ textAlign: "right", fontSize: 11, fontWeight: 600, fontStyle: mo > nowYM ? "italic" : "normal", color: mo === nowYM ? "#E9532A" : mo > nowYM ? "#B7B0A8" : "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }}>
+                  {fmtYM(mo)}{mo === nowYM ? " ●" : mo > nowYM ? " ·proj" : ""}
                 </th>
               ))}
             </tr>

@@ -994,7 +994,11 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
 
   const allYMs = contracts.flatMap(c => [c.start, ...(c.contractedThrough ? [c.contractedThrough] : [])])
   allYMs.push(now)
-  const minYM = allYMs.reduce((a, b) => a < b ? a : b)
+  // Start at most 12 months back (previous 12 months incl. current), keeping the
+  // forward runway. Older history is trimmed and its bars clamp to the left edge.
+  const twelveAgo = ymAdd(now, -11)
+  const rawMin = allYMs.reduce((a, b) => a < b ? a : b)
+  const minYM = rawMin < twelveAgo ? twelveAgo : rawMin
   const hasOngoing = contracts.some(c => !c.contractedThrough)
   const maxYM = hasOngoing
     ? ymAdd(allYMs.reduce((a, b) => a > b ? a : b), 6)
@@ -1010,6 +1014,9 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
   const totalMo = endMo - startMo + 1
 
   if (totalMo <= 0) return null
+
+  // Only rows that overlap the visible window.
+  const visible = contracts.filter(c => toMonths(c.contractedThrough ?? maxYM) >= startMo && toMonths(c.start) <= endMo)
 
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
   const moToLabel = (mo: number) => {
@@ -1038,7 +1045,7 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
           {showAll ? "Active only" : "Show all"}
         </button>
       </div>
-      <div style={{ position: "relative", height: AXIS_H + contracts.length * ROW_H + 8 }}>
+      <div style={{ position: "relative", height: AXIS_H + visible.length * ROW_H + 8 }}>
         {/* Month axis */}
         {axisTicks.map(mo => (
           <div key={mo} style={{ position: "absolute", top: 0, left: `${((mo - startMo) / totalMo) * 100}%`, transform: "translateX(-50%)", textAlign: "center" }}>
@@ -1046,18 +1053,21 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
             <div style={{ width: 1, height: 3, background: "#D1CCC5", margin: "0 auto" }} />
           </div>
         ))}
-        {contracts.map((c, i) => {
+        {visible.map((c, i) => {
           const isOngoing = !c.contractedThrough
           const effectiveThrough = c.contractedThrough ?? maxYM
-          const left = ((toMonths(c.start) - startMo) / totalMo) * 100
-          const width = ((toMonths(effectiveThrough) - toMonths(c.start) + 1) / totalMo) * 100
+          const barStartMo = Math.max(toMonths(c.start), startMo)
+          const barEndMo = Math.min(toMonths(effectiveThrough), endMo)
+          const clippedLeft = toMonths(c.start) < startMo
+          const left = ((barStartMo - startMo) / totalMo) * 100
+          const width = ((barEndMo - barStartMo + 1) / totalMo) * 100
           const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name : null
           const label = accountName ? `${c.name} - ${accountName}` : c.name
           return (
             <div key={c.id} style={{
               position: "absolute", top: AXIS_H + i * ROW_H + 4, left: `${left}%`, width: `${width}%`,
               height: BAR_H, background: ganttColor[c.status] ?? "#F5C4B4",
-              borderRadius: isOngoing ? "4px 0 0 4px" : 4, opacity: 0.85, display: "flex", alignItems: "center",
+              borderRadius: `${clippedLeft ? "0" : "4px"} ${isOngoing ? "0" : "4px"} ${isOngoing ? "0" : "4px"} ${clippedLeft ? "0" : "4px"}`, opacity: 0.85, display: "flex", alignItems: "center",
               paddingLeft: 6, overflow: "hidden",
             }}>
               <span style={{ fontSize: 9, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }} title={label}>{label}</span>
@@ -1068,7 +1078,7 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
         <div style={{
           position: "absolute", top: 0,
           left: `${((toMonths(now) - startMo) / totalMo) * 100}%`,
-          width: 1, height: AXIS_H + contracts.length * ROW_H + 8, background: "#1A1916", opacity: 0.2,
+          width: 1, height: AXIS_H + visible.length * ROW_H + 8, background: "#1A1916", opacity: 0.2,
         }} />
       </div>
     </div>
