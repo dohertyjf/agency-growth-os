@@ -1315,6 +1315,10 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
   const [editingCell, setEditingCell] = useState<EditTarget | null>(null)
   const [editValue, setEditValue] = useState("")
   const [saving, setSaving] = useState(false)
+  const [showVendors, setShowVendors] = useState(false)
+
+  const hasVendors = people.some(p => p.isExternal)
+  const shownPeople = showVendors ? people : people.filter(p => !p.isExternal)
 
   function baseMonthlySalary(p: Person) { return p.annualSalary > 0 ? Math.round(p.annualSalary / 12) : 0 }
   function baseMonthlyHours(p: Person) { return p.billableHours }
@@ -1335,6 +1339,14 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
   function hoursCellValue(personId: string, month: string, p: Person) {
     const override = hoursMap.get(`${personId}:${month}`)
     return { value: override ?? baseMonthlyHours(p), isOverride: override !== undefined }
+  }
+
+  // Monthly totals across the shown people (active that month only).
+  function salaryTotal(mo: string) {
+    return shownPeople.reduce((s, p) => (isActive(p, mo) ? s + salaryCellValue(p.id, mo, p).value : s), 0)
+  }
+  function hoursTotal(mo: string) {
+    return shownPeople.filter(p => !p.isExternal).reduce((s, p) => (isActive(p, mo) ? s + hoursCellValue(p.id, mo, p).value : s), 0)
   }
 
   async function saveCell(target: EditTarget) {
@@ -1374,9 +1386,17 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", marginBottom: 4 }}>Monthly Salary &amp; Hours</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Monthly Salary &amp; Hours</div>
+        {hasVendors && (
+          <button onClick={() => setShowVendors(v => !v)}
+            style={{ fontSize: 11, fontWeight: 600, color: "#6B6760", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, padding: "3px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
+            {showVendors ? "Hide vendors" : "Show vendors"}
+          </button>
+        )}
+      </div>
       <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 14 }}>
-        Grey values are defaults (salary ÷ 12; 160h for FT, billable hrs for PT). Click any cell to override — e.g. when someone changes hours or gets a raise.
+        Grey values are defaults (salary ÷ 12; billable hrs for hours). Click any cell to override — e.g. when someone changes hours or gets a raise.
       </div>
       <div ref={scrollRef} style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse" }}>
@@ -1393,9 +1413,8 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
             </tr>
           </thead>
           <tbody>
-            {people.map((p, pi) => {
-              const isLast = pi === people.length - 1
-              const rowBorder = isLast ? "2px solid #ECE7DE" : "1px solid #ECE7DE"
+            {shownPeople.map((p) => {
+              const rowBorder = "1px solid #ECE7DE"
               return (
                 <>
                   {/* Salary row */}
@@ -1466,6 +1485,38 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
                 </>
               )
             })}
+
+            {/* Totals */}
+            {shownPeople.length > 0 && (
+              <>
+                <tr key="total-salary">
+                  <td style={{ ...stickyLabel, paddingTop: 12, borderTop: "2px solid #ECE7DE", borderBottom: "none", fontWeight: 700, fontSize: 13, color: "#1A1916" }}>
+                    Total{showVendors ? "" : " (team)"}
+                  </td>
+                  {months.map(mo => {
+                    const t = salaryTotal(mo)
+                    return (
+                      <td key={mo} style={{ padding: "10px 8px 4px", textAlign: "right", borderTop: "2px solid #ECE7DE", borderBottom: "none", minWidth: 86, fontSize: 12, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>
+                        {t > 0 ? fmt$(t) : "—"}
+                      </td>
+                    )
+                  })}
+                </tr>
+                <tr key="total-hours">
+                  <td style={{ ...stickyLabel, paddingTop: 2, borderBottom: "none" }}>
+                    <span style={{ color: "#9C9590", fontSize: 11 }}>hrs/mo</span>
+                  </td>
+                  {months.map(mo => {
+                    const t = hoursTotal(mo)
+                    return (
+                      <td key={mo} style={{ padding: "2px 8px 8px", textAlign: "right", borderBottom: "none", minWidth: 86, fontSize: 12, fontWeight: 700, color: "#6B6760", fontVariantNumeric: "tabular-nums" }}>
+                        {t > 0 ? `${Math.round(t)}h` : "—"}
+                      </td>
+                    )
+                  })}
+                </tr>
+              </>
+            )}
           </tbody>
         </table>
       </div>
