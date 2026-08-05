@@ -178,10 +178,11 @@ interface DealCardProps {
   onLost: (id: string) => void
   onRevert?: (id: string) => void
   onEdit: (deal: Contract) => void
+  onDelete: (id: string) => void
   fmt$: (v: number) => string
 }
 
-function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, fmt$ }: DealCardProps) {
+function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$ }: DealCardProps) {
   const accountName = deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name : null
   const daysSinceCall = daysSince(deal.callDate)
 
@@ -215,6 +216,13 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, o
             style={{ padding: "2px 6px", background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#9C9590", cursor: "pointer", lineHeight: 1.4 }}
           >
             Edit
+          </button>
+          <button
+            onClick={() => onDelete(deal.id)}
+            title="Delete deal"
+            style={{ padding: "2px 6px", background: "none", border: "none", fontSize: 16, color: "#C4BFBA", cursor: "pointer", lineHeight: 1 }}
+          >
+            ×
           </button>
         </div>
       </div>
@@ -254,10 +262,11 @@ interface DealGroupProps {
   onLost: (id: string) => void
   onRevert?: (id: string) => void
   onEdit: (deal: Contract) => void
+  onDelete: (id: string) => void
   fmt$: (v: number) => string
 }
 
-function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, fmt$ }: DealGroupProps) {
+function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$ }: DealGroupProps) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -276,6 +285,7 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
             onLost={onLost}
             onRevert={onRevert}
             onEdit={onEdit}
+            onDelete={onDelete}
             fmt$={fmt$}
           />
         ))}
@@ -401,6 +411,13 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     onContractsChange(contracts.map(c => c.id === id ? { ...c, ...updated } : c))
   }
 
+  async function handleDeleteDeal(id: string) {
+    const deal = contracts.find(c => c.id === id)
+    if (!confirm(`Delete "${deal?.name ?? "this deal"}"? This can't be undone.`)) return
+    onContractsChange(contracts.filter(c => c.id !== id))
+    await fetch(`/api/contracts/${id}`, { method: "DELETE" })
+  }
+
   async function handleAddDeal(e: React.FormEvent) {
     e.preventDefault()
     if (!addForm.accountId) return
@@ -461,6 +478,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           onAdvance={id => updateContract(id, { status: "potential" })}
           onLost={id => updateContract(id, { status: "lost" })}
           onEdit={openEdit}
+          onDelete={handleDeleteDeal}
           fmt$={fmt$}
         />
 
@@ -474,6 +492,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           onLost={id => updateContract(id, { status: "lost" })}
           onRevert={id => updateContract(id, { status: "opportunity" })}
           onEdit={openEdit}
+          onDelete={handleDeleteDeal}
           fmt$={fmt$}
         />
 
