@@ -123,6 +123,7 @@ model Contract {
   status            ContractStatus @default(active)
   type              ContractType   @default(retainer)
   accountId         String?
+  ownerId           String?        // Person who owns/manages this account
   account           Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
   callDate          String?
   signedDate        String?

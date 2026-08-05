@@ -42,6 +42,7 @@ interface Contract {
   status: string
   type: string
   accountId?: string | null
+  ownerId?: string | null
   callDate: string | null
   signedDate: string | null
   kickoffDate: string | null
@@ -313,6 +314,7 @@ export default function ClientPageClient({
           initialContracts={initialContracts}
           accounts={accounts}
           products={clientProducts}
+          people={people.map(p => ({ id: p.id, name: p.name, isExternal: p.isExternal }))}
           minHourlyRate={goal?.minHourlyRate ?? null}
           onContractsChange={updated => setContracts(updated)}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}

@@ -15,6 +15,7 @@ interface Contract {
   status: string
   type: string
   accountId?: string | null
+  ownerId?: string | null
   callDate: string | null
   signedDate: string | null
   kickoffDate: string | null
@@ -23,6 +24,12 @@ interface Contract {
 interface Account {
   id: string
   name: string
+}
+
+interface Person {
+  id: string
+  name: string
+  isExternal: boolean
 }
 
 interface Product {
@@ -37,6 +44,7 @@ interface Props {
   initialContracts: Contract[]
   accounts?: Account[]
   products?: Product[]
+  people?: Person[]
   minHourlyRate?: number | null
   onContractsChange?: (contracts: Contract[]) => void
   onAccountCreated?: (account: Account) => void
@@ -474,7 +482,7 @@ const contractsResponsiveStyle = `
   }
 `
 
-export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
+export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, people = [], minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
@@ -564,6 +572,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     }
   }
   const handleHoursChange = (contractId: string, hours: number) => patchContract(contractId, { hoursPerMonth: hours })
+  const handleOwnerChange = (contractId: string, ownerId: string | null) => { patchContract(contractId, { ownerId }) }
 
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
@@ -719,6 +728,8 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               title="Active"
               contracts={byStatus.active}
               accounts={localAccounts}
+              people={people}
+              onOwnerChange={handleOwnerChange}
               onEdit={setEditingContract}
 onSchedule={setSchedulingContract}
               onDelete={handleDelete}
@@ -732,6 +743,8 @@ onSchedule={setSchedulingContract}
               title="Pipeline"
               contracts={byStatus.potential}
               accounts={localAccounts}
+              people={people}
+              onOwnerChange={handleOwnerChange}
               onEdit={setEditingContract}
 onSchedule={setSchedulingContract}
               onDelete={handleDelete}
@@ -754,6 +767,8 @@ onSchedule={setSchedulingContract}
                   title=""
                   contracts={byStatus.finished}
                   accounts={localAccounts}
+                  people={people}
+                  onOwnerChange={handleOwnerChange}
                   onEdit={setEditingContract}
 onSchedule={setSchedulingContract}
                   onDelete={handleDelete}
@@ -769,10 +784,12 @@ onSchedule={setSchedulingContract}
   )
 }
 
-function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDuplicate, onSchedule, dimmed }: {
+function ContractSection({ title, contracts, accounts, people, onOwnerChange, onEdit, onDelete, onDuplicate, onSchedule, dimmed }: {
   title: string
   contracts: Contract[]
   accounts: Account[]
+  people: Person[]
+  onOwnerChange: (contractId: string, ownerId: string | null) => void
   onEdit: (c: Contract) => void
   onDelete: (id: string) => void
   onDuplicate: (c: Contract) => void
@@ -780,6 +797,7 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
   dimmed?: boolean
 }) {
   const fmtCurrency = useFmtCurrency()
+  const teamMembers = people.filter(p => !p.isExternal)
   return (
     <div style={{ marginTop: title ? 12 : 4 }}>
       {title && (
@@ -807,6 +825,16 @@ function ContractSection({ title, contracts, accounts, onEdit, onDelete, onDupli
                   ? `${ymLabel(c.start)} – ${ymLabel(c.contractedThrough)}`
                   : `${ymLabel(c.start)} – Ongoing`}
               </div>
+              {teamMembers.length > 0 && (
+                <div style={{ fontSize: 11, color: "#9C9590", marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ color: "#B0A9A0" }}>Owner</span>
+                  <select value={c.ownerId ?? ""} onChange={e => onOwnerChange(c.id, e.target.value || null)}
+                    style={{ fontSize: 11, border: "1px solid #ECE7DE", borderRadius: 5, padding: "2px 6px", background: "#fff", color: c.ownerId ? "#1A1916" : "#9C9590", fontFamily: "inherit", cursor: "pointer", maxWidth: 170 }}>
+                    <option value="">Unassigned</option>
+                    {teamMembers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="contract-row-actions" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
