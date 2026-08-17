@@ -3,6 +3,7 @@ import { useState } from "react"
 import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, BOOKED_AHEAD_MONTHS, type ContractRow } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import PaymentScheduleModal from "./PaymentScheduleModal"
+import ProjectPulse, { type Pulse } from "./ProjectPulse"
 
 interface Contract {
   id: string
@@ -45,6 +46,8 @@ interface Props {
   accounts?: Account[]
   products?: Product[]
   people?: Person[]
+  pulses?: Pulse[]
+  onPulseChange?: (pulse: Pulse) => void
   minHourlyRate?: number | null
   onContractsChange?: (contracts: Contract[]) => void
   onAccountCreated?: (account: Account) => void
@@ -496,7 +499,7 @@ const contractsResponsiveStyle = `
   }
 `
 
-export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, people = [], minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
+export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, people = [], pulses = [], onPulseChange, minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
@@ -753,6 +756,8 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               contracts={byStatus.active}
               accounts={localAccounts}
               people={people}
+              pulses={pulses}
+              onPulseChange={onPulseChange}
               onOwnerChange={handleOwnerChange}
               onEdit={setEditingContract}
 onSchedule={setSchedulingContract}
@@ -768,6 +773,8 @@ onSchedule={setSchedulingContract}
               contracts={byStatus.potential}
               accounts={localAccounts}
               people={people}
+              pulses={pulses}
+              onPulseChange={onPulseChange}
               onOwnerChange={handleOwnerChange}
               onEdit={setEditingContract}
 onSchedule={setSchedulingContract}
@@ -792,6 +799,8 @@ onSchedule={setSchedulingContract}
                   contracts={byStatus.finished}
                   accounts={localAccounts}
                   people={people}
+                  pulses={pulses}
+                  onPulseChange={onPulseChange}
                   onOwnerChange={handleOwnerChange}
                   onEdit={setEditingContract}
 onSchedule={setSchedulingContract}
@@ -808,11 +817,13 @@ onSchedule={setSchedulingContract}
   )
 }
 
-function ContractSection({ title, contracts, accounts, people, onOwnerChange, onEdit, onDelete, onDuplicate, onSchedule, dimmed }: {
+function ContractSection({ title, contracts, accounts, people, pulses, onPulseChange, onOwnerChange, onEdit, onDelete, onDuplicate, onSchedule, dimmed }: {
   title: string
   contracts: Contract[]
   accounts: Account[]
   people: Person[]
+  pulses: Pulse[]
+  onPulseChange?: (pulse: Pulse) => void
   onOwnerChange: (contractId: string, ownerId: string | null) => void
   onEdit: (c: Contract) => void
   onDelete: (id: string) => void
@@ -822,6 +833,9 @@ function ContractSection({ title, contracts, accounts, people, onOwnerChange, on
 }) {
   const fmtCurrency = useFmtCurrency()
   const teamMembers = people.filter(p => !p.isExternal)
+  const nowYM = new Date().toISOString().slice(0, 7)
+  const prevYM = ymAdd(nowYM, -1)
+  const pulseFor = (contractId: string, month: string) => pulses.find(p => p.contractId === contractId && p.month === month)
   return (
     <div style={{ marginTop: title ? 12 : 4 }}>
       {title && (
@@ -872,6 +886,9 @@ function ContractSection({ title, contracts, accounts, people, onOwnerChange, on
               <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: colors.bg, color: colors.text, textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
                 {STATUS_LABELS[s]}
               </span>
+              {c.status === "active" && (
+                <ProjectPulse contractId={c.id} current={pulseFor(c.id, nowYM)} prev={pulseFor(c.id, prevYM)} onSaved={p => onPulseChange?.(p)} />
+              )}
               <button onClick={() => onSchedule(c)} title="Payment schedule" style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px", whiteSpace: "nowrap" }}>Schedule</button>
               <button onClick={() => onDuplicate(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>Copy</button>
               <button onClick={() => onEdit(c)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, color: "#6B6760", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}>Edit</button>

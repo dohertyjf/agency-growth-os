@@ -10,24 +10,24 @@ const schema = z.object({
 
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ id: string; accountId: string }> }
+  { params }: { params: Promise<{ contractId: string }> }
 ) {
   const session = await auth()
   if (!session || session.user.role !== "coach") return Response.json({ error: "Forbidden" }, { status: 403 })
 
-  const { id, accountId } = await params
-  const account = await prisma.account.findFirst({ where: { id: accountId, clientId: id } })
-  if (!account) return Response.json({ error: "Not found" }, { status: 404 })
+  const { contractId } = await params
+  const contract = await prisma.contract.findUnique({ where: { id: contractId } })
+  if (!contract) return Response.json({ error: "Not found" }, { status: 404 })
 
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
   const { month, score, note } = parsed.data
-  const pulse = await prisma.accountPulse.upsert({
-    where: { accountId_month: { accountId, month } },
+  const pulse = await prisma.contractPulse.upsert({
+    where: { contractId_month: { contractId, month } },
     update: { score, note: note ?? null },
-    create: { accountId, month, score, note: note ?? null },
+    create: { contractId, month, score, note: note ?? null },
   })
   return Response.json(pulse)
 }

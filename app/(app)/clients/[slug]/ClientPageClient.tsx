@@ -99,8 +99,8 @@ interface ContractHours {
   hours: number
 }
 
-interface AccountPulse {
-  accountId: string
+interface Pulse {
+  contractId: string
   month: string
   score: number
   note: string | null
@@ -162,7 +162,7 @@ interface Props {
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
   initialContractHours: ContractHours[]
-  initialPulses: AccountPulse[]
+  initialPulses: Pulse[]
   goal: Goal | null
   initialCalls: Call[]
   products: Product[]
@@ -199,6 +199,8 @@ export default function ClientPageClient({
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
   const [reconView, setReconView] = useState<"reconcile" | "projection" | "yield">("reconcile")
+  const [pulses, setPulses] = useState<Pulse[]>(initialPulses)
+  const handlePulseChange = (pulse: Pulse) => setPulses(prev => [...prev.filter(p => !(p.contractId === pulse.contractId && p.month === pulse.month)), pulse])
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
   const totalHoursWorked = people.filter(p => !p.isExternal).reduce((s, p) => s + p.billableHours, 0)
@@ -298,7 +300,8 @@ export default function ClientPageClient({
         <AccountsPanel
           clientId={clientId}
           initialAccounts={accounts}
-          initialPulses={initialPulses}
+          pulses={pulses}
+          onPulseChange={handlePulseChange}
           contracts={contracts}
           products={clientProducts}
           onAccountsChange={setAccounts}
@@ -325,6 +328,8 @@ export default function ClientPageClient({
           accounts={accounts}
           products={clientProducts}
           people={people.map(p => ({ id: p.id, name: p.name, isExternal: p.isExternal }))}
+          pulses={pulses}
+          onPulseChange={handlePulseChange}
           minHourlyRate={goal?.minHourlyRate ?? null}
           onContractsChange={updated => setContracts(updated)}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}

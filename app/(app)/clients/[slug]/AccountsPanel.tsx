@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { fmtCurrency, ymLabel, ymAdd } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
+import ProjectPulse, { pulseColor, type Pulse } from "./ProjectPulse"
 
 interface Account {
   id: string
@@ -36,24 +37,16 @@ interface Product {
   monthly: number
 }
 
-interface Pulse { accountId: string; month: string; score: number; note: string | null }
-
 interface Props {
   clientId: string
   initialAccounts: Account[]
-  initialPulses?: Pulse[]
+  pulses?: Pulse[]
+  onPulseChange?: (pulse: Pulse) => void
   contracts: Contract[]
   products?: Product[]
   onAccountsChange: (accounts: Account[]) => void
   onContractAccountChange: (contractId: string, accountId: string | null) => void
   onContractCreated?: (contract: Contract) => void
-}
-
-// 1–5 pulse → color. ≤2 red · 3 amber · 4–5 green.
-function pulseColor(score: number): { fg: string; bg: string } {
-  if (score <= 2) return { fg: "#C2410C", bg: "#FBEAE4" }
-  if (score === 3) return { fg: "#B45309", bg: "#FEF3C7" }
-  return { fg: "#166534", bg: "#DCFCE7" }
 }
 
 const now = new Date().toISOString().slice(0, 7)
@@ -251,14 +244,11 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
   )
 }
 
-export default function AccountsPanel({ clientId, initialAccounts, initialPulses = [], contracts, products, onAccountsChange, onContractAccountChange, onContractCreated }: Props) {
+export default function AccountsPanel({ clientId, initialAccounts, pulses = [], onPulseChange, contracts, products, onAccountsChange, onContractAccountChange, onContractCreated }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
-  const [pulses, setPulses] = useState<Pulse[]>(initialPulses)
-  const [editingPulseFor, setEditingPulseFor] = useState<string | null>(null)
-  const [pulseDraft, setPulseDraft] = useState<{ score: number; note: string }>({ score: 3, note: "" })
   const prevMonth = ymAdd(now, -1)
-  const pulseFor = (accountId: string, month: string) => pulses.find(p => p.accountId === accountId && p.month === month)
+  const pulseFor = (contractId: string, month: string) => pulses.find(p => p.contractId === contractId && p.month === month)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: "", contactName: "", contactEmail: "" })
@@ -337,21 +327,18 @@ export default function AccountsPanel({ clientId, initialAccounts, initialPulses
     updateAccounts(accounts.filter(a => a.id !== accountId))
   }
 
-  function openPulse(accountId: string) {
-    const cur = pulseFor(accountId, now)
-    setPulseDraft({ score: cur?.score ?? 3, note: cur?.note ?? "" })
-    setEditingPulseFor(a => (a === accountId ? null : accountId))
+  // Bucket accounts into Active Clients / Pipeline / Paused-Churned by their projects' statuses.
+  function bucketOf(accountId: string): "active" | "pipeline" | "churned" {
+    const cs = byAccount.get(accountId) ?? []
+    if (cs.some(c => c.status === "active")) return "active"
+    if (cs.length === 0 || cs.some(c => c.status === "opportunity" || c.status === "potential")) return "pipeline"
+    return "churned"
   }
-
-  async function handleSavePulse(accountId: string) {
-    const { score, note } = pulseDraft
-    const res = await fetch(`/api/clients/${clientId}/accounts/${accountId}/pulse`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ month: now, score, note: note.trim() || undefined }),
-    })
-    if (!res.ok) return
-    setPulses(prev => [...prev.filter(p => !(p.accountId === accountId && p.month === now)), { accountId, month: now, score, note: note.trim() || null }])
-    setEditingPulseFor(null)
+  // Account's rolled-up pulse = the lowest active project's current-month pulse.
+  function accountPulse(accountId: string): Pulse | undefined {
+    const active = (byAccount.get(accountId) ?? []).filter(c => c.status === "active")
+    const scored = active.map(c => pulseFor(c.id, now)).filter((p): p is Pulse => !!p)
+    return scored.sort((a, b) => a.score - b.score)[0]
   }
 
   async function handleAddProject(e: React.FormEvent, accountId: string) {
@@ -471,11 +458,24 @@ export default function AccountsPanel({ clientId, initialAccounts, initialPulses
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {accounts.map(account => {
+          {(() => {
+            const order = { active: 0, pipeline: 1, churned: 2 } as const
+            const labels = { active: "Active Clients", pipeline: "Pipeline", churned: "Paused / Churned" } as const
+            const sorted = [...accounts].sort((a, b) => order[bucketOf(a.id)] - order[bucketOf(b.id)] || a.name.localeCompare(b.name))
+            return sorted.map((account, idx) => {
+            const bucket = bucketOf(account.id)
+            const showHeader = idx === 0 || bucketOf(sorted[idx - 1].id) !== bucket
+            const bucketCount = sorted.filter(a => bucketOf(a.id) === bucket).length
             const accountContracts = byAccount.get(account.id) ?? []
             const isEditing = editingId === account.id
             return (
-              <div key={account.id} style={{ border: "1px solid #F5F1EC", borderRadius: 8, overflow: "hidden" }}>
+              <div key={account.id}>
+              {showHeader && (
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9C9590", textTransform: "uppercase", letterSpacing: "0.05em", margin: idx === 0 ? "0 0 6px" : "16px 0 6px" }}>
+                  {labels[bucket]} <span style={{ color: "#C0BAB2" }}>({bucketCount})</span>
+                </div>
+              )}
+              <div style={{ border: "1px solid #F5F1EC", borderRadius: 8, overflow: "hidden" }}>
                 {isEditing ? (
                   <form onSubmit={e => handleEditSave(e, account.id)} style={{ padding: "10px 14px", background: "#FBFAF7", display: "flex", flexDirection: "column", gap: 8 }}>
                     <div className="account-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
@@ -518,15 +518,13 @@ export default function AccountsPanel({ clientId, initialAccounts, initialPulses
                     )}
                   </div>
                   {(() => {
-                    const cur = pulseFor(account.id, now)
-                    const prev = pulseFor(account.id, prevMonth)
-                    const declining = cur && prev && cur.score < prev.score
-                    const col = cur ? pulseColor(cur.score) : null
+                    const roll = accountPulse(account.id)
+                    if (!roll) return null
+                    const col = pulseColor(roll.score)
                     return (
-                      <button onClick={() => openPulse(account.id)} title="Client pulse this month"
-                        style={{ display: "flex", alignItems: "center", gap: 4, border: cur ? "none" : "1px dashed #E0DAD0", background: cur ? col!.bg : "none", color: cur ? col!.fg : "#9C9590", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                        {cur ? <>Pulse {cur.score}/5{declining && <span title="Down vs last month" style={{ fontSize: 10 }}> ▼</span>}</> : "+ Pulse"}
-                      </button>
+                      <span title="Lowest active project pulse this month" style={{ background: col.bg, color: col.fg, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                        Pulse {roll.score}/5
+                      </span>
                     )
                   })()}
                   <div style={{ fontSize: 11, color: "#9C9590" }}>
@@ -545,31 +543,6 @@ export default function AccountsPanel({ clientId, initialAccounts, initialPulses
                     ×
                   </button>
                 </div>
-                )}
-                {!isEditing && editingPulseFor === account.id && (
-                  <div style={{ padding: "12px 14px", borderTop: "1px solid #F5F1EC", background: "#FDFCFA", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, whiteSpace: "nowrap" }}>Pulse · {ymLabel(now)}</span>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      {[1, 2, 3, 4, 5].map(n => {
-                        const sel = pulseDraft.score === n
-                        const c = pulseColor(n)
-                        return (
-                          <button key={n} type="button" onClick={() => setPulseDraft(d => ({ ...d, score: n }))}
-                            style={{ width: 30, height: 30, borderRadius: 7, border: sel ? `2px solid ${c.fg}` : "1px solid #ECE7DE", background: sel ? c.bg : "#fff", color: sel ? c.fg : "#9C9590", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                            {n}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <input value={pulseDraft.note} onChange={e => setPulseDraft(d => ({ ...d, note: e.target.value }))}
-                      placeholder="Optional note (why?)" style={{ ...inputStyle, fontSize: 12, flex: 1, minWidth: 160 }} />
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button type="button" onClick={() => setEditingPulseFor(null)}
-                        style={{ padding: "6px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 12, cursor: "pointer", color: "#6B6760" }}>Cancel</button>
-                      <button type="button" onClick={() => handleSavePulse(account.id)}
-                        style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Save pulse</button>
-                    </div>
-                  </div>
                 )}
                 {!isEditing && addingProjectForAccount === account.id && (
                   <form onSubmit={e => handleAddProject(e, account.id)} style={{ padding: "10px 14px", borderTop: "1px solid #F5F1EC", background: "#FDFCFA", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -661,6 +634,9 @@ export default function AccountsPanel({ clientId, initialAccounts, initialPulses
                           {fmtCurrency(c.monthly)}{c.type === "retainer" ? "/mo" : ""}
                         </span>
                         <span style={{ flex: 1 }} />
+                        {c.status === "active" && (
+                          <ProjectPulse contractId={c.id} current={pulseFor(c.id, now)} prev={pulseFor(c.id, prevMonth)} onSaved={p => onPulseChange?.(p)} />
+                        )}
                         {assigningContract === c.id
                           ? assignSelect(c.id, c.accountId ?? null)
                           : <button onClick={() => setAssigningContract(c.id)}
@@ -673,8 +649,10 @@ export default function AccountsPanel({ clientId, initialAccounts, initialPulses
                   </div>
                 )}
               </div>
+              </div>
             )
-          })}
+          })
+          })()}
 
           {(byAccount.get(null) ?? []).length > 0 && (
             <div style={{ border: "1px dashed #ECE7DE", borderRadius: 8, overflow: "hidden", marginTop: 4 }}>
