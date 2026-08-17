@@ -209,6 +209,7 @@ interface EditForm {
   status: ContractStatus
   type: ContractTypeField
   accountId: string | null
+  ownerId: string | null
 }
 
 function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
@@ -222,6 +223,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
     status: "potential" as ContractStatus,
     type: uiType,
     accountId: contract.accountId ?? null,
+    ownerId: contract.ownerId ?? null,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -342,8 +344,9 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
   )
 }
 
-function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
+function EditModal({ contract, clientId, accounts, people = [], onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; people?: Person[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
   const uiType: ContractTypeField = !contract.contractedThrough && contract.type === "retainer" ? "ongoing" : (contract.type as ContractTypeField) ?? "retainer"
+  const teamMembers = people.filter(p => !p.isExternal)
   const [form, setForm] = useState<EditForm>({
     name: contract.name,
     monthly: String(contract.monthly),
@@ -353,6 +356,7 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
     status: contract.status as ContractStatus,
     type: uiType,
     accountId: contract.accountId ?? null,
+    ownerId: contract.ownerId ?? null,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -369,6 +373,7 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
       type: isOngoing ? "retainer" : form.type,
       contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
       accountId: form.accountId,
+      ownerId: form.ownerId,
     }
     const res = await fetch(`/api/contracts/${contract.id}`, {
       method: "PATCH",
@@ -378,7 +383,7 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
     setSaving(false)
     if (!res.ok) { setError("Failed to save"); return }
     const updated = await res.json()
-    onSave({ ...updated, accountId: form.accountId })
+    onSave({ ...updated, accountId: form.accountId, ownerId: form.ownerId })
     onClose()
   }
 
@@ -422,6 +427,15 @@ function EditModal({ contract, clientId, accounts, onClose, onSave, onAccountCre
               onAccountCreated={a => { onAccountCreated(a); setForm(f => ({ ...f, accountId: a.id })) }}
             />
           </div>
+          {teamMembers.length > 0 && (
+            <div>
+              <label style={labelStyle}>Owner <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(optional)</span></label>
+              <select style={inputStyle} value={form.ownerId ?? ""} onChange={e => setForm(f => ({ ...f, ownerId: e.target.value || null }))}>
+                <option value="">Unassigned</option>
+                {teamMembers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label style={labelStyle}>Project Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
@@ -487,12 +501,13 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
   const minHourlyRate = minHourlyRateProp ?? null
+  const teamMembers = people.filter(p => !p.isExternal)
   const [adding, setAdding] = useState(false)
 
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [schedulingContract, setSchedulingContract] = useState<Contract | null>(null)
   const [duplicatingContract, setDuplicatingContract] = useState<Contract | null>(null)
-  const [form, setForm] = useState({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null })
+  const [form, setForm] = useState({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null, ownerId: null as string | null })
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [showAllGantt, setShowAllGantt] = useState(false)
@@ -537,7 +552,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     const data = await res.json()
     if (res.ok) {
       updateContracts([...contracts, data.contract ?? data])
-      setForm({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential", type: "retainer", accountId: null })
+      setForm({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential", type: "retainer", accountId: null, ownerId: null })
       setAdding(false)
     }
     setSaving(false)
@@ -578,7 +593,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       <style>{contractsResponsiveStyle}</style>
       {editingContract && (
-        <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
+        <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} people={people} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
       )}
       {schedulingContract && (
         <PaymentScheduleModal contractId={schedulingContract.id} projectName={schedulingContract.name} mode={schedulingContract.type === "oneoff" ? "oneoff" : "retainer"} total={schedulingContract.monthly} startMonth={schedulingContract.start} endMonth={schedulingContract.contractedThrough} onClose={() => setSchedulingContract(null)} />
@@ -688,6 +703,15 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               </>
             )}
           </div>
+          {teamMembers.length > 0 && (
+            <div style={{ maxWidth: 240 }}>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Owner <span style={{ color: "#C0BAB2" }}>(optional)</span></label>
+              <select style={{ ...inputStyle, background: "#FBFAF7" }} value={form.ownerId ?? ""} onChange={e => setForm(f => ({ ...f, ownerId: e.target.value || null }))}>
+                <option value="">Unassigned</option>
+                {teamMembers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
         </form>
       )}
 

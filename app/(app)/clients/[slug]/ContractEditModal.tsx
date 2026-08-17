@@ -14,9 +14,11 @@ interface Contract {
   status: string
   type: string
   accountId?: string | null
+  ownerId?: string | null
 }
 
 interface Account { id: string; name: string }
+interface Person { id: string; name: string; isExternal: boolean }
 
 const inputStyle: React.CSSProperties = {
   padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6,
@@ -25,14 +27,16 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function ContractEditModal({ contract, accounts, clientId, onClose, onSaved, onAccountCreated }: {
+export default function ContractEditModal({ contract, accounts, people = [], clientId, onClose, onSaved, onAccountCreated }: {
   contract: Contract
   accounts: Account[]
+  people?: Person[]
   clientId: string
   onClose: () => void
   onSaved: (updated: Contract) => void
   onAccountCreated: (account: Account) => void
 }) {
+  const teamMembers = people.filter(p => !p.isExternal)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accounts)
   const [creatingAccount, setCreatingAccount] = useState(false)
   const [newAccountName, setNewAccountName] = useState("")
@@ -47,6 +51,7 @@ export default function ContractEditModal({ contract, accounts, clientId, onClos
     status: contract.status as ContractStatus,
     type: uiType,
     accountId: contract.accountId ?? null as string | null,
+    ownerId: contract.ownerId ?? null as string | null,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,6 +67,7 @@ export default function ContractEditModal({ contract, accounts, clientId, onClos
       hoursPerMonth: parseFloat(form.hoursPerMonth) || 0,
       status: form.status,
       accountId: form.accountId,
+      ownerId: form.ownerId,
       start: form.start,
       type: isOngoing ? "retainer" : form.type,
       contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
@@ -74,7 +80,7 @@ export default function ContractEditModal({ contract, accounts, clientId, onClos
     setSaving(false)
     if (!res.ok) { setError("Failed to save"); return }
     const updated = await res.json()
-    onSaved({ ...updated, accountId: form.accountId })
+    onSaved({ ...updated, accountId: form.accountId, ownerId: form.ownerId })
     onClose()
   }
 
@@ -159,6 +165,15 @@ export default function ContractEditModal({ contract, accounts, clientId, onClos
               </div>
             )}
           </div>
+          {teamMembers.length > 0 && (
+            <div>
+              <label style={labelStyle}>Owner <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(optional)</span></label>
+              <select style={inputStyle} value={form.ownerId ?? ""} onChange={e => setForm(f => ({ ...f, ownerId: e.target.value || null }))}>
+                <option value="">Unassigned</option>
+                {teamMembers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label style={labelStyle}>Project Name</label>
             <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />

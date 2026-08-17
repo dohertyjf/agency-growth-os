@@ -36,6 +36,7 @@ interface Payment {
 interface Props {
   contracts: Contract[]
   accounts: Account[]
+  people?: { id: string; name: string; isExternal: boolean }[]
   clientId: string
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
@@ -86,7 +87,7 @@ function ymAdd(ym: string, months: number): string {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`
 }
 
-export default function ReconciliationTable({ contracts, accounts, clientId, initialAccountMonths, initialPayments, onRevenueUpdate, onPaymentsChange, onContractUpdate, onAccountCreated }: Props) {
+export default function ReconciliationTable({ contracts, accounts, people = [], clientId, initialAccountMonths, initialPayments, onRevenueUpdate, onPaymentsChange, onContractUpdate, onAccountCreated }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [accountMonths, setAccountMonths] = useState<AccountMonth[]>(initialAccountMonths)
@@ -206,6 +207,7 @@ export default function ReconciliationTable({ contracts, accounts, clientId, ini
         <ContractEditModal
           contract={editingContract}
           accounts={accounts}
+          people={people}
           clientId={clientId}
           onClose={() => setEditingContract(null)}
           onSaved={onContractUpdate}

@@ -303,6 +303,7 @@ export default function ClientPageClient({
           clientId={clientId}
           contracts={contracts}
           accounts={accounts}
+          people={people.map(p => ({ id: p.id, name: p.name, isExternal: p.isExternal }))}
           onContractsChange={setContracts}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
         />
@@ -335,6 +336,7 @@ export default function ClientPageClient({
             <ReconciliationTable
               contracts={contracts}
               accounts={accounts}
+              people={people.map(p => ({ id: p.id, name: p.name, isExternal: p.isExternal }))}
               clientId={clientId}
               initialAccountMonths={initialAccountMonths}
               initialPayments={initialPayments}

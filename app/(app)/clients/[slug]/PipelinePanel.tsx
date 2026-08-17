@@ -12,17 +12,20 @@ interface Contract {
   status: string
   type: string
   accountId?: string | null
+  ownerId?: string | null
   callDate: string | null
   signedDate: string | null
   kickoffDate: string | null
 }
 
 interface Account { id: string; name: string }
+interface Person { id: string; name: string; isExternal: boolean }
 
 interface Props {
   clientId: string
   contracts: Contract[]
   accounts: Account[]
+  people?: Person[]
   onContractsChange: (contracts: Contract[]) => void
   onAccountCreated?: (account: Account) => void
 }
@@ -299,13 +302,14 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
   )
 }
 
-export default function PipelinePanel({ clientId, contracts, accounts: initialAccounts, onContractsChange, onAccountCreated }: Props) {
+export default function PipelinePanel({ clientId, contracts, accounts: initialAccounts, people = [], onContractsChange, onAccountCreated }: Props) {
+  const teamMembers = people.filter(p => !p.isExternal)
   const fmt$ = useFmtCurrency()
   const [localAccounts, setLocalAccounts] = useState<Account[]>(initialAccounts)
   const [addOpen, setAddOpen] = useState(false)
   const initYM = new Date().toISOString().slice(0, 7)
   const [addForm, setAddForm] = useState({
-    name: "", monthly: "", accountId: "",
+    name: "", monthly: "", accountId: "", ownerId: "",
     stage: "opportunity" as "opportunity" | "potential",
     callDate: "",
     type: "retainer" as "retainer" | "ongoing" | "oneoff",
@@ -315,7 +319,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   const [addSaving, setAddSaving] = useState(false)
   const [editDeal, setEditDeal] = useState<Contract | null>(null)
   const [editForm, setEditForm] = useState({
-    name: "", monthly: "", accountId: "", callDate: "", signedDate: "",
+    name: "", monthly: "", accountId: "", ownerId: "", callDate: "", signedDate: "",
     type: "retainer" as "retainer" | "ongoing" | "oneoff",
     start: "",
     contractedThrough: "",
@@ -330,6 +334,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       name: deal.name,
       monthly: String(deal.monthly),
       accountId: deal.accountId ?? "",
+      ownerId: deal.ownerId ?? "",
       callDate: deal.callDate ?? "",
       signedDate: deal.signedDate ?? "",
       type: uiType,
@@ -350,6 +355,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         name: editForm.name,
         monthly: parseFloat(editForm.monthly) || 0,
         accountId: editForm.accountId || null,
+        ownerId: editForm.ownerId || null,
         callDate: editForm.callDate || null,
         signedDate: editForm.signedDate || null,
         type: isOngoing ? "retainer" : editForm.type,
@@ -434,6 +440,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         type: isOngoing ? "retainer" : addForm.type,
         contractedThrough: isOngoing ? null : addForm.type === "oneoff" ? (addForm.start || nowYM) : addForm.contractedThrough || null,
         accountId: addForm.accountId || null,
+        ownerId: addForm.ownerId || null,
         callDate: addForm.callDate || null,
       }),
     })
@@ -441,7 +448,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       const created = await res.json()
       onContractsChange([...contracts, { ...created, callDate: created.callDate ?? null, signedDate: created.signedDate ?? null, kickoffDate: created.kickoffDate ?? null }])
       setAddOpen(false)
-      setAddForm({ name: "", monthly: "", accountId: "", stage: "opportunity", callDate: "", type: "retainer", start: nowYM, contractedThrough: "" })
+      setAddForm({ name: "", monthly: "", accountId: "", ownerId: "", stage: "opportunity", callDate: "", type: "retainer", start: nowYM, contractedThrough: "" })
     }
     setAddSaving(false)
   }
@@ -612,7 +619,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                     <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0 }}>$</span>
                     <input
                       style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "7px 10px 7px 4px" }}
-                      type="number" min={0} step={100} value={addForm.monthly}
+                      type="number" min={0} step="any" value={addForm.monthly}
                       onChange={e => setAddForm(f => ({ ...f, monthly: e.target.value }))}
                       placeholder="5000" />
                   </div>
@@ -666,6 +673,16 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                     onChange={e => setAddForm(f => ({ ...f, callDate: e.target.value }))} />
                 </div>
               </div>
+              {teamMembers.length > 0 && (
+                <div>
+                  <label style={labelStyle}>Owner <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(optional)</span></label>
+                  <select style={inputStyle} value={addForm.ownerId}
+                    onChange={e => setAddForm(f => ({ ...f, ownerId: e.target.value }))}>
+                    <option value="">Unassigned</option>
+                    {teamMembers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
                 <button type="button" onClick={() => setAddOpen(false)}
                   style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
@@ -705,7 +722,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                     <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0 }}>$</span>
                     <input
                       style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "7px 10px 7px 4px" }}
-                      type="number" min={0} step={100} value={editForm.monthly}
+                      type="number" min={0} step="any" value={editForm.monthly}
                       onChange={e => setEditForm(f => ({ ...f, monthly: e.target.value }))} />
                   </div>
                 </div>
@@ -755,6 +772,16 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                     onChange={e => setEditForm(f => ({ ...f, signedDate: e.target.value }))} />
                 </div>
               </div>
+              {teamMembers.length > 0 && (
+                <div>
+                  <label style={labelStyle}>Owner <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(optional)</span></label>
+                  <select style={inputStyle} value={editForm.ownerId}
+                    onChange={e => setEditForm(f => ({ ...f, ownerId: e.target.value }))}>
+                    <option value="">Unassigned</option>
+                    {teamMembers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
                 <button type="button" onClick={() => setEditDeal(null)}
                   style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
