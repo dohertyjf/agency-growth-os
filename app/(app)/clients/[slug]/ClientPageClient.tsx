@@ -99,6 +99,13 @@ interface ContractHours {
   hours: number
 }
 
+interface AccountPulse {
+  accountId: string
+  month: string
+  score: number
+  note: string | null
+}
+
 interface Goal {
   annualRevenue: number
   profit: number
@@ -155,6 +162,7 @@ interface Props {
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
   initialContractHours: ContractHours[]
+  initialPulses: AccountPulse[]
   goal: Goal | null
   initialCalls: Call[]
   products: Product[]
@@ -180,7 +188,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -290,6 +298,7 @@ export default function ClientPageClient({
         <AccountsPanel
           clientId={clientId}
           initialAccounts={accounts}
+          initialPulses={initialPulses}
           contracts={contracts}
           products={clientProducts}
           onAccountsChange={setAccounts}

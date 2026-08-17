@@ -75,6 +75,20 @@ model Account {
   notes        String?
   createdAt    DateTime   @default(now())
   contracts    Contract[]
+  pulses       AccountPulse[]
+}
+
+// Monthly client-health "pulse" (1–5) per account — churn-risk signal.
+model AccountPulse {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  month     String   // YYYY-MM
+  score     Int      // 1–5
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([accountId, month])
 }
 
 model MonthlyMetric {
