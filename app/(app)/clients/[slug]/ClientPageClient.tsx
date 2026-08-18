@@ -41,6 +41,7 @@ interface Contract {
   contractedThrough: string | null
   status: string
   verbal?: boolean
+  createdAt?: string
   type: string
   accountId?: string | null
   ownerId?: string | null
