@@ -73,8 +73,10 @@ model Account {
   contactName  String?
   contactEmail String?
   notes        String?
+  ownerId      String?    // account owner (AM); defaults to a project owner in the UI
   createdAt    DateTime   @default(now())
   contracts    Contract[]
+  notesLog     AccountNote[]
 }
 
 model MonthlyMetric {
@@ -133,6 +135,7 @@ model Contract {
   payments          ContractPayment[]
   hoursMonths       ContractHoursMonth[]
   pulses            ContractPulse[]
+  members           ProjectMember[]
 }
 
 // Monthly health "pulse" (1–5) per project — churn-risk signal (active projects).
@@ -164,6 +167,7 @@ model Person {
   createdAt        DateTime            @default(now())
   salaryMonths     PersonSalaryMonth[]
   hoursMonths      PersonHoursMonth[]
+  projectMembers   ProjectMember[]
 }
 
 model PersonSalaryMonth {
@@ -318,5 +322,28 @@ model InviteToken {
   token     String   @unique
   used      Boolean  @default(false)
   expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// People (incl. vendors) assigned to a project, with a per-project title.
+model ProjectMember {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  personId   String
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  role       String?  // per-project title, e.g. "Content Writer"
+  createdAt  DateTime @default(now())
+
+  @@unique([contractId, personId])
+}
+
+// Timestamped relationship notes on an account.
+model AccountNote {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  body      String
+  author    String?
   createdAt DateTime @default(now())
 }

@@ -299,6 +299,7 @@ export default function ClientPageClient({
       {currentTab === "accounts" && (
         <AccountsPanel
           clientId={clientId}
+          clientSlug={clientSlug}
           initialAccounts={accounts}
           pulses={pulses}
           onPulseChange={handlePulseChange}

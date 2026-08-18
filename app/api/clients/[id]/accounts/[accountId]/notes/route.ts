@@ -8,15 +8,9 @@ function authorize(session: import("next-auth").Session | null, clientId: string
   return session.user.clientId === clientId
 }
 
-const schema = z.object({
-  name: z.string().min(1).optional(),
-  contactName: z.string().optional().nullable(),
-  contactEmail: z.string().email().optional().nullable().or(z.literal("")),
-  notes: z.string().optional().nullable(),
-  ownerId: z.string().optional().nullable(),
-})
+const schema = z.object({ body: z.string().min(1) })
 
-export async function PATCH(
+export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string; accountId: string }> }
 ) {
@@ -24,28 +18,28 @@ export async function PATCH(
   const { id, accountId } = await params
   if (!authorize(session, id)) return Response.json({ error: "Forbidden" }, { status: 403 })
 
-  const body = await req.json().catch(() => null)
-  const parsed = schema.safeParse(body)
+  const account = await prisma.account.findFirst({ where: { id: accountId, clientId: id } })
+  if (!account) return Response.json({ error: "Not found" }, { status: 404 })
+
+  const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
-  const account = await prisma.account.updateMany({
-    where: { id: accountId, clientId: id },
-    data: parsed.data,
+  const note = await prisma.accountNote.create({
+    data: { accountId, body: parsed.data.body, author: session!.user.name ?? null },
   })
-  if (account.count === 0) return Response.json({ error: "Not found" }, { status: 404 })
-
-  const updated = await prisma.account.findUnique({ where: { id: accountId } })
-  return Response.json(updated)
+  return Response.json(note)
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string; accountId: string }> }
 ) {
   const session = await auth()
   const { id, accountId } = await params
   if (!authorize(session, id)) return Response.json({ error: "Forbidden" }, { status: 403 })
 
-  await prisma.account.deleteMany({ where: { id: accountId, clientId: id } })
-  return new Response(null, { status: 204 })
+  const noteId = new URL(req.url).searchParams.get("noteId")
+  if (!noteId) return Response.json({ error: "noteId required" }, { status: 400 })
+  await prisma.accountNote.deleteMany({ where: { id: noteId, accountId } })
+  return Response.json({ ok: true })
 }

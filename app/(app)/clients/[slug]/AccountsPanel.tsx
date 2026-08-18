@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import Link from "next/link"
 import { fmtCurrency, ymLabel, ymAdd } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import ProjectPulse, { pulseColor, type Pulse } from "./ProjectPulse"
@@ -39,6 +40,7 @@ interface Product {
 
 interface Props {
   clientId: string
+  clientSlug: string
   initialAccounts: Account[]
   pulses?: Pulse[]
   onPulseChange?: (pulse: Pulse) => void
@@ -244,7 +246,7 @@ function BulkImportModal({ clientId, onClose, onImport }: { clientId: string; on
   )
 }
 
-export default function AccountsPanel({ clientId, initialAccounts, pulses = [], onPulseChange, contracts, products, onAccountsChange, onContractAccountChange, onContractCreated }: Props) {
+export default function AccountsPanel({ clientId, clientSlug, initialAccounts, pulses = [], onPulseChange, contracts, products, onAccountsChange, onContractAccountChange, onContractCreated }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const prevMonth = ymAdd(now, -1)
@@ -339,6 +341,12 @@ export default function AccountsPanel({ clientId, initialAccounts, pulses = [], 
     const active = (byAccount.get(accountId) ?? []).filter(c => c.status === "active")
     const scored = active.map(c => pulseFor(c.id, now)).filter((p): p is Pulse => !!p)
     return scored.sort((a, b) => a.score - b.score)[0]
+  }
+  // Churn risk (Accounts view): lowest active pulse ≤ 2, or any active project's pulse dropped vs last month.
+  function atRisk(accountId: string): boolean {
+    const active = (byAccount.get(accountId) ?? []).filter(c => c.status === "active")
+    if (active.some(c => { const p = pulseFor(c.id, now); return p && p.score <= 2 })) return true
+    return active.some(c => { const cur = pulseFor(c.id, now), prev = pulseFor(c.id, prevMonth); return !!(cur && prev && cur.score < prev.score) })
   }
 
   async function handleAddProject(e: React.FormEvent, accountId: string) {
@@ -468,6 +476,7 @@ export default function AccountsPanel({ clientId, initialAccounts, pulses = [], 
             const bucketCount = sorted.filter(a => bucketOf(a.id) === bucket).length
             const accountContracts = byAccount.get(account.id) ?? []
             const isEditing = editingId === account.id
+            const risk = atRisk(account.id)
             return (
               <div key={account.id}>
               {showHeader && (
@@ -475,7 +484,7 @@ export default function AccountsPanel({ clientId, initialAccounts, pulses = [], 
                   {labels[bucket]} <span style={{ color: "#C0BAB2" }}>({bucketCount})</span>
                 </div>
               )}
-              <div style={{ border: "1px solid #F5F1EC", borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ border: risk ? "1px solid #F3C4B4" : "1px solid #F5F1EC", borderRadius: 8, overflow: "hidden", background: risk ? "#FCEEE8" : undefined }}>
                 {isEditing ? (
                   <form onSubmit={e => handleEditSave(e, account.id)} style={{ padding: "10px 14px", background: "#FBFAF7", display: "flex", flexDirection: "column", gap: 8 }}>
                     <div className="account-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
@@ -504,9 +513,11 @@ export default function AccountsPanel({ clientId, initialAccounts, pulses = [], 
                     </div>
                   </form>
                 ) : (
-                <div className="account-header-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#FBFAF7" }}>
+                <div className="account-header-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: risk ? "#FBEAE4" : "#FBFAF7" }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>{account.name}</div>
+                    <Link href={`/clients/${clientSlug}/accounts/${account.id}`} style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", textDecoration: "none" }}>
+                      {account.name}{risk && <span title="Churn risk" style={{ marginLeft: 6, color: "#C2410C", fontSize: 12 }}>⚠</span>} <span style={{ color: "#C0BAB2", fontWeight: 400 }}>›</span>
+                    </Link>
                     {(account.contactName || account.contactEmail) && (
                       <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
                         {account.contactName}
