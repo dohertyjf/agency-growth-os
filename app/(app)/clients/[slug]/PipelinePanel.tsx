@@ -448,8 +448,8 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
   )
 }
 
-function BoardCard({ deal, accountName, count, fmt$, onEdit }: {
-  deal: Contract; accountName: string | null; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void
+function BoardCard({ deal, accountName, count, fmt$, onEdit, onSetStage }: {
+  deal: Contract; accountName: string | null; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void; onSetStage: (id: string, stage: Stage) => void
 }) {
   return (
     <div draggable
@@ -463,6 +463,10 @@ function BoardCard({ deal, accountName, count, fmt$, onEdit }: {
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
         {count > 0 && <span title="Call notes" style={{ fontSize: 10, background: "#F0EBE3", color: "#6B6760", borderRadius: 99, padding: "1px 7px", fontWeight: 700 }}>📝 {count}</span>}
         <span style={{ flex: 1 }} />
+        <select value={stageOf(deal)} onChange={e => onSetStage(deal.id, e.target.value as Stage)} title="Move stage"
+          style={{ fontSize: 10, border: "1px solid #ECE7DE", borderRadius: 4, padding: "1px 4px", color: "#6B6760", background: "#fff", outline: "none", cursor: "pointer", maxWidth: 92 }}>
+          {STAGE_COLS.map(c => <option key={c.stage} value={c.stage}>{c.label}</option>)}
+        </select>
         <button onClick={() => onEdit(deal)} title="Edit"
           style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#9C9590", cursor: "pointer", padding: "1px 7px", lineHeight: 1.4 }}>Edit</button>
       </div>
@@ -504,7 +508,7 @@ function BoardColumn({ col, deals, accounts, noteCounts, fmt$, onEdit, onSetStag
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 7, minHeight: 40 }}>
         {shown.map(deal => (
-          <BoardCard key={deal.id} deal={deal} count={noteCounts[deal.id] ?? 0} fmt$={fmt$} onEdit={onEdit}
+          <BoardCard key={deal.id} deal={deal} count={noteCounts[deal.id] ?? 0} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage}
             accountName={deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name ?? null : null} />
         ))}
         {shown.length === 0 && <div style={{ fontSize: 11, color: "#C0BAB2", textAlign: "center", padding: "8px 0" }}>Drop here</div>}
