@@ -19,6 +19,14 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   const id = client.id
 
+  // Auto-finish: any active retainer/one-off whose end date is before this month has ended.
+  // Ongoing retainers (no end date) are never touched. Runs on every load so it self-heals.
+  const nowYM = new Date().toISOString().slice(0, 7)
+  await prisma.contract.updateMany({
+    where: { clientId: id, status: "active", contractedThrough: { lt: nowYM } },
+    data: { status: "finished" },
+  })
+
   const [metrics, goal, contracts, accountMonths, payments, accounts, products, roadmapItems, people, salaryMonths, hoursMonths] = await Promise.all([
     prisma.monthlyMetric.findMany({ where: { clientId: id }, orderBy: { month: "asc" } }),
     prisma.goal.findUnique({ where: { clientId: id } }),
