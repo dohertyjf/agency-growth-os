@@ -12,8 +12,10 @@ import ProgressPanel from "./ProgressPanel"
 import GoalsPanel from "./GoalsPanel"
 import PeoplePanel from "./PeoplePanel"
 import PipelinePanel from "./PipelinePanel"
+import MonthlyChecklist from "./MonthlyChecklist"
 import CallsClient from "../../calls/CallsClient"
 import { CurrencyProvider } from "@/lib/CurrencyContext"
+import { ymDiff } from "@/lib/calc"
 
 interface Metric {
   id: string
@@ -155,6 +157,8 @@ interface Props {
   projectionState: string | null
   clientSlug: string
   initialNoteCounts?: Record<string, number>
+  checklistMonth: string
+  initialChecklist: { dismissed: boolean; checkedKeys: string[] } | null
   clientName: string
   clientAgency: string | null
   currentTab: Tab
@@ -191,7 +195,7 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function ClientPageClient({
-  clientId, projectionState, clientSlug, initialNoteCounts, clientName, clientAgency, currentTab,
+  clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
   metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
 }: Props) {
@@ -242,6 +246,21 @@ export default function ClientPageClient({
     setContracts(prev => prev.map(c => c.id === contractId ? { ...c, accountId } : c))
   }
 
+  // Monthly close-out hints
+  const renewalCount = contracts.filter(c =>
+    c.status === "active" && (c.type === "retainer") && c.contractedThrough
+    && ymDiff(checklistMonth, c.contractedThrough) >= 0 && ymDiff(checklistMonth, c.contractedThrough) <= 2
+  ).length
+  const prevYM = ((y, m) => `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}`)(+checklistMonth.slice(0, 4), +checklistMonth.slice(5, 7))
+  const atRiskCount = accounts.filter(a => {
+    const active = contracts.filter(c => c.accountId === a.id && c.status === "active")
+    return active.some(c => {
+      const cur = pulses.find(p => p.contractId === c.id && p.month === checklistMonth)
+      const prev = pulses.find(p => p.contractId === c.id && p.month === prevYM)
+      return (cur && cur.score <= 2) || (cur && prev && cur.score < prev.score)
+    })
+  }).length
+
   const currency = goal?.currency ?? "USD"
 
   return (
@@ -255,6 +274,15 @@ export default function ClientPageClient({
         <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 32, fontWeight: 600, color: "#1A1916", margin: 0, lineHeight: 1.1 }}>{clientName}</h1>
         {clientAgency && <div style={{ fontSize: 13, color: "#9C9590", marginTop: 4 }}>{clientAgency}</div>}
       </div>
+
+      <MonthlyChecklist
+        clientId={clientId}
+        clientSlug={clientSlug}
+        month={checklistMonth}
+        initial={initialChecklist}
+        renewalCount={renewalCount}
+        atRiskCount={atRiskCount}
+      />
 
       <div className="tab-strip" style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE", overflowX: "auto", scrollbarWidth: "none" }}>
         {TABS.map(t => (

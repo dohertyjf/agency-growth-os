@@ -54,6 +54,9 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
   const noteCounts: Record<string, number> = {}
   for (const r of noteCountRows) noteCounts[r.contractId] = r._count._all
 
+  const checklistRow = await prisma.monthlyChecklist.findUnique({ where: { clientId_month: { clientId: id, month: nowYM } } })
+  const initialChecklist = checklistRow ? { dismissed: checklistRow.dismissed, checkedKeys: JSON.parse(checklistRow.checkedKeys) as string[] } : null
+
   return (
     <ClientPageClient
       clientId={id}
@@ -76,6 +79,8 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialContractHours={contractHours.map(h => ({ contractId: h.contractId, month: h.month, hours: h.hours }))}
       initialPulses={contractPulses.map(p => ({ contractId: p.contractId, month: p.month, score: p.score, note: p.note ?? null }))}
       initialNoteCounts={noteCounts}
+      checklistMonth={nowYM}
+      initialChecklist={initialChecklist}
       goal={goal}
       initialCalls={calls.map(c => ({ id: c.id, clientId: c.clientId, date: c.date, title: c.title, transcript: c.transcript ?? null, video: c.video ?? null, synopsis: c.synopsis ?? null, notes: c.notes ?? null, isGroupCall: c.isGroupCall, questions: c.questions.map(q => ({ id: q.id, q: q.q, a: q.a ?? null, order: q.order })) }))}
       products={products.map(p => ({ id: p.id, name: p.name, description: p.description ?? null, type: p.type as "retainer" | "ongoing" | "oneoff", monthly: p.monthly }))}

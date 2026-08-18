@@ -62,6 +62,7 @@ model Client {
   products      Product[]
   roadmapItems  RoadmapItem[]
   people        Person[]
+  monthlyChecklists MonthlyChecklist[]
   createdAt     DateTime        @default(now())
 }
 
@@ -361,4 +362,17 @@ model ContractNote {
   kind       String   @default("note") // note | transcript
   author     String?
   createdAt  DateTime @default(now())
+}
+
+// Dismissible start-of-month close-out checklist, per client per month.
+model MonthlyChecklist {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  month       String   // YYYY-MM the checklist is shown for
+  dismissed   Boolean  @default(false)
+  checkedKeys String   @default("[]") // JSON array of ticked item keys
+  updatedAt   DateTime @updatedAt
+
+  @@unique([clientId, month])
 }
