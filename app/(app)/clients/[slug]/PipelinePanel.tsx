@@ -636,7 +636,8 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   const oppToProposalPct = totalEntered > 0 ? Math.round((totalProposal / totalEntered) * 100) : null
   const proposalToWonPct = totalProposal > 0 ? Math.round((wonDeals.length / totalProposal) * 100) : null
   const proposalToLostPct = totalProposal > 0 ? Math.round((lostDeals.length / totalProposal) * 100) : null
-  const proposalStillOpenPct = totalProposal > 0 ? Math.round((potentialDeals.length / totalProposal) * 100) : null
+  const proposalVerbalPct = totalProposal > 0 ? Math.round((verbalDeals.length / totalProposal) * 100) : null
+  const proposalQualifyingPct = totalProposal > 0 ? Math.round((qualifiedDeals.length / totalProposal) * 100) : null
 
   // Stats
   const closeRate = wonDeals.length + lostDeals.length > 0
@@ -852,8 +853,9 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
               <div style={{ marginTop: 10, marginLeft: 12, display: "flex", flexDirection: "column", gap: 6 }}>
                 {[
                   { label: "Won", count: wonDeals.length, pct: proposalToWonPct, color: "#1F7A4D", bg: "#DCFCE7" },
+                  { label: "Verbal", count: verbalDeals.length, pct: proposalVerbalPct, color: "#D97706", bg: "#FEF3C7" },
+                  { label: "Still Qualifying", count: qualifiedDeals.length, pct: proposalQualifyingPct, color: "#0EA5E9", bg: "#E0F2FE" },
                   { label: "Lost", count: lostDeals.length, pct: proposalToLostPct, color: "#9C9590", bg: "#F3F4F6" },
-                  { label: "Still Open", count: potentialDeals.length, pct: proposalStillOpenPct, color: "#92400E", bg: "#FFF7ED" },
                 ].map(row => (
                   <div key={row.label}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, fontSize: 11 }}>
