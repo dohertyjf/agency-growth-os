@@ -58,7 +58,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialStartDate={client.startDate ?? null}
       initialEndDate={client.endDate ?? null}
       metrics={metrics}
-      initialContracts={contracts.map(c => ({ ...c, verbal: c.verbal, createdAt: c.createdAt.toISOString(), accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null, hoursPerMonth: c.hoursPerMonth, callDate: c.callDate ?? null, signedDate: c.signedDate ?? null, kickoffDate: c.kickoffDate ?? null }))}
+      initialContracts={contracts.map(c => ({ ...c, verbal: c.verbal, createdAt: c.createdAt.toISOString(), stageEnteredAt: (c.stageEnteredAt ?? c.createdAt).toISOString(), accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null, hoursPerMonth: c.hoursPerMonth, callDate: c.callDate ?? null, signedDate: c.signedDate ?? null, kickoffDate: c.kickoffDate ?? null }))}
       initialPeople={people.map(p => ({ id: p.id, name: p.name, role: p.role ?? null, responsibilities: p.responsibilities ?? null, isExternal: p.isExternal, isFullTime: p.isFullTime, annualSalary: p.annualSalary, billableHours: p.billableHours, startDate: p.startDate ?? null, endDate: p.endDate ?? null }))}
       initialSalaryMonths={salaryMonths.map(s => ({ personId: s.personId, month: s.month, monthlySalary: s.monthlySalary }))}
       initialHoursMonths={hoursMonths.map(h => ({ personId: h.personId, month: h.month, monthlyHours: h.monthlyHours }))}

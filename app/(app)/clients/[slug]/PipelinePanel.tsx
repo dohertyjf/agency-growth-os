@@ -12,6 +12,7 @@ interface Contract {
   status: string
   verbal?: boolean
   createdAt?: string
+  stageEnteredAt?: string
   type: string
   accountId?: string | null
   ownerId?: string | null
@@ -532,7 +533,10 @@ function PipelineBoard({ deals, accounts, noteCounts, fmt$, onEdit, onSetStage }
       <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, alignItems: "stretch" }}>
         {STAGE_COLS.map(col => (
           <BoardColumn key={col.stage} col={col}
-            deals={deals.filter(d => stageOf(d) === col.stage).sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))}
+            deals={deals.filter(d => stageOf(d) === col.stage).sort((a, b) => {
+              const key = (d: Contract) => col.stage === "opportunity" ? (d.createdAt ?? "") : (d.stageEnteredAt ?? d.createdAt ?? "")
+              return key(b).localeCompare(key(a))
+            })}
             accounts={accounts} noteCounts={noteCounts} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage} />
         ))}
       </div>

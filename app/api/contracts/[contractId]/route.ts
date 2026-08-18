@@ -47,6 +47,19 @@ export async function PATCH(
     updateData.contractedThrough = updateData.start ?? contract.start
   }
 
+  // Bump stageEnteredAt when the pipeline stage actually changes (drives "age in stage" sorting).
+  const stg = (status: string, verbal: boolean) =>
+    status === "active" || status === "finished" ? "won"
+    : status === "lost" ? "lost"
+    : status === "potential" && verbal ? "verbal"
+    : status === "potential" ? "qualified"
+    : "opportunity"
+  const nextStatus = parsed.data.status ?? contract.status
+  const nextVerbal = parsed.data.verbal ?? contract.verbal
+  if (stg(contract.status, contract.verbal) !== stg(nextStatus, nextVerbal)) {
+    (updateData as { stageEnteredAt?: Date }).stageEnteredAt = new Date()
+  }
+
   const updated = await prisma.contract.update({
     where: { id: contractId },
     data: updateData,
