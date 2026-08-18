@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Contract {
@@ -13,6 +13,7 @@ interface Contract {
   verbal?: boolean
   createdAt?: string
   stageEnteredAt?: string
+  updatedAt?: string
   type: string
   accountId?: string | null
   ownerId?: string | null
@@ -158,6 +159,11 @@ function fmtDate(d: string | null): string {
   return `${months[+m - 1]} ${+day}, ${y}`
 }
 
+// ISO timestamp -> "Aug 18, 2026"
+function fmtStamp(iso: string | undefined): string {
+  return iso ? fmtDate(iso.slice(0, 10)) : "—"
+}
+
 function fmtYM(ym: string): string {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
   const [y, m] = ym.split("-")
@@ -179,8 +185,8 @@ const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 
 
 interface Note { id: string; body: string; kind: string; author: string | null; createdAt: string }
 
-function DealNotes({ contractId, initialCount, onCountChange }: { contractId: string; initialCount: number; onCountChange: (n: number) => void }) {
-  const [open, setOpen] = useState(false)
+function DealNotes({ contractId, initialCount, onCountChange, defaultOpen = false }: { contractId: string; initialCount: number; onCountChange: (n: number) => void; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [notes, setNotes] = useState<Note[]>([])
@@ -192,16 +198,22 @@ function DealNotes({ contractId, initialCount, onCountChange }: { contractId: st
 
   function bump(n: number) { setCount(n); onCountChange(n) }
 
+  async function load() {
+    if (loaded) return
+    setLoading(true)
+    const res = await fetch(`/api/contracts/${contractId}/notes`)
+    setLoading(false)
+    if (res.ok) { const data = await res.json(); setNotes(data); setLoaded(true); bump(data.length) }
+  }
+
   async function toggle() {
     const next = !open
     setOpen(next)
-    if (next && !loaded) {
-      setLoading(true)
-      const res = await fetch(`/api/contracts/${contractId}/notes`)
-      setLoading(false)
-      if (res.ok) { const data = await res.json(); setNotes(data); setLoaded(true); bump(data.length) }
-    }
+    if (next) await load()
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (defaultOpen) load() }, [])
 
   async function add(e: React.FormEvent) {
     e.preventDefault()
@@ -471,6 +483,9 @@ function BoardCard({ deal, accountName, count, fmt$, onEdit, onSetStage }: {
         </select>
         <button onClick={() => onEdit(deal)} title="Edit"
           style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#9C9590", cursor: "pointer", padding: "1px 7px", lineHeight: 1.4 }}>Edit</button>
+      </div>
+      <div style={{ fontSize: 10, color: "#C0BAB2", marginTop: 1 }}>
+        Created {fmtStamp(deal.createdAt)}{deal.updatedAt && deal.updatedAt !== deal.createdAt && ` · Updated ${fmtStamp(deal.updatedAt)}`}
       </div>
     </div>
   )
@@ -1012,10 +1027,13 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={e => { if (e.target === e.currentTarget) setEditDeal(null) }}
         >
-          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 440, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
-            <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 20px", color: "#1A1916" }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 440, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
+            <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 6px", color: "#1A1916" }}>
               Edit Deal
             </h3>
+            <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 18 }}>
+              Created {fmtStamp(editDeal.createdAt)} · Updated {fmtStamp(editDeal.updatedAt)}
+            </div>
             <form onSubmit={handleEditSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={labelStyle}>Deal Name</label>
@@ -1101,6 +1119,9 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                 </button>
               </div>
             </form>
+            <div style={{ marginTop: 16, borderTop: "1px solid #ECE7DE", paddingTop: 4 }}>
+              <DealNotes contractId={editDeal.id} initialCount={liveCounts[editDeal.id] ?? 0} onCountChange={n => handleNoteCountChange(editDeal.id, n)} defaultOpen />
+            </div>
           </div>
         </div>
       )}

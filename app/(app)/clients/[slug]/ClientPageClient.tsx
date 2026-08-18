@@ -43,6 +43,7 @@ interface Contract {
   verbal?: boolean
   createdAt?: string
   stageEnteredAt?: string
+  updatedAt?: string
   type: string
   accountId?: string | null
   ownerId?: string | null

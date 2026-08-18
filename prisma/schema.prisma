@@ -125,6 +125,7 @@ model Contract {
   status            ContractStatus @default(active)
   verbal            Boolean        @default(false) // pipeline: verbal yes, not yet signed/paid
   stageEnteredAt    DateTime?      @default(now()) // when the deal last changed pipeline stage
+  updatedAt         DateTime       @updatedAt      // last edit of any kind
   type              ContractType   @default(retainer)
   accountId         String?
   ownerId           String?        // Person who owns/manages this account
