@@ -10,6 +10,7 @@ interface Contract {
   start: string
   contractedThrough: string | null
   status: string
+  verbal?: boolean
   type: string
   accountId?: string | null
   ownerId?: string | null
@@ -279,6 +280,24 @@ function DealNotes({ contractId, initialCount, onCountChange }: { contractId: st
   )
 }
 
+type Stage = "opportunity" | "qualified" | "verbal" | "won" | "lost"
+
+function stageOf(c: Contract): Stage {
+  if (c.status === "active" || c.status === "finished") return "won"
+  if (c.status === "lost") return "lost"
+  if (c.status === "potential" && c.verbal) return "verbal"
+  if (c.status === "potential") return "qualified"
+  return "opportunity"
+}
+
+const STAGE_COLS: { stage: Stage; label: string; hint: string; accent: string }[] = [
+  { stage: "opportunity", label: "Opportunity", hint: "Initial contact", accent: "#6366F1" },
+  { stage: "qualified", label: "Qualified", hint: "In negotiation", accent: "#0EA5E9" },
+  { stage: "verbal", label: "Verbal", hint: "Yes — not signed/paid", accent: "#D97706" },
+  { stage: "won", label: "Won", hint: "Signed & paid", accent: "#1F7A4D" },
+  { stage: "lost", label: "Lost", hint: "Didn't close", accent: "#C2410C" },
+]
+
 interface DealCardProps {
   deal: Contract
   accounts: Account[]
@@ -291,9 +310,11 @@ interface DealCardProps {
   fmt$: (v: number) => string
   noteCount?: number
   onNoteCountChange?: (id: string, n: number) => void
+  secondaryLabel?: string
+  onSecondary?: (id: string) => void
 }
 
-function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCount = 0, onNoteCountChange }: DealCardProps) {
+function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCount = 0, onNoteCountChange, secondaryLabel, onSecondary }: DealCardProps) {
   const accountName = deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name : null
   const daysSinceCall = daysSince(deal.callDate)
 
@@ -352,6 +373,14 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, o
         >
           {advanceLabel}
         </button>
+        {secondaryLabel && onSecondary && (
+          <button
+            onClick={() => onSecondary(deal.id)}
+            style={{ padding: "6px 10px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, color: "#1F7A4D", cursor: "pointer", fontWeight: 600 }}
+          >
+            {secondaryLabel}
+          </button>
+        )}
         <button
           onClick={() => onLost(deal.id)}
           style={{ padding: "6px 12px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, color: "#C2410C", cursor: "pointer", fontWeight: 500 }}
@@ -378,9 +407,11 @@ interface DealGroupProps {
   fmt$: (v: number) => string
   noteCounts?: Record<string, number>
   onNoteCountChange?: (id: string, n: number) => void
+  secondaryLabel?: string
+  onSecondary?: (id: string) => void
 }
 
-function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCounts, onNoteCountChange }: DealGroupProps) {
+function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCounts, onNoteCountChange, secondaryLabel, onSecondary }: DealGroupProps) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -403,6 +434,8 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
             fmt$={fmt$}
             noteCount={noteCounts?.[deal.id] ?? 0}
             onNoteCountChange={onNoteCountChange}
+            secondaryLabel={secondaryLabel}
+            onSecondary={onSecondary}
           />
         ))}
         {deals.length === 0 && (
@@ -411,6 +444,94 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function BoardCard({ deal, accountName, count, fmt$, onEdit }: {
+  deal: Contract; accountName: string | null; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void
+}) {
+  return (
+    <div draggable
+      onDragStart={e => { e.dataTransfer.setData("text/plain", deal.id); e.dataTransfer.effectAllowed = "move" }}
+      style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 8, padding: "9px 11px", cursor: "grab", display: "flex", flexDirection: "column", gap: 5 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", lineHeight: 1.25 }}>{deal.name}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1916", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{fmt$(deal.monthly)}</span>
+      </div>
+      {accountName && <div style={{ fontSize: 11, color: "#9C9590" }}>{accountName}</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+        {count > 0 && <span title="Call notes" style={{ fontSize: 10, background: "#F0EBE3", color: "#6B6760", borderRadius: 99, padding: "1px 7px", fontWeight: 700 }}>📝 {count}</span>}
+        <span style={{ flex: 1 }} />
+        <button onClick={() => onEdit(deal)} title="Edit"
+          style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#9C9590", cursor: "pointer", padding: "1px 7px", lineHeight: 1.4 }}>Edit</button>
+      </div>
+    </div>
+  )
+}
+
+function BoardColumn({ col, deals, accounts, noteCounts, fmt$, onEdit, onSetStage }: {
+  col: typeof STAGE_COLS[number]
+  deals: Contract[]
+  accounts: Account[]
+  noteCounts: Record<string, number>
+  fmt$: (v: number) => string
+  onEdit: (d: Contract) => void
+  onSetStage: (id: string, stage: Stage) => void
+}) {
+  const [over, setOver] = useState(false)
+  const bounded = col.stage === "won" || col.stage === "lost"
+  const isRecent = (c: Contract) => {
+    const d = col.stage === "won" ? (c.signedDate ?? c.start) : (c.callDate ?? c.start)
+    const days = daysSince(d)
+    return days === null || days <= 90
+  }
+  const shown = bounded ? deals.filter(isRecent) : deals
+  const hidden = deals.length - shown.length
+  const sum = deals.reduce((t, c) => t + c.monthly, 0)
+  return (
+    <div
+      onDragOver={e => { e.preventDefault(); if (!over) setOver(true) }}
+      onDragLeave={() => setOver(false)}
+      onDrop={e => { e.preventDefault(); setOver(false); const id = e.dataTransfer.getData("text/plain"); if (id) onSetStage(id, col.stage) }}
+      style={{ minWidth: 224, flex: "1 1 224px", background: over ? "#F3EFE8" : "#FBFAF7", border: `1px solid ${over ? col.accent : "#ECE7DE"}`, borderRadius: 10, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, paddingBottom: 2 }}>
+        <span style={{ width: 8, height: 8, borderRadius: 2, background: col.accent }} />
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1916" }}>{col.label}</span>
+        <span style={{ fontSize: 11, background: "#F0EBE3", color: "#6B6760", borderRadius: 99, padding: "0 7px", fontWeight: 700 }}>{deals.length}</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 10, color: "#C0BAB2", fontVariantNumeric: "tabular-nums" }}>{sum > 0 ? fmt$(sum) : ""}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 7, minHeight: 40 }}>
+        {shown.map(deal => (
+          <BoardCard key={deal.id} deal={deal} count={noteCounts[deal.id] ?? 0} fmt$={fmt$} onEdit={onEdit}
+            accountName={deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name ?? null : null} />
+        ))}
+        {shown.length === 0 && <div style={{ fontSize: 11, color: "#C0BAB2", textAlign: "center", padding: "8px 0" }}>Drop here</div>}
+        {hidden > 0 && <div style={{ fontSize: 10, color: "#C0BAB2", textAlign: "center" }}>+{hidden} older (90+ days)</div>}
+      </div>
+    </div>
+  )
+}
+
+function PipelineBoard({ deals, accounts, noteCounts, fmt$, onEdit, onSetStage }: {
+  deals: Contract[]
+  accounts: Account[]
+  noteCounts: Record<string, number>
+  fmt$: (v: number) => string
+  onEdit: (d: Contract) => void
+  onSetStage: (id: string, stage: Stage) => void
+}) {
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, alignItems: "stretch" }}>
+        {STAGE_COLS.map(col => (
+          <BoardColumn key={col.stage} col={col}
+            deals={deals.filter(d => stageOf(d) === col.stage)}
+            accounts={accounts} noteCounts={noteCounts} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage} />
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: "#9C9590", marginTop: 8 }}>Drag a card between columns to change its stage. Won &amp; Lost show the last 90 days.</div>
     </div>
   )
 }
@@ -432,6 +553,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     contractedThrough: "",
   })
   const [addSaving, setAddSaving] = useState(false)
+  const [view, setView] = useState<"list" | "board">("list")
   const [editDeal, setEditDeal] = useState<Contract | null>(null)
   const [editForm, setEditForm] = useState({
     name: "", monthly: "", accountId: "", ownerId: "", callDate: "", signedDate: "",
@@ -496,6 +618,8 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   // Pipeline = open deals only
   const opportunityDeals = contracts.filter(c => c.status === "opportunity")
   const potentialDeals = contracts.filter(c => c.status === "potential")
+  const qualifiedDeals = potentialDeals.filter(c => !c.verbal)
+  const verbalDeals = potentialDeals.filter(c => c.verbal)
   const wonDeals = contracts.filter(c => c.status === "active")
   const lostDeals = contracts.filter(c => c.status === "lost")
   const pipeline = [...opportunityDeals, ...potentialDeals]
@@ -521,7 +645,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   const kickoffTimes = wonDeals.map(c => daysBetween(c.signedDate, c.kickoffDate)).filter((d): d is number => d !== null)
   const avgTimeToKickoff = kickoffTimes.length > 0 ? Math.round(kickoffTimes.reduce((a, b) => a + b, 0) / kickoffTimes.length) : null
 
-  async function updateContract(id: string, fields: Record<string, string | null>) {
+  async function updateContract(id: string, fields: Record<string, string | boolean | null>) {
     const res = await fetch(`/api/contracts/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -530,6 +654,19 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     if (!res.ok) return
     const updated = await res.json()
     onContractsChange(contracts.map(c => c.id === id ? { ...c, ...updated } : c))
+  }
+
+  // Single source of truth for moving a deal between pipeline stages (board DnD + list buttons).
+  async function setStage(id: string, stage: Stage) {
+    const deal = contracts.find(c => c.id === id)
+    const patch: Record<string, string | boolean | null> =
+      stage === "opportunity" ? { status: "opportunity", verbal: false }
+      : stage === "qualified" ? { status: "potential", verbal: false }
+      : stage === "verbal" ? { status: "potential", verbal: true }
+      : stage === "won" ? { status: "active", verbal: false }
+      : { status: "lost" }
+    if (stage === "won" && deal && !deal.signedDate) patch.signedDate = today
+    await updateContract(id, patch)
   }
 
   async function handleDeleteDeal(id: string) {
@@ -569,19 +706,24 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "7fr 3fr", gap: 24, alignItems: "start" }}>
-
-      {/* Left: Open Pipeline */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
-            <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, color: "#1A1916", margin: 0 }}>
-              Pipeline
-            </h2>
-            <div style={{ fontSize: 13, color: "#9C9590", marginTop: 2 }}>
-              {pipeline.length} open deal{pipeline.length !== 1 ? "s" : ""}
-              {pipeline.length > 0 && ` · ${fmt$(pipeline.reduce((s, c) => s + c.monthly, 0))}/mo potential`}
-            </div>
+    <div>
+      {/* Top bar: title + view toggle + add */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, color: "#1A1916", margin: 0 }}>
+            Pipeline
+          </h2>
+          <div style={{ fontSize: 13, color: "#9C9590", marginTop: 2 }}>
+            {pipeline.length} open deal{pipeline.length !== 1 ? "s" : ""}
+            {pipeline.length > 0 && ` · ${fmt$(pipeline.reduce((s, c) => s + c.monthly, 0))}/mo potential`}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", border: "1px solid #ECE7DE", borderRadius: 6, overflow: "hidden" }}>
+            {(["list", "board"] as const).map(v => (
+              <button key={v} type="button" onClick={() => setView(v)}
+                style={{ padding: "7px 14px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", background: view === v ? "#1A1916" : "#fff", color: view === v ? "#fff" : "#6B6760", textTransform: "capitalize" }}>{v}</button>
+            ))}
           </div>
           <button
             onClick={() => setAddOpen(true)}
@@ -590,6 +732,22 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
             + Add Deal
           </button>
         </div>
+      </div>
+
+      {view === "board" ? (
+        <PipelineBoard
+          deals={contracts}
+          accounts={localAccounts}
+          noteCounts={liveCounts}
+          fmt$={fmt$}
+          onEdit={openEdit}
+          onSetStage={setStage}
+        />
+      ) : (
+      <div style={{ display: "grid", gridTemplateColumns: "7fr 3fr", gap: 24, alignItems: "start" }}>
+
+      {/* Left: Open Pipeline */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
         <DealGroup
           title="Opportunity"
@@ -597,8 +755,8 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           deals={opportunityDeals}
           accounts={localAccounts}
           advanceLabel="→ Qualified"
-          onAdvance={id => updateContract(id, { status: "potential" })}
-          onLost={id => updateContract(id, { status: "lost" })}
+          onAdvance={id => setStage(id, "qualified")}
+          onLost={id => setStage(id, "lost")}
           onEdit={openEdit}
           onDelete={handleDeleteDeal}
           noteCounts={liveCounts}
@@ -609,12 +767,30 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         <DealGroup
           title="Qualified"
           subtitle="In negotiation"
-          deals={potentialDeals}
+          deals={qualifiedDeals}
+          accounts={localAccounts}
+          advanceLabel="🤝 Verbal"
+          onAdvance={id => setStage(id, "verbal")}
+          secondaryLabel="✓ Won"
+          onSecondary={id => setStage(id, "won")}
+          onLost={id => setStage(id, "lost")}
+          onRevert={id => setStage(id, "opportunity")}
+          onEdit={openEdit}
+          onDelete={handleDeleteDeal}
+          noteCounts={liveCounts}
+          onNoteCountChange={handleNoteCountChange}
+          fmt$={fmt$}
+        />
+
+        <DealGroup
+          title="Verbal"
+          subtitle="Verbal yes — not signed or paid"
+          deals={verbalDeals}
           accounts={localAccounts}
           advanceLabel="✓ Won"
-          onAdvance={id => updateContract(id, { status: "active", signedDate: today })}
-          onLost={id => updateContract(id, { status: "lost" })}
-          onRevert={id => updateContract(id, { status: "opportunity" })}
+          onAdvance={id => setStage(id, "won")}
+          onLost={id => setStage(id, "lost")}
+          onRevert={id => setStage(id, "qualified")}
           onEdit={openEdit}
           onDelete={handleDeleteDeal}
           noteCounts={liveCounts}
@@ -713,6 +889,8 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           )}
         </div>
       </div>
+      </div>
+      )}
 
       {/* Add Deal Modal */}
       {addOpen && (

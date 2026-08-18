@@ -10,6 +10,7 @@ const schema = z.object({
   start: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   contractedThrough: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
   status: z.enum(["opportunity", "potential", "active", "lost", "finished"]).optional(),
+  verbal: z.boolean().optional(),
   type: z.enum(["retainer", "oneoff"]).optional(),
   accountId: z.string().nullable().optional(),
   ownerId: z.string().nullable().optional(),

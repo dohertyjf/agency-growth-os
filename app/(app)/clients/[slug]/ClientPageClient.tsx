@@ -40,6 +40,7 @@ interface Contract {
   start: string
   contractedThrough: string | null
   status: string
+  verbal?: boolean
   type: string
   accountId?: string | null
   ownerId?: string | null
