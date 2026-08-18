@@ -28,6 +28,7 @@ interface Props {
   people?: Person[]
   onContractsChange: (contracts: Contract[]) => void
   onAccountCreated?: (account: Account) => void
+  noteCounts?: Record<string, number>
 }
 
 function AccountPicker({ accounts, value, onChange, clientId, onAccountCreated }: {
@@ -173,6 +174,111 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
+interface Note { id: string; body: string; kind: string; author: string | null; createdAt: string }
+
+function DealNotes({ contractId, initialCount, onCountChange }: { contractId: string; initialCount: number; onCountChange: (n: number) => void }) {
+  const [open, setOpen] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [notes, setNotes] = useState<Note[]>([])
+  const [count, setCount] = useState(initialCount)
+  const [body, setBody] = useState("")
+  const [kind, setKind] = useState<"note" | "transcript">("note")
+  const [saving, setSaving] = useState(false)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+
+  function bump(n: number) { setCount(n); onCountChange(n) }
+
+  async function toggle() {
+    const next = !open
+    setOpen(next)
+    if (next && !loaded) {
+      setLoading(true)
+      const res = await fetch(`/api/contracts/${contractId}/notes`)
+      setLoading(false)
+      if (res.ok) { const data = await res.json(); setNotes(data); setLoaded(true); bump(data.length) }
+    }
+  }
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault()
+    if (!body.trim()) return
+    setSaving(true)
+    const res = await fetch(`/api/contracts/${contractId}/notes`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: body.trim(), kind }),
+    })
+    setSaving(false)
+    if (!res.ok) return
+    const n = await res.json()
+    setNotes(prev => [n, ...prev]); bump(count + 1)
+    setBody(""); setKind("note")
+  }
+
+  async function del(id: string) {
+    await fetch(`/api/contracts/${contractId}/notes?noteId=${id}`, { method: "DELETE" })
+    setNotes(prev => prev.filter(n => n.id !== id)); bump(Math.max(0, count - 1))
+  }
+
+  return (
+    <div style={{ marginTop: 10, borderTop: "1px solid #F5F1EC", paddingTop: 8 }}>
+      <button onClick={toggle}
+        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#6B6760", padding: 0, display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#C0BAB2" }}>{open ? "▾" : "▸"}</span> Call Notes
+        {count > 0 && <span style={{ fontSize: 10, background: "#F0EBE3", color: "#6B6760", borderRadius: 99, padding: "1px 7px", fontWeight: 700 }}>{count}</span>}
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          <form onSubmit={add} style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+            <textarea value={body} onChange={e => setBody(e.target.value)}
+              placeholder={kind === "transcript" ? "Paste the call transcript…" : "What happened on the call — objections, budget, next steps…"}
+              rows={kind === "transcript" ? 5 : 3}
+              style={{ width: "100%", padding: "8px 10px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 12, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box", color: "#1A1916" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", border: "1px solid #ECE7DE", borderRadius: 6, overflow: "hidden" }}>
+                {(["note", "transcript"] as const).map(k => (
+                  <button key={k} type="button" onClick={() => setKind(k)}
+                    style={{ padding: "5px 12px", fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer", background: kind === k ? "#E9532A" : "#fff", color: kind === k ? "#fff" : "#6B6760", textTransform: "capitalize" }}>{k}</button>
+                ))}
+              </div>
+              <span style={{ flex: 1 }} />
+              <button type="submit" disabled={saving || !body.trim()}
+                style={{ padding: "6px 14px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: saving || !body.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : "Save"}</button>
+            </div>
+          </form>
+
+          {loading && <div style={{ fontSize: 12, color: "#9C9590" }}>Loading…</div>}
+          {!loading && notes.length === 0 && <div style={{ fontSize: 12, color: "#C0BAB2" }}>No notes yet.</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {notes.map(n => {
+              const isTranscript = n.kind === "transcript"
+              const isOpen = expanded[n.id]
+              const preview = n.body.length > 220 && isTranscript && !isOpen ? n.body.slice(0, 220) + "…" : n.body
+              return (
+                <div key={n.id} style={{ borderLeft: `2px solid ${isTranscript ? "#D8CFC2" : "#ECE7DE"}`, paddingLeft: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    {isTranscript && <span style={{ fontSize: 9, fontWeight: 700, color: "#7A6E5C", background: "#F0EBE1", borderRadius: 4, padding: "1px 5px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Transcript</span>}
+                    <span style={{ fontSize: 10, color: "#9C9590" }}>{new Date(n.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                    {n.author && <span style={{ fontSize: 10, color: "#C0BAB2" }}>· {n.author}</span>}
+                    <span style={{ flex: 1 }} />
+                    <button onClick={() => del(n.id)} style={{ background: "none", border: "none", color: "#C0BAB2", cursor: "pointer", fontSize: 10, textDecoration: "underline", padding: 0 }}>delete</button>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#1A1916", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview}</div>
+                  {isTranscript && n.body.length > 220 && (
+                    <button onClick={() => setExpanded(x => ({ ...x, [n.id]: !isOpen }))}
+                      style={{ background: "none", border: "none", color: "#E9532A", cursor: "pointer", fontSize: 11, fontWeight: 600, padding: "2px 0 0" }}>{isOpen ? "Show less" : "Show full transcript"}</button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface DealCardProps {
   deal: Contract
   accounts: Account[]
@@ -183,9 +289,11 @@ interface DealCardProps {
   onEdit: (deal: Contract) => void
   onDelete: (id: string) => void
   fmt$: (v: number) => string
+  noteCount?: number
+  onNoteCountChange?: (id: string, n: number) => void
 }
 
-function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$ }: DealCardProps) {
+function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCount = 0, onNoteCountChange }: DealCardProps) {
   const accountName = deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name : null
   const daysSinceCall = daysSince(deal.callDate)
 
@@ -251,6 +359,7 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, o
           Lost
         </button>
       </div>
+      <DealNotes contractId={deal.id} initialCount={noteCount} onCountChange={n => onNoteCountChange?.(deal.id, n)} />
     </div>
   )
 }
@@ -267,9 +376,11 @@ interface DealGroupProps {
   onEdit: (deal: Contract) => void
   onDelete: (id: string) => void
   fmt$: (v: number) => string
+  noteCounts?: Record<string, number>
+  onNoteCountChange?: (id: string, n: number) => void
 }
 
-function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$ }: DealGroupProps) {
+function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCounts, onNoteCountChange }: DealGroupProps) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -290,6 +401,8 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
             onEdit={onEdit}
             onDelete={onDelete}
             fmt$={fmt$}
+            noteCount={noteCounts?.[deal.id] ?? 0}
+            onNoteCountChange={onNoteCountChange}
           />
         ))}
         {deals.length === 0 && (
@@ -302,7 +415,9 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
   )
 }
 
-export default function PipelinePanel({ clientId, contracts, accounts: initialAccounts, people = [], onContractsChange, onAccountCreated }: Props) {
+export default function PipelinePanel({ clientId, contracts, accounts: initialAccounts, people = [], onContractsChange, onAccountCreated, noteCounts = {} }: Props) {
+  const [liveCounts, setLiveCounts] = useState<Record<string, number>>(noteCounts)
+  const handleNoteCountChange = (id: string, n: number) => setLiveCounts(prev => ({ ...prev, [id]: n }))
   const teamMembers = people.filter(p => !p.isExternal)
   const fmt$ = useFmtCurrency()
   const [localAccounts, setLocalAccounts] = useState<Account[]>(initialAccounts)
@@ -486,6 +601,8 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           onLost={id => updateContract(id, { status: "lost" })}
           onEdit={openEdit}
           onDelete={handleDeleteDeal}
+          noteCounts={liveCounts}
+          onNoteCountChange={handleNoteCountChange}
           fmt$={fmt$}
         />
 
@@ -500,6 +617,8 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           onRevert={id => updateContract(id, { status: "opportunity" })}
           onEdit={openEdit}
           onDelete={handleDeleteDeal}
+          noteCounts={liveCounts}
+          onNoteCountChange={handleNoteCountChange}
           fmt$={fmt$}
         />
 

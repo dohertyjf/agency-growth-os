@@ -150,6 +150,7 @@ interface Props {
   clientId: string
   projectionState: string | null
   clientSlug: string
+  initialNoteCounts?: Record<string, number>
   clientName: string
   clientAgency: string | null
   currentTab: Tab
@@ -186,7 +187,7 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function ClientPageClient({
-  clientId, projectionState, clientSlug, clientName, clientAgency, currentTab,
+  clientId, projectionState, clientSlug, initialNoteCounts, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
   metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
 }: Props) {
@@ -319,6 +320,7 @@ export default function ClientPageClient({
           people={people.map(p => ({ id: p.id, name: p.name, isExternal: p.isExternal }))}
           onContractsChange={setContracts}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
+          noteCounts={initialNoteCounts}
         />
       )}
 

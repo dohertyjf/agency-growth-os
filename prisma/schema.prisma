@@ -136,6 +136,7 @@ model Contract {
   hoursMonths       ContractHoursMonth[]
   pulses            ContractPulse[]
   members           ProjectMember[]
+  notesLog          ContractNote[]
 }
 
 // Monthly health "pulse" (1–5) per project — churn-risk signal (active projects).
@@ -346,4 +347,15 @@ model AccountNote {
   body      String
   author    String?
   createdAt DateTime @default(now())
+}
+
+// Call notes & transcripts warehoused on a pipeline deal (or any project).
+model ContractNote {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  body       String
+  kind       String   @default("note") // note | transcript
+  author     String?
+  createdAt  DateTime @default(now())
 }
