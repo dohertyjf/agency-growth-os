@@ -329,9 +329,10 @@ interface DealCardProps {
   onNoteCountChange?: (id: string, n: number) => void
   secondaryLabel?: string
   onSecondary?: (id: string) => void
+  product?: string
 }
 
-function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCount = 0, onNoteCountChange, secondaryLabel, onSecondary }: DealCardProps) {
+function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCount = 0, onNoteCountChange, secondaryLabel, onSecondary, product }: DealCardProps) {
   const accountName = deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name : null
   const daysSinceCall = daysSince(deal.callDate)
 
@@ -340,6 +341,9 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, o
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1916" }}>{deal.name}</div>
+          {product && (
+            <div style={{ fontSize: 9, fontWeight: 700, color: "#4B5563", background: "#F0EBE3", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.03em", display: "inline-block", marginTop: 3 }}>{product}</div>
+          )}
           {accountName && (
             <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>{accountName}</div>
           )}
@@ -426,9 +430,10 @@ interface DealGroupProps {
   onNoteCountChange?: (id: string, n: number) => void
   secondaryLabel?: string
   onSecondary?: (id: string) => void
+  products?: Product[]
 }
 
-function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCounts, onNoteCountChange, secondaryLabel, onSecondary }: DealGroupProps) {
+function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCounts, onNoteCountChange, secondaryLabel, onSecondary, products }: DealGroupProps) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -453,6 +458,7 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
             onNoteCountChange={onNoteCountChange}
             secondaryLabel={secondaryLabel}
             onSecondary={onSecondary}
+            product={products?.find(p => p.id === deal.productId)?.name}
           />
         ))}
         {deals.length === 0 && (
@@ -786,6 +792,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
         <DealGroup
+          products={products}
           title="Opportunity"
           subtitle="Initial contact made"
           deals={opportunityDeals}
@@ -801,6 +808,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         />
 
         <DealGroup
+          products={products}
           title="Qualified"
           subtitle="In negotiation"
           deals={qualifiedDeals}
@@ -819,6 +827,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         />
 
         <DealGroup
+          products={products}
           title="Verbal"
           subtitle="Verbal yes — not signed or paid"
           deals={verbalDeals}
