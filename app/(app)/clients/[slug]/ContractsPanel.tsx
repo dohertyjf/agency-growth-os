@@ -16,6 +16,7 @@ interface Contract {
   status: string
   type: string
   accountId?: string | null
+  productId?: string | null
   ownerId?: string | null
   callDate: string | null
   signedDate: string | null
@@ -213,6 +214,7 @@ interface EditForm {
   type: ContractTypeField
   accountId: string | null
   ownerId: string | null
+  productId: string | null
 }
 
 function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
@@ -227,6 +229,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
     type: uiType,
     accountId: contract.accountId ?? null,
     ownerId: contract.ownerId ?? null,
+    productId: contract.productId ?? null,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -347,7 +350,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
   )
 }
 
-function EditModal({ contract, clientId, accounts, people = [], onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; people?: Person[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
+function EditModal({ contract, clientId, accounts, products, people = [], onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; products?: Product[]; people?: Person[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
   const uiType: ContractTypeField = !contract.contractedThrough && contract.type === "retainer" ? "ongoing" : (contract.type as ContractTypeField) ?? "retainer"
   const teamMembers = people.filter(p => !p.isExternal)
   const [form, setForm] = useState<EditForm>({
@@ -360,6 +363,7 @@ function EditModal({ contract, clientId, accounts, people = [], onClose, onSave,
     type: uiType,
     accountId: contract.accountId ?? null,
     ownerId: contract.ownerId ?? null,
+    productId: contract.productId ?? null,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -377,6 +381,7 @@ function EditModal({ contract, clientId, accounts, people = [], onClose, onSave,
       contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
       accountId: form.accountId,
       ownerId: form.ownerId,
+      productId: form.productId,
     }
     const res = await fetch(`/api/contracts/${contract.id}`, {
       method: "PATCH",
@@ -386,7 +391,7 @@ function EditModal({ contract, clientId, accounts, people = [], onClose, onSave,
     setSaving(false)
     if (!res.ok) { setError("Failed to save"); return }
     const updated = await res.json()
-    onSave({ ...updated, accountId: form.accountId, ownerId: form.ownerId })
+    onSave({ ...updated, accountId: form.accountId, ownerId: form.ownerId, productId: form.productId })
     onClose()
   }
 
@@ -436,6 +441,15 @@ function EditModal({ contract, clientId, accounts, people = [], onClose, onSave,
               <select style={inputStyle} value={form.ownerId ?? ""} onChange={e => setForm(f => ({ ...f, ownerId: e.target.value || null }))}>
                 <option value="">Unassigned</option>
                 {teamMembers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
+          {products && products.length > 0 && (
+            <div>
+              <label style={labelStyle}>Product <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(package)</span></label>
+              <select style={inputStyle} value={form.productId ?? ""} onChange={e => setForm(f => ({ ...f, productId: e.target.value || null }))}>
+                <option value="">— None —</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
           )}
@@ -510,7 +524,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [schedulingContract, setSchedulingContract] = useState<Contract | null>(null)
   const [duplicatingContract, setDuplicatingContract] = useState<Contract | null>(null)
-  const [form, setForm] = useState({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null, ownerId: null as string | null })
+  const [form, setForm] = useState({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null, ownerId: null as string | null, productId: null as string | null })
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [showAllGantt, setShowAllGantt] = useState(false)
@@ -555,7 +569,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     const data = await res.json()
     if (res.ok) {
       updateContracts([...contracts, data.contract ?? data])
-      setForm({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential", type: "retainer", accountId: null, ownerId: null })
+      setForm({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential", type: "retainer", accountId: null, ownerId: null, productId: null })
       setAdding(false)
     }
     setSaving(false)
@@ -596,7 +610,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       <style>{contractsResponsiveStyle}</style>
       {editingContract && (
-        <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} people={people} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
+        <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} products={products} people={people} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
       )}
       {schedulingContract && (
         <PaymentScheduleModal contractId={schedulingContract.id} projectName={schedulingContract.name} mode={schedulingContract.type === "oneoff" ? "oneoff" : "retainer"} total={schedulingContract.monthly} startMonth={schedulingContract.start} endMonth={schedulingContract.contractedThrough} onClose={() => setSchedulingContract(null)} />
@@ -632,7 +646,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
                 value=""
                 onChange={e => {
                   const p = products.find(p => p.id === e.target.value)
-                  if (p) setForm(f => ({ ...f, name: p.name, type: p.type as ContractTypeField, monthly: String(p.monthly) }))
+                  if (p) setForm(f => ({ ...f, name: p.name, type: p.type as ContractTypeField, monthly: String(p.monthly), productId: p.id }))
                 }}
               >
                 <option value="">— Select a product —</option>
@@ -752,6 +766,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
           {/* Active */}
           {byStatus.active.length > 0 && (
             <ContractSection
+              products={products}
               title="Active"
               contracts={byStatus.active}
               accounts={localAccounts}
@@ -769,6 +784,7 @@ onSchedule={setSchedulingContract}
           {/* Pipeline */}
           {byStatus.potential.length > 0 && (
             <ContractSection
+              products={products}
               title="Pipeline"
               contracts={byStatus.potential}
               accounts={localAccounts}
@@ -795,6 +811,7 @@ onSchedule={setSchedulingContract}
               </button>
               {showPast && (
                 <ContractSection
+              products={products}
                   title=""
                   contracts={byStatus.finished}
                   accounts={localAccounts}
@@ -817,7 +834,7 @@ onSchedule={setSchedulingContract}
   )
 }
 
-function ContractSection({ title, contracts, accounts, people, pulses, onPulseChange, onOwnerChange, onEdit, onDelete, onDuplicate, onSchedule, dimmed }: {
+function ContractSection({ title, contracts, accounts, products, people, pulses, onPulseChange, onOwnerChange, onEdit, onDelete, onDuplicate, onSchedule, dimmed }: {
   title: string
   contracts: Contract[]
   accounts: Account[]
@@ -830,6 +847,7 @@ function ContractSection({ title, contracts, accounts, people, pulses, onPulseCh
   onDuplicate: (c: Contract) => void
   onSchedule: (c: Contract) => void
   dimmed?: boolean
+  products?: Product[]
 }) {
   const fmtCurrency = useFmtCurrency()
   const teamMembers = people.filter(p => !p.isExternal)
@@ -851,7 +869,12 @@ function ContractSection({ title, contracts, accounts, people, pulses, onPulseCh
         return (
           <div key={c.id} className="contract-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #F5F1EC", opacity: dimmed ? 0.6 : 1 }}>
             <div style={{ flex: "1 1 160px", minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</div>
+              {(() => { const pn = c.productId ? products?.find(p => p.id === c.productId)?.name : null; return (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</span>
+                  {pn && <span style={{ fontSize: 9, fontWeight: 700, color: "#4B5563", background: "#F0EBE3", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.03em" }}>{pn}</span>}
+                </div>
+              ) })()}
               <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
                 {accountName
                   ? <span style={{ color: "#6B6760", fontWeight: 500 }}>{accountName} · </span>

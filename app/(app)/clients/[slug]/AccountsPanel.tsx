@@ -52,7 +52,7 @@ interface Props {
 }
 
 const now = new Date().toISOString().slice(0, 7)
-const defaultProjectForm = { name: "", type: "retainer" as ContractType, monthly: "", status: "active" as ContractStatus, start: now, contractedThrough: "" }
+const defaultProjectForm = { name: "", type: "retainer" as ContractType, monthly: "", status: "active" as ContractStatus, start: now, contractedThrough: "", productId: "" }
 
 const inputStyle: React.CSSProperties = {
   padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6,
@@ -363,6 +363,7 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
         status: projectForm.status,
         start: projectForm.start,
         contractedThrough: isOngoing ? null : projectForm.type === "oneoff" ? projectForm.start : projectForm.contractedThrough || null,
+        productId: projectForm.productId || null,
         accountId,
       }),
     })
@@ -565,7 +566,7 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
                           value=""
                           onChange={e => {
                             const p = products.find(p => p.id === e.target.value)
-                            if (p) setProjectForm(f => ({ ...f, name: p.name, type: p.type as ContractType, monthly: String(p.monthly) }))
+                            if (p) setProjectForm(f => ({ ...f, name: p.name, type: p.type as ContractType, monthly: String(p.monthly), productId: p.id }))
                           }}
                         >
                           <option value="">— Select to pre-fill —</option>

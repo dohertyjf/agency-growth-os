@@ -13,6 +13,7 @@ const schema = z.object({
   verbal: z.boolean().optional(),
   type: z.enum(["retainer", "oneoff"]).optional(),
   accountId: z.string().nullable().optional(),
+  productId: z.string().nullable().optional(),
   ownerId: z.string().nullable().optional(),
   callDate: z.string().nullable().optional(),
   signedDate: z.string().nullable().optional(),

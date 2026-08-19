@@ -11,6 +11,7 @@ interface Contract {
   contractedThrough: string | null
   status: string
   verbal?: boolean
+  productId?: string | null
   createdAt?: string
   stageEnteredAt?: string
   updatedAt?: string
@@ -24,6 +25,7 @@ interface Contract {
 
 interface Account { id: string; name: string }
 interface Person { id: string; name: string; isExternal: boolean }
+interface Product { id: string; name: string; type: string; monthly: number }
 
 interface Props {
   clientId: string
@@ -33,6 +35,7 @@ interface Props {
   onContractsChange: (contracts: Contract[]) => void
   onAccountCreated?: (account: Account) => void
   noteCounts?: Record<string, number>
+  products?: Product[]
 }
 
 function AccountPicker({ accounts, value, onChange, clientId, onAccountCreated }: {
@@ -462,8 +465,8 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
   )
 }
 
-function BoardCard({ deal, accountName, count, fmt$, onEdit, onSetStage }: {
-  deal: Contract; accountName: string | null; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void; onSetStage: (id: string, stage: Stage) => void
+function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage }: {
+  deal: Contract; accountName: string | null; product?: string; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void; onSetStage: (id: string, stage: Stage) => void
 }) {
   return (
     <div draggable
@@ -474,6 +477,7 @@ function BoardCard({ deal, accountName, count, fmt$, onEdit, onSetStage }: {
         <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1916", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{fmt$(deal.monthly)}</span>
       </div>
       {accountName && <div style={{ fontSize: 11, color: "#9C9590" }}>{accountName}</div>}
+      {product && <div style={{ fontSize: 9, fontWeight: 700, color: "#4B5563", background: "#F0EBE3", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.03em", display: "inline-block" }}>{product}</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
         {count > 0 && <span title="Call notes" style={{ fontSize: 10, background: "#F0EBE3", color: "#6B6760", borderRadius: 99, padding: "1px 7px", fontWeight: 700 }}>📝 {count}</span>}
         <span style={{ flex: 1 }} />
@@ -491,10 +495,11 @@ function BoardCard({ deal, accountName, count, fmt$, onEdit, onSetStage }: {
   )
 }
 
-function BoardColumn({ col, deals, accounts, noteCounts, fmt$, onEdit, onSetStage }: {
+function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage }: {
   col: typeof STAGE_COLS[number]
   deals: Contract[]
   accounts: Account[]
+  products: Product[]
   noteCounts: Record<string, number>
   fmt$: (v: number) => string
   onEdit: (d: Contract) => void
@@ -526,7 +531,8 @@ function BoardColumn({ col, deals, accounts, noteCounts, fmt$, onEdit, onSetStag
       <div style={{ display: "flex", flexDirection: "column", gap: 7, minHeight: 40 }}>
         {shown.map(deal => (
           <BoardCard key={deal.id} deal={deal} count={noteCounts[deal.id] ?? 0} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage}
-            accountName={deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name ?? null : null} />
+            accountName={deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name ?? null : null}
+            product={deal.productId ? products.find(p => p.id === deal.productId)?.name ?? undefined : undefined} />
         ))}
         {shown.length === 0 && <div style={{ fontSize: 11, color: "#C0BAB2", textAlign: "center", padding: "8px 0" }}>Drop here</div>}
         {hidden > 0 && <div style={{ fontSize: 10, color: "#C0BAB2", textAlign: "center" }}>+{hidden} older (90+ days)</div>}
@@ -535,9 +541,10 @@ function BoardColumn({ col, deals, accounts, noteCounts, fmt$, onEdit, onSetStag
   )
 }
 
-function PipelineBoard({ deals, accounts, noteCounts, fmt$, onEdit, onSetStage }: {
+function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage }: {
   deals: Contract[]
   accounts: Account[]
+  products: Product[]
   noteCounts: Record<string, number>
   fmt$: (v: number) => string
   onEdit: (d: Contract) => void
@@ -547,7 +554,7 @@ function PipelineBoard({ deals, accounts, noteCounts, fmt$, onEdit, onSetStage }
     <div>
       <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, alignItems: "stretch" }}>
         {STAGE_COLS.map(col => (
-          <BoardColumn key={col.stage} col={col}
+          <BoardColumn key={col.stage} col={col} products={products}
             deals={deals.filter(d => stageOf(d) === col.stage).sort((a, b) => {
               const key = (d: Contract) => col.stage === "opportunity" ? (d.createdAt ?? "") : (d.stageEnteredAt ?? d.createdAt ?? "")
               return key(b).localeCompare(key(a))
@@ -560,7 +567,7 @@ function PipelineBoard({ deals, accounts, noteCounts, fmt$, onEdit, onSetStage }
   )
 }
 
-export default function PipelinePanel({ clientId, contracts, accounts: initialAccounts, people = [], onContractsChange, onAccountCreated, noteCounts = {} }: Props) {
+export default function PipelinePanel({ clientId, contracts, accounts: initialAccounts, people = [], onContractsChange, onAccountCreated, noteCounts = {}, products = [] }: Props) {
   const [liveCounts, setLiveCounts] = useState<Record<string, number>>(noteCounts)
   const handleNoteCountChange = (id: string, n: number) => setLiveCounts(prev => ({ ...prev, [id]: n }))
   const teamMembers = people.filter(p => !p.isExternal)
@@ -571,7 +578,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   const [addForm, setAddForm] = useState({
     name: "", monthly: "", accountId: "", ownerId: "",
     stage: "opportunity" as "opportunity" | "potential",
-    callDate: "",
+    callDate: "", productId: "",
     type: "retainer" as "retainer" | "ongoing" | "oneoff",
     start: initYM,
     contractedThrough: "",
@@ -580,7 +587,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   const [view, setView] = useState<"list" | "board">("list")
   const [editDeal, setEditDeal] = useState<Contract | null>(null)
   const [editForm, setEditForm] = useState({
-    name: "", monthly: "", accountId: "", ownerId: "", callDate: "", signedDate: "",
+    name: "", monthly: "", accountId: "", ownerId: "", callDate: "", signedDate: "", productId: "",
     type: "retainer" as "retainer" | "ongoing" | "oneoff",
     start: "",
     contractedThrough: "",
@@ -598,6 +605,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       ownerId: deal.ownerId ?? "",
       callDate: deal.callDate ?? "",
       signedDate: deal.signedDate ?? "",
+      productId: deal.productId ?? "",
       type: uiType,
       start: deal.start,
       contractedThrough: deal.contractedThrough ?? "",
@@ -619,6 +627,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         ownerId: editForm.ownerId || null,
         callDate: editForm.callDate || null,
         signedDate: editForm.signedDate || null,
+        productId: editForm.productId || null,
         type: isOngoing ? "retainer" : editForm.type,
         start: editForm.start,
         contractedThrough: isOngoing ? null : editForm.type === "oneoff" ? editForm.start : editForm.contractedThrough || null,
@@ -714,6 +723,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         monthly: parseFloat(addForm.monthly) || 0,
         start: addForm.start || nowYM,
         status: addForm.stage,
+        productId: addForm.productId || null,
         type: isOngoing ? "retainer" : addForm.type,
         contractedThrough: isOngoing ? null : addForm.type === "oneoff" ? (addForm.start || nowYM) : addForm.contractedThrough || null,
         accountId: addForm.accountId || null,
@@ -725,7 +735,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       const created = await res.json()
       onContractsChange([...contracts, { ...created, callDate: created.callDate ?? null, signedDate: created.signedDate ?? null, kickoffDate: created.kickoffDate ?? null }])
       setAddOpen(false)
-      setAddForm({ name: "", monthly: "", accountId: "", ownerId: "", stage: "opportunity", callDate: "", type: "retainer", start: nowYM, contractedThrough: "" })
+      setAddForm({ name: "", monthly: "", accountId: "", ownerId: "", stage: "opportunity", callDate: "", productId: "", type: "retainer", start: nowYM, contractedThrough: "" })
     }
     setAddSaving(false)
   }
@@ -763,6 +773,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         <PipelineBoard
           deals={contracts}
           accounts={localAccounts}
+          products={products}
           noteCounts={liveCounts}
           fmt$={fmt$}
           onEdit={openEdit}
@@ -1006,6 +1017,16 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                   </select>
                 </div>
               )}
+              {products.length > 0 && (
+                <div>
+                  <label style={labelStyle}>Product <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(package)</span></label>
+                  <select style={inputStyle} value={addForm.productId}
+                    onChange={e => setAddForm(f => ({ ...f, productId: e.target.value }))}>
+                    <option value="">— None —</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
                 <button type="button" onClick={() => setAddOpen(false)}
                   style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
@@ -1105,6 +1126,16 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                     onChange={e => setEditForm(f => ({ ...f, ownerId: e.target.value }))}>
                     <option value="">Unassigned</option>
                     {teamMembers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {products.length > 0 && (
+                <div>
+                  <label style={labelStyle}>Product <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(package)</span></label>
+                  <select style={inputStyle} value={editForm.productId}
+                    onChange={e => setEditForm(f => ({ ...f, productId: e.target.value }))}>
+                    <option value="">— None —</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
               )}

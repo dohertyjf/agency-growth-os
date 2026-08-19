@@ -45,7 +45,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
         allAccounts={accounts.map(a => ({ id: a.id, name: a.name }))}
         people={people.map(p => ({ id: p.id, name: p.name, role: p.role ?? null, isExternal: p.isExternal }))}
         products={products.map(p => ({ id: p.id, name: p.name, type: p.type as "retainer" | "ongoing" | "oneoff", monthly: p.monthly }))}
-        contracts={contracts.map(c => ({ id: c.id, name: c.name, monthly: c.monthly, hoursPerMonth: c.hoursPerMonth, start: c.start, contractedThrough: c.contractedThrough ?? null, status: c.status, type: c.type, ownerId: c.ownerId ?? null }))}
+        contracts={contracts.map(c => ({ id: c.id, name: c.name, monthly: c.monthly, hoursPerMonth: c.hoursPerMonth, start: c.start, contractedThrough: c.contractedThrough ?? null, status: c.status, type: c.type, ownerId: c.ownerId ?? null, productId: c.productId ?? null }))}
         pulses={pulses.map(p => ({ contractId: p.contractId, month: p.month, score: p.score, note: p.note ?? null }))}
         hours={hours.map(h => ({ contractId: h.contractId, month: h.month, hours: h.hours }))}
         payments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}

@@ -32,6 +32,7 @@ const schema = z.object({
   status: z.enum(["opportunity", "potential", "active", "lost", "finished"]).default("potential"),
   type: z.enum(["retainer", "oneoff"]).default("retainer"),
   accountId: z.string().nullable().optional(),
+  productId: z.string().nullable().optional(),
   ownerId: z.string().nullable().optional(),
   callDate: z.string().nullable().optional(),
   signedDate: z.string().nullable().optional(),

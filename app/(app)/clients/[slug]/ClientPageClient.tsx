@@ -43,6 +43,7 @@ interface Contract {
   contractedThrough: string | null
   status: string
   verbal?: boolean
+  productId?: string | null
   createdAt?: string
   stageEnteredAt?: string
   updatedAt?: string
@@ -353,6 +354,7 @@ export default function ClientPageClient({
           onContractsChange={setContracts}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
           noteCounts={initialNoteCounts}
+          products={clientProducts}
         />
       )}
 
@@ -385,6 +387,7 @@ export default function ClientPageClient({
             <ReconciliationTable
               contracts={contracts}
               accounts={accounts}
+              products={clientProducts}
               people={people.map(p => ({ id: p.id, name: p.name, isExternal: p.isExternal }))}
               clientId={clientId}
               initialAccountMonths={initialAccountMonths}

@@ -14,11 +14,13 @@ interface Contract {
   status: string
   type: string
   accountId?: string | null
+  productId?: string | null
   ownerId?: string | null
 }
 
 interface Account { id: string; name: string }
 interface Person { id: string; name: string; isExternal: boolean }
+interface Product { id: string; name: string }
 
 const inputStyle: React.CSSProperties = {
   padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 6,
@@ -27,9 +29,10 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function ContractEditModal({ contract, accounts, people = [], clientId, onClose, onSaved, onAccountCreated }: {
+export default function ContractEditModal({ contract, accounts, products = [], people = [], clientId, onClose, onSaved, onAccountCreated }: {
   contract: Contract
   accounts: Account[]
+  products?: Product[]
   people?: Person[]
   clientId: string
   onClose: () => void
@@ -52,6 +55,7 @@ export default function ContractEditModal({ contract, accounts, people = [], cli
     type: uiType,
     accountId: contract.accountId ?? null as string | null,
     ownerId: contract.ownerId ?? null as string | null,
+    productId: contract.productId ?? null as string | null,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +75,7 @@ export default function ContractEditModal({ contract, accounts, people = [], cli
       start: form.start,
       type: isOngoing ? "retainer" : form.type,
       contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
+      productId: form.productId,
     }
     const res = await fetch(`/api/contracts/${contract.id}`, {
       method: "PATCH",
@@ -80,7 +85,7 @@ export default function ContractEditModal({ contract, accounts, people = [], cli
     setSaving(false)
     if (!res.ok) { setError("Failed to save"); return }
     const updated = await res.json()
-    onSaved({ ...updated, accountId: form.accountId, ownerId: form.ownerId })
+    onSaved({ ...updated, accountId: form.accountId, ownerId: form.ownerId, productId: form.productId })
     onClose()
   }
 
@@ -171,6 +176,15 @@ export default function ContractEditModal({ contract, accounts, people = [], cli
               <select style={inputStyle} value={form.ownerId ?? ""} onChange={e => setForm(f => ({ ...f, ownerId: e.target.value || null }))}>
                 <option value="">Unassigned</option>
                 {teamMembers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
+          {products.length > 0 && (
+            <div>
+              <label style={labelStyle}>Product <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(package)</span></label>
+              <select style={inputStyle} value={form.productId ?? ""} onChange={e => setForm(f => ({ ...f, productId: e.target.value || null }))}>
+                <option value="">— None —</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
           )}

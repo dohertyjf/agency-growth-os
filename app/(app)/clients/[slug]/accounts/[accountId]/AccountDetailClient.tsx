@@ -10,7 +10,7 @@ interface Person { id: string; name: string; role: string | null; isExternal: bo
 interface Product { id: string; name: string; type: "retainer" | "ongoing" | "oneoff"; monthly: number }
 interface Contract {
   id: string; name: string; monthly: number; hoursPerMonth: number
-  start: string; contractedThrough: string | null; status: string; type: string; ownerId: string | null
+  start: string; contractedThrough: string | null; status: string; type: string; ownerId: string | null; productId?: string | null
 }
 interface HoursRow { contractId: string; month: string; hours: number }
 interface PaymentRow { contractId: string; month: string; amount: number }
@@ -401,6 +401,9 @@ export default function AccountDetailClient(props: Props) {
                   {items.map(c => (
                     <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 0", borderBottom: "1px solid #F5F1EC" }}>
                       <span style={{ fontWeight: 500, color: "#1A1916" }}>{c.name}</span>
+                      {c.productId && props.products.find(p => p.id === c.productId) && (
+                        <span style={{ fontSize: 9, fontWeight: 700, color: "#4B5563", background: "#F0EBE3", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.03em" }}>{props.products.find(p => p.id === c.productId)!.name}</span>
+                      )}
                       <span style={{ fontSize: 12, color: "#9C9590" }}>
                         {c.type === "oneoff" ? ymLabel(c.start) : c.contractedThrough ? `${ymLabel(c.start)} – ${ymLabel(c.contractedThrough)}` : `${ymLabel(c.start)} – Ongoing`}
                       </span>
