@@ -370,7 +370,7 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, o
         </div>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexShrink: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>
-            {fmt$(deal.monthly)}<span style={{ fontSize: 11, fontWeight: 400, color: "#9C9590" }}>/mo</span>
+            {fmt$(deal.monthly)}{deal.type !== "oneoff" && <span style={{ fontSize: 11, fontWeight: 400, color: "#9C9590" }}>/mo</span>}
           </div>
           <button
             onClick={() => onEdit(deal)}
@@ -988,7 +988,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={labelStyle}>Monthly Value</label>
+                  <label style={labelStyle}>{addForm.type === "oneoff" ? "Total" : "Monthly Value"}</label>
                   <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff" }}>
                     <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0 }}>$</span>
                     <input
@@ -1104,7 +1104,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={labelStyle}>Monthly Value</label>
+                  <label style={labelStyle}>{editForm.type === "oneoff" ? "Total" : "Monthly Value"}</label>
                   <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff" }}>
                     <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0 }}>$</span>
                     <input
