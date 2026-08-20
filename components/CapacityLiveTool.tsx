@@ -31,7 +31,17 @@ const DEFAULTS: Record<string, string> = {
   churn: "1", hoursPerClient: "20", billableHours: "320", activeClients: "7", goalMRR: "50000",
 }
 
-export default function CapacityLiveTool() {
+interface Props {
+  /** Headline above the tool. Defaults to the coach-facing sales-call framing. */
+  title?: string
+  /** Sub-line under the headline. */
+  subtitle?: string
+}
+
+export default function CapacityLiveTool({
+  title = "Growth Projection — live",
+  subtitle = "Type a prospect's numbers and adjust live on a call. Nothing is saved.",
+}: Props = {}) {
   const [currency, setCurrency] = useState<Currency>("USD")
   const sym = currSym(currency)
   const fmt$ = (val: number) => fmtCurrency(val, currency)
@@ -74,9 +84,9 @@ export default function CapacityLiveTool() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
         <div>
           <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>
-            Growth Projection — live
+            {title}
           </h1>
-          <p style={{ fontSize: 13, color: "#9C9590", margin: 0 }}>Type a prospect&apos;s numbers and adjust live on a call. Nothing is saved.</p>
+          <p style={{ fontSize: 13, color: "#9C9590", margin: 0 }}>{subtitle}</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <select value={currency} onChange={e => setCurrency(e.target.value as Currency)}
