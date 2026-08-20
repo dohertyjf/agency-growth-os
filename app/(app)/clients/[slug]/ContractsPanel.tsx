@@ -1,5 +1,4 @@
 "use client"
-import OneoffDelivery from "./OneoffDelivery"
 import { useState } from "react"
 import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, BOOKED_AHEAD_MONTHS, type ContractRow } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
@@ -218,6 +217,8 @@ interface EditForm {
   accountId: string | null
   ownerId: string | null
   productId: string | null
+  deliveryStart: string
+  deliveryEnd: string
 }
 
 function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
@@ -233,6 +234,8 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
     accountId: contract.accountId ?? null,
     ownerId: contract.ownerId ?? null,
     productId: contract.productId ?? null,
+    deliveryStart: contract.deliveryStart ?? "",
+    deliveryEnd: contract.deliveryEnd ?? "",
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -249,6 +252,8 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
       type: isOngoing ? "retainer" : form.type,
       contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
       accountId: form.accountId || undefined,
+      deliveryStart: form.deliveryStart || null,
+      deliveryEnd: form.deliveryEnd || null,
     }
     const res = await fetch(`/api/clients/${clientId}/contracts`, {
       method: "POST",
@@ -367,6 +372,8 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
     accountId: contract.accountId ?? null,
     ownerId: contract.ownerId ?? null,
     productId: contract.productId ?? null,
+    deliveryStart: contract.deliveryStart ?? "",
+    deliveryEnd: contract.deliveryEnd ?? "",
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -385,6 +392,8 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
       accountId: form.accountId,
       ownerId: form.ownerId,
       productId: form.productId,
+      deliveryStart: form.deliveryStart || null,
+      deliveryEnd: form.deliveryEnd || null,
     }
     const res = await fetch(`/api/contracts/${contract.id}`, {
       method: "PATCH",
@@ -476,7 +485,13 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
               <label style={labelStyle}>Month Paid</label>
               <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
             </div>
-            <OneoffDelivery contractId={contract.id} paymentMonth={form.start} initialStart={contract.deliveryStart ?? null} initialEnd={contract.deliveryEnd ?? null} />
+            <div>
+              <div style={{ ...labelStyle, marginBottom: 6 }}>Delivery window <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(work timeline — set hours per month in Schedule)</span></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div><label style={labelStyle}>Delivery start</label><input style={inputStyle} type="month" value={form.deliveryStart} onChange={e => setForm(f => ({ ...f, deliveryStart: e.target.value }))} /></div>
+                <div><label style={labelStyle}>Delivery end</label><input style={inputStyle} type="month" value={form.deliveryEnd} onChange={e => setForm(f => ({ ...f, deliveryEnd: e.target.value }))} /></div>
+              </div>
+            </div>
             </>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" ? "1fr" : "1fr 1fr", gap: 12 }}>
@@ -619,7 +634,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
         <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} products={products} people={people} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
       )}
       {schedulingContract && (
-        <PaymentScheduleModal contractId={schedulingContract.id} projectName={schedulingContract.name} mode={schedulingContract.type === "oneoff" ? "oneoff" : "retainer"} total={schedulingContract.monthly} startMonth={schedulingContract.start} endMonth={schedulingContract.contractedThrough} onClose={() => setSchedulingContract(null)} />
+        <PaymentScheduleModal contractId={schedulingContract.id} projectName={schedulingContract.name} mode={schedulingContract.type === "oneoff" ? "oneoff" : "retainer"} total={schedulingContract.monthly} hoursPerMonth={schedulingContract.hoursPerMonth} startMonth={schedulingContract.start} endMonth={schedulingContract.contractedThrough} deliveryStart={schedulingContract.deliveryStart ?? null} deliveryEnd={schedulingContract.deliveryEnd ?? null} onClose={() => setSchedulingContract(null)} />
       )}
       {duplicatingContract && (
         <DuplicateModal contract={duplicatingContract} clientId={clientId} accounts={localAccounts} onClose={() => setDuplicatingContract(null)} onSave={handleDuplicated} onAccountCreated={handleAccountCreated} />

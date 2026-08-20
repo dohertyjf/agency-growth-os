@@ -1,6 +1,5 @@
 "use client"
 import { useState } from "react"
-import OneoffDelivery from "./OneoffDelivery"
 
 type ContractTypeField = "retainer" | "ongoing" | "oneoff"
 type ContractStatus = "opportunity" | "potential" | "active" | "lost" | "finished"
@@ -59,6 +58,8 @@ export default function ContractEditModal({ contract, accounts, products = [], p
     accountId: contract.accountId ?? null as string | null,
     ownerId: contract.ownerId ?? null as string | null,
     productId: contract.productId ?? null as string | null,
+    deliveryStart: contract.deliveryStart ?? "",
+    deliveryEnd: contract.deliveryEnd ?? "",
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,6 +80,8 @@ export default function ContractEditModal({ contract, accounts, products = [], p
       type: isOngoing ? "retainer" : form.type,
       contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
       productId: form.productId,
+      deliveryStart: form.deliveryStart || null,
+      deliveryEnd: form.deliveryEnd || null,
     }
     const res = await fetch(`/api/contracts/${contract.id}`, {
       method: "PATCH",
@@ -211,7 +214,13 @@ export default function ContractEditModal({ contract, accounts, products = [], p
               <label style={labelStyle}>Month Paid</label>
               <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
             </div>
-            <OneoffDelivery contractId={contract.id} paymentMonth={form.start} initialStart={contract.deliveryStart ?? null} initialEnd={contract.deliveryEnd ?? null} />
+            <div>
+              <div style={{ ...labelStyle, marginBottom: 6 }}>Delivery window <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(work timeline — set hours per month in Schedule)</span></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div><label style={labelStyle}>Delivery start</label><input style={inputStyle} type="month" value={form.deliveryStart} onChange={e => setForm(f => ({ ...f, deliveryStart: e.target.value }))} /></div>
+                <div><label style={labelStyle}>Delivery end</label><input style={inputStyle} type="month" value={form.deliveryEnd} onChange={e => setForm(f => ({ ...f, deliveryEnd: e.target.value }))} /></div>
+              </div>
+            </div>
             </>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" ? "1fr" : "1fr 1fr", gap: 12 }}>
