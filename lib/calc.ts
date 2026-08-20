@@ -384,3 +384,49 @@ export function fmtCurrency(v: number, currency = "USD"): string {
 export function fmtPercent(v: number) {
   return (Math.round(v * 10) / 10) + "%"
 }
+
+// ── Capacity (delivery hours) by month ────────────────────────────────────────
+export interface CapacityContract {
+  id: string
+  hoursPerMonth?: number
+  start: string
+  contractedThrough: string | null
+  status: string
+  type?: string
+  deliveryStart?: string | null
+  deliveryEnd?: string | null
+}
+export interface DeliveryRow { contractId: string; month: string; hours: number }
+
+// Planned delivery hours per month: committed (signed/active) and pipeline
+// (qualified/opportunity). Retainers spread hoursPerMonth over their term;
+// one-offs use their delivery-month rows, falling back to hoursPerMonth in the
+// delivery/payment month when none are set.
+export function capacityByMonth(
+  contracts: CapacityContract[],
+  deliveryMonths: DeliveryRow[],
+  months: string[],
+): { month: string; committed: number; pipeline: number }[] {
+  const byContract = new Map<string, Map<string, number>>()
+  for (const d of deliveryMonths) {
+    if (!byContract.has(d.contractId)) byContract.set(d.contractId, new Map())
+    byContract.get(d.contractId)!.set(d.month, d.hours)
+  }
+  const hoursFor = (c: CapacityContract, m: string): number => {
+    const hpm = c.hoursPerMonth ?? 0
+    if (c.type === "oneoff") {
+      const rows = byContract.get(c.id)
+      if (rows && rows.size) return rows.get(m) ?? 0
+      const only = c.deliveryStart || c.start
+      return m === only ? hpm : 0
+    }
+    const end = c.contractedThrough
+    if (c.start <= m && (!end || m <= end)) return hpm
+    return 0
+  }
+  return months.map(m => ({
+    month: m,
+    committed: contracts.filter(c => c.status === "active").reduce((s, c) => s + hoursFor(c, m), 0),
+    pipeline: contracts.filter(c => c.status === "potential" || c.status === "opportunity").reduce((s, c) => s + hoursFor(c, m), 0),
+  }))
+}

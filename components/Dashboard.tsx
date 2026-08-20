@@ -4,6 +4,7 @@ import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
 import { useRouter } from "next/navigation"
 import MetricCard from "./MetricCard"
 import MetricChart, { ChartPoint, FlowBars } from "./MetricChart"
+import CapacitySoldChart from "./CapacitySoldChart"
 import MonthTable, { BulkMetricsModal } from "./MonthTable"
 import GrowthProjection from "./GrowthProjection"
 import {
@@ -36,6 +37,8 @@ interface Contract {
   contractedThrough: string | null
   status: string
   type?: string
+  deliveryStart?: string | null
+  deliveryEnd?: string | null
 }
 
 interface Goal {
@@ -71,6 +74,7 @@ interface Props {
   goal: Goal | null
   payments?: Payment[]
   contractHours?: ContractHours[]
+  deliveryMonths?: ContractHours[]
   accountMonths?: AccountMonthRow[]
   initialStatus?: ClientStatus
   initialStartDate?: string | null
@@ -123,7 +127,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, projectionState, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, contractHours = [], accountMonths = [], initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, totalHoursWorked = 0, payrollByMonth }: Props) {
+export default function Dashboard({ clientId, projectionState, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, contractHours = [], deliveryMonths = [], accountMonths = [], initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, totalHoursWorked = 0, payrollByMonth }: Props) {
   const router = useRouter()
   const fmt$ = useFmtCurrency()
   const currency = useCurrency()
@@ -638,6 +642,10 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
             {showMRRFlow ? "● MRR Flow" : "○ MRR Flow"}
           </button>
         </div>
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <CapacitySoldChart contracts={contracts} deliveryMonths={deliveryMonths} teamCapacity={totalHoursWorked} now={nowYM} />
       </div>
 
       {/* Metric Cards */}

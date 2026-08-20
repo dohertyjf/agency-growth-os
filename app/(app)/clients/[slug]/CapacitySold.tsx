@@ -1,5 +1,5 @@
 "use client"
-import { ymAdd, ymLabel } from "@/lib/calc"
+import { ymAdd, ymLabel, capacityByMonth } from "@/lib/calc"
 
 interface Contract {
   id: string
@@ -26,31 +26,12 @@ export default function CapacitySold({ contracts, deliveryMonths, teamCapacity, 
 }) {
   const months = Array.from({ length: 12 }, (_, i) => ymAdd(now, i))
 
-  // delivery rows by contract
-  const byContract = new Map<string, Map<string, number>>()
-  for (const d of deliveryMonths) {
-    if (!byContract.has(d.contractId)) byContract.set(d.contractId, new Map())
-    byContract.get(d.contractId)!.set(d.month, d.hours)
-  }
+  const data = capacityByMonth(contracts, deliveryMonths, months)
+  const cm = new Map(data.map(d => [d.month, d]))
+  const committed = (m: string) => cm.get(m)?.committed ?? 0
+  const pipeline = (m: string) => cm.get(m)?.pipeline ?? 0
 
-  function hoursFor(c: Contract, m: string): number {
-    if (c.type === "oneoff") {
-      const rows = byContract.get(c.id)
-      if (rows && rows.size) return rows.get(m) ?? 0
-      // legacy fallback: whole thing lands in its delivery/payment month
-      const only = c.deliveryStart || c.start
-      return m === only ? c.hoursPerMonth : 0
-    }
-    // retainer / ongoing: hoursPerMonth every month it's live
-    const end = c.contractedThrough
-    if (c.start <= m && (!end || m <= end)) return c.hoursPerMonth
-    return 0
-  }
-
-  const committed = (m: string) => contracts.filter(c => c.status === "active").reduce((s, c) => s + hoursFor(c, m), 0)
-  const pipeline = (m: string) => contracts.filter(c => c.status === "potential" || c.status === "opportunity").reduce((s, c) => s + hoursFor(c, m), 0)
-
-  const peak = Math.max(teamCapacity, ...months.map(m => committed(m) + pipeline(m)), 1)
+  const peak = Math.max(teamCapacity, ...data.map(d => d.committed + d.pipeline), 1)
 
   const th: React.CSSProperties = { textAlign: "right", padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "#9C9590", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }
   const td: React.CSSProperties = { padding: "8px 10px", textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }
