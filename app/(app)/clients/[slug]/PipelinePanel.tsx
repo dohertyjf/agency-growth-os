@@ -598,7 +598,15 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     contractedThrough: "",
   })
   const [addSaving, setAddSaving] = useState(false)
-  const [view, setView] = useState<"list" | "board">("list")
+  const [view, setView] = useState<"list" | "board">("board")
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("agos:pipelineView") : null
+    if (saved === "list" || saved === "board") setView(saved)
+  }, [])
+  const selectView = (v: "list" | "board") => {
+    setView(v)
+    try { window.localStorage.setItem("agos:pipelineView", v) } catch {}
+  }
   const [editDeal, setEditDeal] = useState<Contract | null>(null)
   const [editForm, setEditForm] = useState({
     name: "", monthly: "", accountId: "", ownerId: "", callDate: "", signedDate: "", productId: "", deliveryStart: "", deliveryEnd: "",
@@ -785,7 +793,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ display: "flex", border: "1px solid #ECE7DE", borderRadius: 6, overflow: "hidden" }}>
             {(["list", "board"] as const).map(v => (
-              <button key={v} type="button" onClick={() => setView(v)}
+              <button key={v} type="button" onClick={() => selectView(v)}
                 style={{ padding: "7px 14px", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", background: view === v ? "#1A1916" : "#fff", color: view === v ? "#fff" : "#6B6760", textTransform: "capitalize" }}>{v}</button>
             ))}
           </div>
