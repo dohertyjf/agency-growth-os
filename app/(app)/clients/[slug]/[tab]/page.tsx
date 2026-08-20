@@ -19,11 +19,23 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   const id = client.id
 
-  // Auto-finish: any active retainer/one-off whose end date is before this month has ended.
-  // Ongoing retainers (no end date) are never touched. Runs on every load so it self-heals.
+  // Auto-finish: an active project whose end has passed → finished. Retainers use
+  // contractedThrough; one-offs use their delivery end (payment can precede delivery),
+  // falling back to the payment month only when no delivery window is set. Ongoing
+  // retainers (no end) are never touched. Runs on every load so it self-heals.
   const nowYM = new Date().toISOString().slice(0, 7)
   await prisma.contract.updateMany({
-    where: { clientId: id, status: "active", contractedThrough: { lt: nowYM } },
+    where: { clientId: id, status: "active", type: { not: "oneoff" }, contractedThrough: { lt: nowYM } },
+    data: { status: "finished" },
+  })
+  await prisma.contract.updateMany({
+    where: {
+      clientId: id, status: "active", type: "oneoff",
+      OR: [
+        { deliveryEnd: { lt: nowYM } },
+        { deliveryEnd: null, contractedThrough: { lt: nowYM } },
+      ],
+    },
     data: { status: "finished" },
   })
 
