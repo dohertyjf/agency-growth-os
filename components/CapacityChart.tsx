@@ -1,4 +1,5 @@
 "use client"
+import { useState } from "react"
 import { fmtCurrency } from "@/lib/calc"
 
 function currSym(c: string) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
@@ -24,6 +25,7 @@ const accent = "#E9532A"
 export default function CapacityChart({ projected, startValue, mrrCap, goal, capacityHitMonth, monthLabels, currency }: Props) {
   const sym = currSym(currency)
   const fmt$ = (v: number) => fmtCurrency(v, currency)
+  const [hover, setHover] = useState<number | null>(null)
 
   const allVals = [startValue, ...projected, goal, mrrCap ?? 0].filter(v => v > 0)
   const dataMax = allVals.length ? Math.max(...allVals) : 1
@@ -77,7 +79,32 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cap
             stroke={mrrCap != null && v >= mrrCap ? "#6B6760" : accent}
             strokeWidth={2} opacity={0.7} />
         ))}
+        {hover !== null && (
+          <>
+            <line x1={toX(hover)} y1={PT} x2={toX(hover)} y2={PT + plotH} stroke="#1A1916" strokeWidth={1} opacity={0.18} />
+            <circle cx={toX(hover)} cy={toY(projected[hover])} r={5}
+              fill="#fff" stroke={mrrCap != null && projected[hover] >= mrrCap ? "#6B6760" : accent} strokeWidth={2.5} />
+          </>
+        )}
+        {projected.map((_, i) => (
+          <rect key={`h${i}`} x={toX(i) - plotW / 22} y={PT} width={plotW / 11} height={plotH}
+            fill="transparent" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
+        ))}
       </svg>
+      {hover !== null && (() => {
+        const v = projected[hover]
+        const atCap = mrrCap != null && v >= mrrCap
+        const toGoal = goal - v
+        return (
+          <div style={{ position: "absolute", left: `${(toX(hover) / W) * 100}%`, top: `${(toY(v) / H) * 100}%`, transform: "translate(-50%, -118%)", pointerEvents: "none", background: "#1A1916", color: "#fff", borderRadius: 8, padding: "7px 10px", fontSize: 12, whiteSpace: "nowrap", boxShadow: "0 4px 16px rgba(0,0,0,0.22)", zIndex: 5 }}>
+            <div style={{ fontWeight: 700 }}>{monthLabels[hover]}</div>
+            <div style={{ color: "#F0C9BB" }}>{fmt$(v)}/mo</div>
+            <div style={{ fontSize: 11, color: "#C9C4BC", marginTop: 1 }}>
+              {atCap ? "At capacity ceiling" : goal > 0 ? (toGoal > 0 ? `${fmt$(toGoal)} to goal` : "Goal reached") : ""}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
