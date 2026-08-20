@@ -1,4 +1,5 @@
 "use client"
+import OneoffDelivery from "./OneoffDelivery"
 import { useState } from "react"
 import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, BOOKED_AHEAD_MONTHS, type ContractRow } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
@@ -17,6 +18,8 @@ interface Contract {
   type: string
   accountId?: string | null
   productId?: string | null
+  deliveryStart?: string | null
+  deliveryEnd?: string | null
   ownerId?: string | null
   callDate: string | null
   signedDate: string | null
@@ -468,10 +471,13 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
             </div>
           </div>
           {form.type === "oneoff" ? (
+            <>
             <div>
               <label style={labelStyle}>Month Paid</label>
               <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
             </div>
+            <OneoffDelivery contractId={contract.id} paymentMonth={form.start} initialStart={contract.deliveryStart ?? null} initialEnd={contract.deliveryEnd ?? null} />
+            </>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" ? "1fr" : "1fr 1fr", gap: 12 }}>
               <div>
@@ -1084,7 +1090,11 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }:
 function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: { contracts: Contract[]; accounts: Account[]; now: string; showAll: boolean; onToggleShowAll: () => void }) {
   if (!contracts.length) return null
 
-  const allYMs = contracts.flatMap(c => [c.start, ...(c.contractedThrough ? [c.contractedThrough] : [])])
+  // One-offs display on their delivery (work) window, not the single payment month.
+  const spanStart = (c: Contract) => c.type === "oneoff" ? (c.deliveryStart || c.start) : c.start
+  const spanEnd = (c: Contract): string | null => c.type === "oneoff" ? (c.deliveryEnd || c.deliveryStart || c.start) : c.contractedThrough
+
+  const allYMs = contracts.flatMap(c => { const e = spanEnd(c); return [spanStart(c), ...(e ? [e] : [])] })
   allYMs.push(now)
   // Window: 12 months back through 12 months forward runway. History is trimmed
   // (bars clamp to the left edge) and the runway is capped at 12 months out.
@@ -1092,7 +1102,7 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
   const forwardCap = ymAdd(now, 12)
   const rawMin = allYMs.reduce((a, b) => a < b ? a : b)
   const minYM = rawMin < twelveAgo ? twelveAgo : rawMin
-  const hasOngoing = contracts.some(c => !c.contractedThrough)
+  const hasOngoing = contracts.some(c => !spanEnd(c))
   const rawMax = allYMs.reduce((a, b) => a > b ? a : b)
   const extendedMax = hasOngoing ? ymAdd(rawMax, 6) : rawMax
   const maxYM = extendedMax > forwardCap ? forwardCap : extendedMax
@@ -1109,7 +1119,7 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
   if (totalMo <= 0) return null
 
   // Only rows that overlap the visible window.
-  const visible = contracts.filter(c => toMonths(c.contractedThrough ?? maxYM) >= startMo && toMonths(c.start) <= endMo)
+  const visible = contracts.filter(c => toMonths(spanEnd(c) ?? maxYM) >= startMo && toMonths(spanStart(c)) <= endMo)
 
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
   const moToLabel = (mo: number) => {
@@ -1147,11 +1157,11 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
           </div>
         ))}
         {visible.map((c, i) => {
-          const isOngoing = !c.contractedThrough
-          const effectiveThrough = c.contractedThrough ?? maxYM
-          const barStartMo = Math.max(toMonths(c.start), startMo)
+          const isOngoing = !spanEnd(c)
+          const effectiveThrough = spanEnd(c) ?? maxYM
+          const barStartMo = Math.max(toMonths(spanStart(c)), startMo)
           const barEndMo = Math.min(toMonths(effectiveThrough), endMo)
-          const clippedLeft = toMonths(c.start) < startMo
+          const clippedLeft = toMonths(spanStart(c)) < startMo
           const clippedRight = toMonths(effectiveThrough) > endMo // ends beyond the 12-month window
           const left = ((barStartMo - startMo) / totalMo) * 100
           const width = ((barEndMo - barStartMo + 1) / totalMo) * 100

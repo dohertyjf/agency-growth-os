@@ -49,6 +49,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
   })
 
   const contractHours = await prisma.contractHoursMonth.findMany({ where: { contract: { clientId: id } } })
+  const deliveryMonths = await prisma.contractDeliveryMonth.findMany({ where: { contract: { clientId: id } } })
   const contractPulses = await prisma.contractPulse.findMany({ where: { contract: { clientId: id } } })
   const noteCountRows = await prisma.contractNote.groupBy({ by: ["contractId"], where: { contract: { clientId: id } }, _count: { _all: true } })
   const noteCounts: Record<string, number> = {}
@@ -69,7 +70,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialStartDate={client.startDate ?? null}
       initialEndDate={client.endDate ?? null}
       metrics={metrics}
-      initialContracts={contracts.map(c => ({ ...c, verbal: c.verbal, productId: c.productId ?? null, createdAt: c.createdAt.toISOString(), stageEnteredAt: (c.stageEnteredAt ?? c.createdAt).toISOString(), updatedAt: c.updatedAt.toISOString(), accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null, hoursPerMonth: c.hoursPerMonth, callDate: c.callDate ?? null, signedDate: c.signedDate ?? null, kickoffDate: c.kickoffDate ?? null }))}
+      initialContracts={contracts.map(c => ({ ...c, verbal: c.verbal, productId: c.productId ?? null, deliveryStart: c.deliveryStart ?? null, deliveryEnd: c.deliveryEnd ?? null, createdAt: c.createdAt.toISOString(), stageEnteredAt: (c.stageEnteredAt ?? c.createdAt).toISOString(), updatedAt: c.updatedAt.toISOString(), accountId: c.accountId ?? null, contractedThrough: c.contractedThrough ?? null, hoursPerMonth: c.hoursPerMonth, callDate: c.callDate ?? null, signedDate: c.signedDate ?? null, kickoffDate: c.kickoffDate ?? null }))}
       initialPeople={people.map(p => ({ id: p.id, name: p.name, role: p.role ?? null, responsibilities: p.responsibilities ?? null, isExternal: p.isExternal, isFullTime: p.isFullTime, annualSalary: p.annualSalary, billableHours: p.billableHours, startDate: p.startDate ?? null, endDate: p.endDate ?? null }))}
       initialSalaryMonths={salaryMonths.map(s => ({ personId: s.personId, month: s.month, monthlySalary: s.monthlySalary }))}
       initialHoursMonths={hoursMonths.map(h => ({ personId: h.personId, month: h.month, monthlyHours: h.monthlyHours }))}
@@ -77,6 +78,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialAccountMonths={accountMonths.map(am => ({ contractId: am.contractId, month: am.month, actual: am.actual }))}
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
       initialContractHours={contractHours.map(h => ({ contractId: h.contractId, month: h.month, hours: h.hours }))}
+      initialDeliveryMonths={deliveryMonths.map(d => ({ contractId: d.contractId, month: d.month, hours: d.hours }))}
       initialPulses={contractPulses.map(p => ({ contractId: p.contractId, month: p.month, score: p.score, note: p.note ?? null }))}
       initialNoteCounts={noteCounts}
       checklistMonth={nowYM}

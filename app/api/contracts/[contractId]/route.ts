@@ -14,6 +14,8 @@ const schema = z.object({
   type: z.enum(["retainer", "oneoff"]).optional(),
   accountId: z.string().nullable().optional(),
   productId: z.string().nullable().optional(),
+  deliveryStart: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
+  deliveryEnd: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
   ownerId: z.string().nullable().optional(),
   callDate: z.string().nullable().optional(),
   signedDate: z.string().nullable().optional(),

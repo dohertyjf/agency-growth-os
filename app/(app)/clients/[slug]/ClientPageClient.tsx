@@ -12,6 +12,7 @@ import ProgressPanel from "./ProgressPanel"
 import GoalsPanel from "./GoalsPanel"
 import PeoplePanel from "./PeoplePanel"
 import PipelinePanel from "./PipelinePanel"
+import CapacitySold from "./CapacitySold"
 import MonthlyChecklist from "./MonthlyChecklist"
 import CallsClient from "../../calls/CallsClient"
 import { CurrencyProvider } from "@/lib/CurrencyContext"
@@ -44,6 +45,8 @@ interface Contract {
   status: string
   verbal?: boolean
   productId?: string | null
+  deliveryStart?: string | null
+  deliveryEnd?: string | null
   createdAt?: string
   stageEnteredAt?: string
   updatedAt?: string
@@ -172,6 +175,7 @@ interface Props {
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
   initialContractHours: ContractHours[]
+  initialDeliveryMonths: ContractHours[]
   initialPulses: Pulse[]
   goal: Goal | null
   initialCalls: Call[]
@@ -198,7 +202,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -208,7 +212,7 @@ export default function ClientPageClient({
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
-  const [reconView, setReconView] = useState<"reconcile" | "projection" | "yield">("reconcile")
+  const [reconView, setReconView] = useState<"reconcile" | "projection" | "yield" | "capacity">("reconcile")
   const [pulses, setPulses] = useState<Pulse[]>(initialPulses)
   const handlePulseChange = (pulse: Pulse) => setPulses(prev => [...prev.filter(p => !(p.contractId === pulse.contractId && p.month === pulse.month)), pulse])
 
@@ -376,7 +380,7 @@ export default function ClientPageClient({
       {currentTab === "reconciliation" && (
         <div>
           <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 16 }}>
-            {([["reconcile", "Reconcile"], ["projection", "Projection"], ["yield", "Yield"]] as const).map(([v, label]) => (
+            {([["reconcile", "Reconcile"], ["projection", "Projection"], ["yield", "Yield"], ["capacity", "Capacity"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setReconView(v)}
                 style={{ padding: "4px 14px", fontSize: 12, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: reconView === v ? "#fff" : "transparent", color: reconView === v ? "#1A1916" : "#9C9590", boxShadow: reconView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
                 {label}
@@ -399,13 +403,20 @@ export default function ClientPageClient({
             />
           ) : reconView === "projection" ? (
             <CashflowProjection contracts={contracts} />
-          ) : (
+          ) : reconView === "yield" ? (
             <YieldByMonth
               contracts={contracts}
               accounts={accounts}
               accountMonths={initialAccountMonths}
               initialHours={initialContractHours}
               minHourlyRate={goal?.minHourlyRate ?? null}
+            />
+          ) : (
+            <CapacitySold
+              contracts={contracts}
+              deliveryMonths={initialDeliveryMonths}
+              teamCapacity={totalHoursWorked}
+              now={new Date().toISOString().slice(0, 7)}
             />
           )}
         </div>

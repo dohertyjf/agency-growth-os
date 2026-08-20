@@ -12,6 +12,8 @@ interface Contract {
   status: string
   verbal?: boolean
   productId?: string | null
+  deliveryStart?: string | null
+  deliveryEnd?: string | null
   createdAt?: string
   stageEnteredAt?: string
   updatedAt?: string

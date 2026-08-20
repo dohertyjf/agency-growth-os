@@ -130,6 +130,8 @@ model Contract {
   type              ContractType   @default(retainer)
   accountId         String?
   productId         String?        // which Product (package) this project signed onto
+  deliveryStart     String?        // one-offs: work window start (YYYY-MM), decoupled from payment
+  deliveryEnd       String?        // one-offs: work window end (YYYY-MM)
   ownerId           String?        // Person who owns/manages this account
   account           Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
   product           Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
@@ -140,6 +142,7 @@ model Contract {
   accountMonths     AccountMonth[]
   payments          ContractPayment[]
   hoursMonths       ContractHoursMonth[]
+  deliveryMonths    ContractDeliveryMonth[]
   pulses            ContractPulse[]
   members           ProjectMember[]
   notesLog          ContractNote[]
@@ -224,6 +227,18 @@ model ContractPayment {
 
 // Actual hours spent on a project in a given month — for hourly-yield tracking.
 model ContractHoursMonth {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  month      String   // YYYY-MM
+  hours      Float
+
+  @@unique([contractId, month])
+}
+
+// Planned/sold hours by month — the delivery (capacity) timeline, decoupled from payment.
+// Primary use: one-offs whose work spans months. Retainers derive from hoursPerMonth.
+model ContractDeliveryMonth {
   id         String   @id @default(cuid())
   contractId String
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)

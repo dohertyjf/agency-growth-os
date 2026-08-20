@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import OneoffDelivery from "./OneoffDelivery"
 
 type ContractTypeField = "retainer" | "ongoing" | "oneoff"
 type ContractStatus = "opportunity" | "potential" | "active" | "lost" | "finished"
@@ -15,6 +16,8 @@ interface Contract {
   type: string
   accountId?: string | null
   productId?: string | null
+  deliveryStart?: string | null
+  deliveryEnd?: string | null
   ownerId?: string | null
 }
 
@@ -203,10 +206,13 @@ export default function ContractEditModal({ contract, accounts, products = [], p
             </div>
           </div>
           {form.type === "oneoff" ? (
+            <>
             <div>
               <label style={labelStyle}>Month Paid</label>
               <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
             </div>
+            <OneoffDelivery contractId={contract.id} paymentMonth={form.start} initialStart={contract.deliveryStart ?? null} initialEnd={contract.deliveryEnd ?? null} />
+            </>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" ? "1fr" : "1fr 1fr", gap: 12 }}>
               <div>
