@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
+import PaymentScheduleModal from "./PaymentScheduleModal"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Contract {
@@ -176,7 +177,12 @@ function fmtYM(ym: string): string {
 }
 
 function dealMeta(deal: Contract): string {
-  if (deal.type === "oneoff") return `One-off · ${fmtYM(deal.start)}`
+  if (deal.type === "oneoff") {
+    const dEnd = deal.deliveryEnd || null
+    const dStart = deal.deliveryStart || deal.start
+    if (dEnd && dEnd !== dStart) return `One-off · ${fmtYM(dStart)} – ${fmtYM(dEnd)}`
+    return `One-off · ${fmtYM(deal.start)}`
+  }
   if (deal.contractedThrough) return `Retainer · ${fmtYM(deal.start)} – ${fmtYM(deal.contractedThrough)}`
   return `Retainer · ${fmtYM(deal.start)} – Ongoing`
 }
@@ -595,12 +601,13 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   const [view, setView] = useState<"list" | "board">("list")
   const [editDeal, setEditDeal] = useState<Contract | null>(null)
   const [editForm, setEditForm] = useState({
-    name: "", monthly: "", accountId: "", ownerId: "", callDate: "", signedDate: "", productId: "",
+    name: "", monthly: "", accountId: "", ownerId: "", callDate: "", signedDate: "", productId: "", deliveryStart: "", deliveryEnd: "",
     type: "retainer" as "retainer" | "ongoing" | "oneoff",
     start: "",
     contractedThrough: "",
   })
   const [editSaving, setEditSaving] = useState(false)
+  const [scheduleDeal, setScheduleDeal] = useState<Contract | null>(null)
 
   function openEdit(deal: Contract) {
     const uiType: "retainer" | "ongoing" | "oneoff" =
@@ -614,10 +621,22 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       callDate: deal.callDate ?? "",
       signedDate: deal.signedDate ?? "",
       productId: deal.productId ?? "",
+      deliveryStart: deal.deliveryStart ?? "",
+      deliveryEnd: deal.deliveryEnd ?? "",
       type: uiType,
       start: deal.start,
       contractedThrough: deal.contractedThrough ?? "",
     })
+  }
+
+  async function openScheduleForEdit() {
+    if (!editDeal) return
+    const res = await fetch(`/api/contracts/${editDeal.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deliveryStart: editForm.deliveryStart || null, deliveryEnd: editForm.deliveryEnd || null }),
+    })
+    if (res.ok) { const u = await res.json(); onContractsChange(contracts.map(c => c.id === editDeal.id ? { ...c, ...u } : c)) }
+    setScheduleDeal({ ...editDeal, deliveryStart: editForm.deliveryStart || null, deliveryEnd: editForm.deliveryEnd || null })
   }
 
   async function handleEditSave(e: React.FormEvent) {
@@ -636,6 +655,8 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         callDate: editForm.callDate || null,
         signedDate: editForm.signedDate || null,
         productId: editForm.productId || null,
+        deliveryStart: editForm.deliveryStart || null,
+        deliveryEnd: editForm.deliveryEnd || null,
         type: isOngoing ? "retainer" : editForm.type,
         start: editForm.start,
         contractedThrough: isOngoing ? null : editForm.type === "oneoff" ? editForm.start : editForm.contractedThrough || null,
@@ -1108,6 +1129,19 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                   </div>
                 )}
               </div>
+              {editForm.type === "oneoff" && (
+                <div style={{ border: "1px solid #ECE7DE", borderRadius: 8, padding: 12, background: "#FBFAF7", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ ...labelStyle, marginBottom: 0 }}>Delivery window <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(work span — cash is separate)</span></div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div><label style={labelStyle}>Delivery start</label><input style={inputStyle} type="month" value={editForm.deliveryStart} onChange={e => setEditForm(f => ({ ...f, deliveryStart: e.target.value }))} /></div>
+                    <div><label style={labelStyle}>Delivery end</label><input style={inputStyle} type="month" value={editForm.deliveryEnd} onChange={e => setEditForm(f => ({ ...f, deliveryEnd: e.target.value }))} /></div>
+                  </div>
+                  <button type="button" onClick={openScheduleForEdit}
+                    style={{ padding: "8px 12px", background: "#fff", border: "1px solid #E9532A", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "#E9532A", cursor: "pointer", alignSelf: "flex-start" }}>
+                    Payment plan &amp; hours →
+                  </button>
+                </div>
+              )}
               <div>
                 <label style={labelStyle}>Account <span style={{ color: "#E9532A" }}>*</span></label>
                 <AccountPicker
@@ -1166,6 +1200,21 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
             </div>
           </div>
         </div>
+      )}
+
+      {scheduleDeal && (
+        <PaymentScheduleModal
+          contractId={scheduleDeal.id}
+          projectName={scheduleDeal.name}
+          mode={scheduleDeal.type === "oneoff" ? "oneoff" : "retainer"}
+          total={scheduleDeal.monthly}
+          hoursPerMonth={scheduleDeal.hoursPerMonth}
+          startMonth={scheduleDeal.start}
+          endMonth={scheduleDeal.contractedThrough}
+          deliveryStart={scheduleDeal.deliveryStart ?? null}
+          deliveryEnd={scheduleDeal.deliveryEnd ?? null}
+          onClose={() => setScheduleDeal(null)}
+        />
       )}
     </div>
   )
