@@ -16,8 +16,8 @@ function addDerived(m: {
   return {
     ...m,
     grossProfit: grossProfit(m.revenue, m.salaries),
-    netProfit: netProfit(m.revenue, m.totalExpenses),
-    netMargin: netMargin(m.revenue, m.totalExpenses),
+    netProfit: netProfit(m.revenue, m.salaries, m.totalExpenses),
+    netMargin: netMargin(m.revenue, m.salaries, m.totalExpenses),
   }
 }
 

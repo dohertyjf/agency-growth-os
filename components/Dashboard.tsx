@@ -100,8 +100,8 @@ function derivedMetrics(m: Metric, payroll = 0) {
   return {
     ...m,
     grossProfit: grossProfit(m.revenue, m.salaries),
-    netProfit: netProfit(m.revenue, m.totalExpenses),
-    netMargin: netMargin(m.revenue, m.totalExpenses),
+    netProfit: netProfit(m.revenue, m.salaries, m.totalExpenses),
+    netMargin: netMargin(m.revenue, m.salaries, m.totalExpenses),
     closeRate: m.leads > 0 ? (m.newClients / m.leads) * 100 : 0,
     peopleCostPct: payroll > 0 && m.revenue > 0 ? (payroll / m.revenue) * 100 : 0,
     marketingSpend: m.marketingSpend ?? 0,
