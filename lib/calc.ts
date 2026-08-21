@@ -193,6 +193,10 @@ export interface CapacityResult {
   bindingConstraint: "capacity" | "demand" | null
   ceilingHitMonth: number        // index into projected where the ceiling is reached, -1 if never
   goalHitMonth: number           // index where goal is reached, -1 if never / no goal
+  uncapped: number[]             // the same projection with delivery capacity kept out of the way
+  hoursNeeded: number[]          // billable hours the uncapped path would require each month
+  capacityRunsOutMonth: number   // first month the uncapped path needs more hours than they have, -1 if never
+  hoursAtHorizon: number         // hours the uncapped path needs by the end of the projection
   newClientsPerMonth: number
   netMRRChange: number           // new MRR − churned MRR in the first month
   currentHoursUsed: number
@@ -261,6 +265,20 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   const goal = inp.goalMRR ?? 0
   const goalHitMonth = goal > 0 ? projected.findIndex(v => v >= goal) : -1
 
+  // What the same agency would do if delivery capacity were never the limit.
+  // The gap between this and `projected` is the revenue capacity is costing
+  // them, and it is what says how much capacity they need to build.
+  const uncapped = projectMRR(
+    inp.startRevenue, inp.leads, inp.closeRate, inp.avgDeal, churnRate, months
+  )
+  const hoursNeeded = inp.avgDeal > 0
+    ? uncapped.map(v => Math.ceil((v / inp.avgDeal) * inp.hoursPerClient))
+    : uncapped.map(() => 0)
+  const capacityRunsOutMonth = inp.billableHours > 0
+    ? hoursNeeded.findIndex(h => h > inp.billableHours)
+    : -1
+  const hoursAtHorizon = hoursNeeded.length > 0 ? hoursNeeded[hoursNeeded.length - 1] : 0
+
   const newClientsPerMonth = inp.leads * (inp.closeRate / 100)
   const netMRRChange = newMRRPerMonth - inp.startRevenue * churnRate
 
@@ -271,6 +289,7 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   return {
     projected, maxClients, churnRate, capacityCeiling, demandCeiling, mrrCap,
     bindingConstraint, ceilingHitMonth, goalHitMonth,
+    uncapped, hoursNeeded, capacityRunsOutMonth, hoursAtHorizon,
     newClientsPerMonth, netMRRChange, currentHoursUsed, hoursAvailable, slotsAvailable,
   }
 }

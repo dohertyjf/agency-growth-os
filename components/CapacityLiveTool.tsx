@@ -84,14 +84,40 @@ export default function CapacityLiveTool({
   }, [r])
 
   const goal = inputs.goalMRR ?? 0
+  // Capacity is something you build, not a wall you hit. When it is what binds,
+  // say what it has to become and by when.
+  const capacityPlan = useMemo(() => {
+    if (r.capacityRunsOutMonth < 0 || inputs.billableHours <= 0) return null
+    const marks = [11, 23, 35]
+      .filter(i => i < horizon && i >= r.capacityRunsOutMonth)
+      .map(i => ({ label: monthLabels[i], hrs: r.hoursNeeded[i] }))
+    const multiple = r.hoursAtHorizon / inputs.billableHours
+    return {
+      runsOut: monthLabels[r.capacityRunsOutMonth],
+      hrs: r.hoursAtHorizon,
+      pct: Math.round((multiple - 1) * 100),
+      marks,
+    }
+  }, [r, inputs.billableHours, monthLabels, horizon])
+
   const goalVerdict = useMemo(() => {
     if (goal <= 0) return null
-    if (r.goalHitMonth >= 0) return { ok: true, text: `You reach ${fmtCurrency(goal, currency)}/mo in ${monthLabels[r.goalHitMonth]} — month ${r.goalHitMonth + 1} of ${horizon}.` }
-    if (r.mrrCap != null && goal > r.mrrCap) {
-      return { ok: false, text: `${fmtCurrency(goal, currency)}/mo is above your ceiling of ${fmtCurrency(r.mrrCap, currency)} — no amount of time gets you there without changing something.` }
-    }
-    return { ok: false, text: `You do not reach ${fmtCurrency(goal, currency)}/mo within ${horizon} months — you get to ${fmtCurrency(r.projected[r.projected.length - 1], currency)}. It is reachable, just not this fast.` }
-  }, [goal, r, monthLabels, horizon, currency])
+    // The goal in clients, not just money — "17 clients" lands where "$50,000"
+    // does not, and it sits next to the two counts that decide whether it is
+    // even possible: what they have, and what their hours cover.
+    const need = inputs.avgDeal > 0 ? Math.ceil(goal / inputs.avgDeal) : null
+    const clients = need != null
+      ? `That is ${need} clients at ${fmtCurrency(inputs.avgDeal, currency)} each — you have ${inputs.activeClients} today${r.maxClients != null ? `, and your hours cover ${r.maxClients}` : ""}.`
+      : null
+    const overMax = need != null && r.maxClients != null && need > r.maxClients
+
+    const head = r.goalHitMonth >= 0
+      ? { ok: true, text: `You reach ${fmtCurrency(goal, currency)}/mo in ${monthLabels[r.goalHitMonth]} — month ${r.goalHitMonth + 1} of ${horizon}.` }
+      : r.mrrCap != null && goal > r.mrrCap
+        ? { ok: false, text: `${fmtCurrency(goal, currency)}/mo is above your ceiling of ${fmtCurrency(r.mrrCap, currency)} — no amount of time gets you there without changing something.` }
+        : { ok: false, text: `You do not reach ${fmtCurrency(goal, currency)}/mo within ${horizon} months — you get to ${fmtCurrency(r.projected[r.projected.length - 1], currency)}. It is reachable, just not this fast.` }
+    return { ...head, clients, overMax }
+  }, [goal, r, monthLabels, horizon, currency, inputs.avgDeal, inputs.activeClients])
   const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
 
@@ -236,6 +262,29 @@ export default function CapacityLiveTool({
       {goalVerdict && (
         <div style={{ fontSize: 14, lineHeight: 1.5, color: goalVerdict.ok ? "#1F7A4D" : "#9A3412", marginBottom: 20, padding: "0 2px" }}>
           {goalVerdict.ok ? "\u2713 " : "\u2192 "}{goalVerdict.text}
+          {goalVerdict.clients && (
+            <div style={{ color: goalVerdict.overMax ? "#9A3412" : "#6B6760", marginTop: 4 }}>
+              {goalVerdict.clients}
+              {goalVerdict.overMax && <strong> More than your team can serve at these hours.</strong>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {capacityPlan && (
+        <div style={{ background: "#F5F1EC", border: "1px solid #ECE7DE", borderRadius: 10, padding: "13px 16px", marginBottom: 20 }}>
+          <div style={{ fontSize: 14, lineHeight: 1.5, color: "#1A1916" }}>
+            Delivery capacity runs out around <strong>{capacityPlan.runsOut}</strong>. To keep growing past it you
+            need <strong>{capacityPlan.hrs} billable hrs/mo</strong> by {monthLabels[horizon - 1]}
+            {capacityPlan.pct > 0 && <> — {capacityPlan.pct}% more than today</>}.
+          </div>
+          {capacityPlan.marks.length > 1 && (
+            <div style={{ fontSize: 12, color: "#6B6760", marginTop: 7, fontVariantNumeric: "tabular-nums" }}>
+              {capacityPlan.marks.map((m, i) => (
+                <span key={m.label}>{i > 0 && <span style={{ color: "#C9C4BC" }}> · </span>}{m.label}: <strong>{m.hrs} hrs</strong></span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
