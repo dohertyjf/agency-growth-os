@@ -164,11 +164,23 @@ export interface CapacityInputs {
   leads: number          // leads / month
   closeRate: number      // percent (0–100)
   avgDeal: number        // monthly value per client
-  churn: number          // clients lost / month
+  churnPct?: number      // % of clients lost / month — the preferred input
+  churn?: number         // legacy: clients lost / month, converted via activeClients
   hoursPerClient: number // avg monthly hours per client
   billableHours: number  // total monthly billable capacity
   activeClients: number  // clients served today
   goalMRR?: number | null
+}
+
+// Churn as a fraction of the book per month. Submissions saved before churn
+// became a percentage stored a client count instead; those are converted
+// against the client count they were captured with, so old reports keep
+// recomputing to the same numbers.
+export function churnRateOf(inp: Pick<CapacityInputs, "churnPct" | "churn" | "activeClients">): number {
+  const pct = inp.churnPct != null
+    ? inp.churnPct / 100
+    : inp.activeClients > 0 ? (inp.churn ?? 0) / inp.activeClients : 0
+  return Math.min(1, Math.max(0, pct))
 }
 
 export interface CapacityResult {
@@ -222,11 +234,7 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   // Ceiling 1 — delivery hours run out. A hard wall: you cannot serve more.
   const capacityCeiling = maxClients !== null && inp.avgDeal > 0 ? maxClients * inp.avgDeal : null
 
-  // The churn figure is entered as "clients lost per month", which is a rate
-  // measured against the book they have today.
-  const churnRate = inp.activeClients > 0
-    ? Math.min(1, Math.max(0, inp.churn / inp.activeClients))
-    : 0
+  const churnRate = churnRateOf(inp)
 
   // Ceiling 2 — growth stalls where new wins equal churn losses. An asymptote,
   // not a wall, so it is never passed to projectMRR as a hard cap. With no churn

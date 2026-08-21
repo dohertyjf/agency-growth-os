@@ -1,7 +1,7 @@
 "use client"
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { projectCapacity, fmtCurrency, ymAdd, ymLabel, type CapacityInputs } from "@/lib/calc"
+import { projectCapacity, churnRateOf, fmtCurrency, ymAdd, ymLabel, type CapacityInputs } from "@/lib/calc"
 import CapacityChart from "@/components/CapacityChart"
 import DeleteLeadButton from "@/components/DeleteLeadButton"
 
@@ -26,7 +26,7 @@ const FIELDS: { key: keyof CapacityInputs; label: string; money?: boolean; step?
   { key: "leads", label: "Leads / mo", step: 0.5 },
   { key: "closeRate", label: "Close Rate %", step: 0.1 },
   { key: "avgDeal", label: "Avg Deal Size / mo", money: true, step: 100 },
-  { key: "churn", label: "Churn / mo", step: 0.5 },
+  { key: "churnPct", label: "Churn % / mo", step: 0.5 },
   { key: "hoursPerClient", label: "Avg monthly hours per client", step: 0.5 },
   { key: "billableHours", label: "Billable Hrs / mo", step: 10 },
   { key: "activeClients", label: "Active Clients", step: 1 },
@@ -38,7 +38,12 @@ export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; 
   const sym = lead.currency === "GBP" ? "£" : lead.currency === "EUR" ? "€" : "$"
   const fmt$ = (v: number) => fmtCurrency(v, lead.currency)
 
-  const [inputs, setInputs] = useState<CapacityInputs>(lead.adjustedInputs ?? lead.inputs)
+  // Records captured before churn became a percentage carry a client count;
+  // normalise so the editable field always has a percentage in it.
+  const [inputs, setInputs] = useState<CapacityInputs>(() => {
+    const raw = lead.adjustedInputs ?? lead.inputs
+    return raw.churnPct != null ? raw : { ...raw, churnPct: churnRateOf(raw) * 100 }
+  })
   const [takeaways, setTakeaways] = useState(lead.takeaways ?? "")
   const [scheduled, setScheduled] = useState(lead.scheduled)
   const [reportSent, setReportSent] = useState(lead.reportSent)

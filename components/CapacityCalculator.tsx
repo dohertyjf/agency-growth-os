@@ -28,7 +28,7 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
   const [leads, setLeads] = useState(10)
   const [closeRate, setCloseRate] = useState(20)
   const [avgDeal, setAvgDeal] = useState(3000)
-  const [churn, setChurn] = useState(1)
+  const [churnPct, setChurnPct] = useState(14.3)
   const [hoursPerClient, setHoursPerClient] = useState(20)
   const [billableHours, setBillableHours] = useState(320)
   const [activeClients, setActiveClients] = useState(7)
@@ -76,7 +76,7 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: cleanEmail, name: cleanName || undefined, agency: cleanAgency || undefined, currency,
-          inputs: { startRevenue, leads, closeRate, avgDeal, churn, hoursPerClient, billableHours, activeClients, goalMRR },
+          inputs: { startRevenue, leads, closeRate, avgDeal, churnPct, hoursPerClient, billableHours, activeClients, goalMRR },
           honeypot,
         }),
       })
@@ -167,8 +167,8 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
               <input style={inputStyle} type="number" min={0} step={100} value={avgDeal} onChange={num(setAvgDeal)} />
             </div>
             <div>
-              <label style={labelStyle}>Churn / mo (clients)</label>
-              <input style={inputStyle} type="number" min={0} step={0.5} value={churn} onChange={num(setChurn)} />
+              <label style={labelStyle}>Churn % / mo</label>
+              <input style={inputStyle} type="number" min={0} step={0.5} value={churnPct} onChange={num(setChurnPct)} />
             </div>
             <div>
               <label style={labelStyle}>Avg monthly hours per client</label>

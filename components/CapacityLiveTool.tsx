@@ -19,7 +19,7 @@ const FIELDS: { key: keyof CapacityInputs; label: string; money?: boolean; step?
   { key: "leads", label: "Leads / mo", step: 0.5 },
   { key: "closeRate", label: "Close Rate %", step: 0.1 },
   { key: "avgDeal", label: "Avg Deal Size / mo", money: true, step: 100 },
-  { key: "churn", label: "Churn / mo (clients)", step: 0.5 },
+  { key: "churnPct", label: "Churn % / mo", step: 0.5 },
   { key: "hoursPerClient", label: "Avg monthly hours per client", step: 0.5 },
   { key: "billableHours", label: "Billable Hrs / mo", step: 10 },
   { key: "activeClients", label: "Active Clients", step: 1 },
@@ -28,7 +28,7 @@ const FIELDS: { key: keyof CapacityInputs; label: string; money?: boolean; step?
 
 const DEFAULTS: Record<string, string> = {
   startRevenue: "20000", leads: "10", closeRate: "20", avgDeal: "3000",
-  churn: "1", hoursPerClient: "20", billableHours: "320", activeClients: "7", goalMRR: "50000",
+  churnPct: "14.3", hoursPerClient: "20", billableHours: "320", activeClients: "7", goalMRR: "50000",
 }
 
 interface Props {
@@ -50,7 +50,7 @@ export default function CapacityLiveTool({
   const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
   const inputs = useMemo<CapacityInputs>(() => ({
     startRevenue: num(v.startRevenue), leads: num(v.leads), closeRate: num(v.closeRate),
-    avgDeal: num(v.avgDeal), churn: num(v.churn), hoursPerClient: num(v.hoursPerClient),
+    avgDeal: num(v.avgDeal), churnPct: num(v.churnPct), hoursPerClient: num(v.hoursPerClient),
     billableHours: num(v.billableHours), activeClients: num(v.activeClients), goalMRR: num(v.goalMRR),
   }), [v])
 
@@ -62,9 +62,9 @@ export default function CapacityLiveTool({
   // types a client count, the model works in a rate, and without this the
   // conversion is invisible unless a specific verdict branch happens to render.
   const hints = useMemo<Partial<Record<string, string>>>(() => ({
-    churn: inputs.activeClients > 0
-      ? `= ${fmtPercent(r.churnRate * 100)} of your clients a month`
-      : "set Active Clients to read this as a rate",
+    churnPct: r.churnRate > 0
+      ? `\u2248 ${(r.churnRate * inputs.activeClients).toFixed(1)} of ${inputs.activeClients} clients \u00b7 avg stay ${Math.round(1 / r.churnRate)} mo`
+      : "no churn — clients stay forever",
     activeClients: inputs.hoursPerClient > 0
       ? `using ${Math.round(r.currentHoursUsed)} of ${inputs.billableHours} hrs`
       : undefined,
