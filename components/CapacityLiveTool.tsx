@@ -58,6 +58,19 @@ export default function CapacityLiveTool({
   const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
   const monthLabels = useMemo(() => Array.from({ length: 12 }, (_, i) => ymLabel(ymAdd(now, i + 1))), [now])
 
+  // Read-outs under the inputs they are derived from. Churn especially: the user
+  // types a client count, the model works in a rate, and without this the
+  // conversion is invisible unless a specific verdict branch happens to render.
+  const hints = useMemo<Partial<Record<string, string>>>(() => ({
+    churn: inputs.activeClients > 0
+      ? `= ${fmtPercent(r.churnRate * 100)} of your clients a month`
+      : "set Active Clients to read this as a rate",
+    activeClients: inputs.hoursPerClient > 0
+      ? `using ${Math.round(r.currentHoursUsed)} of ${inputs.billableHours} hrs`
+      : undefined,
+    billableHours: r.maxClients != null ? `room for ${r.maxClients} clients` : undefined,
+  }), [inputs.activeClients, inputs.hoursPerClient, inputs.billableHours, r])
+
   const goal = inputs.goalMRR ?? 0
   const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
@@ -118,6 +131,11 @@ export default function CapacityLiveTool({
               <label style={labelStyle}>{f.label}{f.money ? ` ${sym}` : ""}</label>
               <input type="number" min={0} step={f.step} value={v[f.key]}
                 onChange={e => setV(prev => ({ ...prev, [f.key]: e.target.value }))} style={inputStyle} />
+              {hints[f.key] && (
+                <div style={{ fontSize: 10, color: "#9C9590", marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+                  {hints[f.key]}
+                </div>
+              )}
             </div>
           ))}
         </div>
