@@ -151,12 +151,47 @@ export default function CapacityLiveTool({
   const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
 
+  // The smallest price rise that actually reaches the goal, given everything
+  // else they typed. Raising price lifts both ceilings and speeds the climb, so
+  // the outcome is monotonic in price and a binary search is safe.
+  const minPriceRise = useMemo(() => {
+    if (goal <= 0 || inputs.avgDeal <= 0 || r.goalHitMonth >= 0) return null
+    const reaches = (mult: number) =>
+      projectCapacity({ ...inputs, avgDeal: inputs.avgDeal * mult }, horizon).goalHitMonth >= 0
+    const CEILING = 10
+    if (!reaches(CEILING)) return null   // price alone cannot get there
+
+    let lo = 1, hi = CEILING
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2
+      if (reaches(mid)) hi = mid; else lo = mid
+    }
+    // Round the percentage up, then price from that, so the figure shown is one
+    // that genuinely works rather than the bare mathematical boundary.
+    const pct = Math.max(1, Math.ceil((hi - 1) * 100))
+    const price = Math.ceil(inputs.avgDeal * (1 + pct / 100))
+    const res = projectCapacity({ ...inputs, avgDeal: price }, horizon)
+    if (res.goalHitMonth < 0) return null
+    return { pct, price, month: monthLabels[res.goalHitMonth] }
+  }, [inputs, goal, r, horizon, monthLabels])
+
   // The order to pull the levers in. At each step only moves that address the
   // ceiling currently binding are considered — recommending "fix churn" to an
   // agency that is out of delivery hours is how people waste a year. Apply the
   // winner, recompute, and let the next constraint pick the next move.
   const sequence = useMemo(() => {
     if (goal <= 0 || r.goalHitMonth >= 0) return null
+    // If a price rise alone reaches the goal, that is the whole plan — and it
+    // should quote the rise actually needed, not the generic 50% the lever list
+    // uses for comparison.
+    if (minPriceRise) {
+      return [{
+        label: `Raise prices ${minPriceRise.pct}% (to ${fmtCurrency(minPriceRise.price, currency)}/mo per client)`,
+        ceiling: projectCapacity({ ...inputs, avgDeal: minPriceRise.price }, horizon).mrrCap ?? 0,
+        binds: null,
+        reached: minPriceRise.month,
+      }]
+    }
     let state: CapacityInputs = inputs
     const used = new Set<string>()
     const steps: { label: string; ceiling: number; binds: "capacity" | "demand" | null; reached: string | null }[] = []
@@ -187,7 +222,7 @@ export default function CapacityLiveTool({
       if (best.res.goalHitMonth >= 0) break
     }
     return steps.length > 0 ? steps : null
-  }, [inputs, goal, r, horizon, currency, monthLabels])
+  }, [inputs, goal, r, horizon, currency, monthLabels, minPriceRise])
 
   const scenarios = useMemo(() => {
     const base = r
@@ -323,6 +358,11 @@ export default function CapacityLiveTool({
       {goalVerdict && (
         <div style={{ fontSize: 14, lineHeight: 1.5, color: goalVerdict.ok ? "#1F7A4D" : "#9A3412", marginBottom: 20, padding: "0 2px" }}>
           {goalVerdict.ok ? "\u2713 " : "\u2192 "}{goalVerdict.text}
+          {minPriceRise && (
+            <div style={{ color: "#1F7A4D", marginTop: 4, fontWeight: 600 }}>
+              A {minPriceRise.pct}% price rise gets you there — {fmtCurrency(minPriceRise.price, currency)}/mo per client, reaching {fmt$(goal)} by {minPriceRise.month}.
+            </div>
+          )}
           {goalVerdict.clients && (
             <div style={{ color: goalVerdict.overMax ? "#9A3412" : "#6B6760", marginTop: 4 }}>
               {goalVerdict.clients}
