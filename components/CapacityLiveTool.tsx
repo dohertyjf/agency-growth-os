@@ -46,6 +46,9 @@ export default function CapacityLiveTool({
   const sym = currSym(currency)
   const fmt$ = (val: number) => fmtCurrency(val, currency)
   const [v, setV] = useState<Record<string, string>>(DEFAULTS)
+  // The horizon doubles as the goal deadline — "$50k within 2 years" is one
+  // question, not two, so it gets one control.
+  const [horizon, setHorizon] = useState(12)
 
   const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
   const inputs = useMemo<CapacityInputs>(() => ({
@@ -54,9 +57,9 @@ export default function CapacityLiveTool({
     billableHours: num(v.billableHours), activeClients: num(v.activeClients), goalMRR: num(v.goalMRR),
   }), [v])
 
-  const r = useMemo(() => projectCapacity(inputs), [inputs])
+  const r = useMemo(() => projectCapacity(inputs, horizon), [inputs, horizon])
   const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
-  const monthLabels = useMemo(() => Array.from({ length: 12 }, (_, i) => ymLabel(ymAdd(now, i + 1))), [now])
+  const monthLabels = useMemo(() => Array.from({ length: horizon }, (_, i) => ymLabel(ymAdd(now, i + 1))), [now, horizon])
 
   // Read-outs under the inputs they are derived from. Churn especially: the user
   // types a client count, the model works in a rate, and without this the
@@ -81,13 +84,21 @@ export default function CapacityLiveTool({
   }, [r])
 
   const goal = inputs.goalMRR ?? 0
+  const goalVerdict = useMemo(() => {
+    if (goal <= 0) return null
+    if (r.goalHitMonth >= 0) return { ok: true, text: `You reach ${fmtCurrency(goal, currency)}/mo in ${monthLabels[r.goalHitMonth]} — month ${r.goalHitMonth + 1} of ${horizon}.` }
+    if (r.mrrCap != null && goal > r.mrrCap) {
+      return { ok: false, text: `${fmtCurrency(goal, currency)}/mo is above your ceiling of ${fmtCurrency(r.mrrCap, currency)} — no amount of time gets you there without changing something.` }
+    }
+    return { ok: false, text: `You do not reach ${fmtCurrency(goal, currency)}/mo within ${horizon} months — you get to ${fmtCurrency(r.projected[r.projected.length - 1], currency)}. It is reachable, just not this fast.` }
+  }, [goal, r, monthLabels, horizon, currency])
   const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
 
   const scenarios = useMemo(() => {
     const base = r
     const outcome = (patch: Partial<CapacityInputs>) => {
-      const res = projectCapacity({ ...inputs, ...patch })
+      const res = projectCapacity({ ...inputs, ...patch }, horizon)
       if (res.mrrCap == null) return "removes the ceiling entirely"
       // A lever that does not move the binding ceiling is the most useful thing
       // this list can tell you — say so plainly instead of reporting a "lift"
@@ -110,7 +121,7 @@ export default function CapacityLiveTool({
       { patch: { billableHours: inputs.billableHours * 2 }, label: `Double delivery capacity (to ${inputs.billableHours * 2} billable hrs/mo)` },
       { patch: { leads: inputs.leads * 2 }, label: `Double your leads (to ${inputs.leads * 2}/mo)` },
       { patch: { churnPct: halfChurn }, label: `Halve your churn (to ${fmtPercent(halfChurn)}/mo)` },
-    ].map(row => ({ ...row, cap: projectCapacity({ ...inputs, ...row.patch }).mrrCap ?? 0, result: outcome(row.patch) }))
+    ].map(row => ({ ...row, cap: projectCapacity({ ...inputs, ...row.patch }, horizon).mrrCap ?? 0, result: outcome(row.patch) }))
     // Rank to call out the biggest move, but keep the printed order fixed — a
     // list that reshuffles as you type is unreadable.
     const best = Math.max(...rows.map(x => x.cap))
@@ -121,7 +132,7 @@ export default function CapacityLiveTool({
       isBest: x.cap === best && x.cap > baseCap,
       isNoChange: Math.round(x.cap) === Math.round(baseCap),
     }))
-  }, [inputs, monthLabels, currency, r])
+  }, [inputs, monthLabels, currency, r, horizon])
 
   return (
     <div>
@@ -137,6 +148,18 @@ export default function CapacityLiveTool({
             style={{ ...inputStyle, width: "auto", padding: "8px 12px", cursor: "pointer" }} aria-label="Currency">
             <option value="USD">$ USD</option><option value="GBP">£ GBP</option><option value="EUR">€ EUR</option>
           </select>
+          <div style={{ display: "flex", border: "1px solid #ECE7DE", borderRadius: 8, overflow: "hidden", background: "#fff" }}>
+            {[{ m: 12, label: "1 yr" }, { m: 24, label: "2 yr" }, { m: 36, label: "3 yr" }].map(h => (
+              <button key={h.m} onClick={() => setHorizon(h.m)} aria-pressed={horizon === h.m}
+                style={{
+                  fontSize: 12, fontWeight: 600, padding: "8px 13px", cursor: "pointer", border: "none",
+                  background: horizon === h.m ? accent : "transparent",
+                  color: horizon === h.m ? "#fff" : "#6B6760",
+                }}>
+                {h.label}
+              </button>
+            ))}
+          </div>
           <button onClick={() => setV(DEFAULTS)}
             style={{ fontSize: 12, fontWeight: 600, color: "#9C9590", background: "#fff", border: "1px solid #ECE7DE", borderRadius: 7, padding: "8px 14px", cursor: "pointer" }}>
             Reset
@@ -209,6 +232,12 @@ export default function CapacityLiveTool({
           </div>
         )}
       </div>
+
+      {goalVerdict && (
+        <div style={{ fontSize: 14, lineHeight: 1.5, color: goalVerdict.ok ? "#1F7A4D" : "#9A3412", marginBottom: 20, padding: "0 2px" }}>
+          {goalVerdict.ok ? "\u2713 " : "\u2192 "}{goalVerdict.text}
+        </div>
+      )}
 
       {/* Chart */}
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 24 }}>

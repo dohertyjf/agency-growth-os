@@ -11,7 +11,7 @@ function fmtAxis(v: number, sym: string): string {
 }
 
 interface Props {
-  projected: number[]        // 12 months
+  projected: number[]        // one entry per projected month
   startValue: number
   mrrCap: number | null
   goal: number
@@ -41,7 +41,12 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
   const W = 880, H = 260, PL = 60, PR = 24, PT = 20, PB = 36
   const plotW = W - PL - PR
   const plotH = H - PT - PB
-  const toX = (i: number) => PL + (i / 11) * plotW
+  // Generalised over however many months are projected (12, 24 or 36).
+  const n = projected.length
+  const lastIdx = Math.max(1, n - 1)
+  const toX = (i: number) => PL + (i / lastIdx) * plotW
+  // Aim for ~5 x-axis labels regardless of horizon, always including the last.
+  const labelStep = Math.max(1, Math.round(n / 5))
   const toY = (v: number) => PT + plotH - ((v - yMin) / yRange) * plotH
   const yTicks = Array.from({ length: 5 }, (_, i) => yMin + (yRange * i) / 4)
   const pathD = projected.map((v, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(v)}`).join(" ")
@@ -58,7 +63,7 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
           </g>
         ))}
         {monthLabels.map((label, i) => {
-          if (i % 3 !== 0 && i !== 11) return null
+          if (i % labelStep !== 0 && i !== lastIdx) return null
           return <text key={i} x={toX(i)} y={H - 6} textAnchor="middle" fontSize={10} fill="#9C9590">{label}</text>
         })}
         {capY !== null && mrrCap != null && (
@@ -97,7 +102,7 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
           </>
         )}
         {projected.map((_, i) => (
-          <rect key={`h${i}`} x={toX(i) - plotW / 22} y={PT} width={plotW / 11} height={plotH}
+          <rect key={`h${i}`} x={toX(i) - plotW / (lastIdx * 2)} y={PT} width={plotW / lastIdx} height={plotH}
             fill="transparent" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
         ))}
       </svg>
