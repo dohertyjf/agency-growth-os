@@ -70,6 +70,7 @@ export default function CapacityLiveTool({
       : "no churn — clients stay forever",
     activeClients: inputs.hoursPerClient > 0
       ? `using ${Math.round(r.currentHoursUsed)} of ${inputs.billableHours} hrs`
+        + (r.slotsAvailable != null ? ` \u00b7 ${r.slotsAvailable > 0 ? `${r.slotsAvailable} slots open` : "at capacity"}` : "")
       : undefined,
     billableHours: r.maxClients != null ? `room for ${r.maxClients} clients` : undefined,
   }), [inputs.activeClients, inputs.hoursPerClient, inputs.billableHours, r])
@@ -299,6 +300,7 @@ export default function CapacityLiveTool({
           ceilingLabel={r.bindingConstraint === "demand" ? "Growth stalls" : "Capacity ceiling"}
           secondCeiling={secondCeiling}
           monthLabels={monthLabels}
+          startLabel={ymLabel(now)}
           currency={currency}
         />
       </div>

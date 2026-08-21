@@ -17,6 +17,8 @@ interface Props {
   goal: number
   ceilingHitMonth: number
   monthLabels: string[]
+  /** Label for the starting point — the month they are in today. */
+  startLabel?: string
   currency: string
   /** What the ceiling line represents — depends on which constraint binds. */
   ceilingLabel?: string
@@ -26,12 +28,18 @@ interface Props {
 
 const accent = "#E9532A"
 
-export default function CapacityChart({ projected, startValue, mrrCap, goal, ceilingHitMonth, monthLabels, currency, ceilingLabel = "Capacity ceiling", secondCeiling = null }: Props) {
+export default function CapacityChart({ projected, startValue, mrrCap, goal, ceilingHitMonth, monthLabels, startLabel = "now", currency, ceilingLabel = "Capacity ceiling", secondCeiling = null }: Props) {
   const sym = currSym(currency)
   const fmt$ = (v: number) => fmtCurrency(v, currency)
   const [hover, setHover] = useState<number | null>(null)
 
-  const allVals = [startValue, ...projected, goal, mrrCap ?? 0, secondCeiling?.value ?? 0].filter(v => v > 0)
+  // Today is the first point on the line. Without it the chart opens at month 1
+  // — which, for an agency growing fast enough to hit its ceiling immediately,
+  // renders as a flat line at the cap and hides the climb entirely.
+  const series = [startValue, ...projected]
+  const labels = [startLabel, ...monthLabels]
+
+  const allVals = [...series, goal, mrrCap ?? 0, secondCeiling?.value ?? 0].filter(v => v > 0)
   const dataMax = allVals.length ? Math.max(...allVals) : 1
   const dataMin = allVals.length ? Math.min(...allVals) : 0
   const spread = dataMax - dataMin || dataMax * 0.15 || 1
@@ -42,14 +50,14 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
   const plotW = W - PL - PR
   const plotH = H - PT - PB
   // Generalised over however many months are projected (12, 24 or 36).
-  const n = projected.length
+  const n = series.length
   const lastIdx = Math.max(1, n - 1)
   const toX = (i: number) => PL + (i / lastIdx) * plotW
   // Aim for ~5 x-axis labels regardless of horizon, always including the last.
   const labelStep = Math.max(1, Math.round(n / 5))
   const toY = (v: number) => PT + plotH - ((v - yMin) / yRange) * plotH
   const yTicks = Array.from({ length: 5 }, (_, i) => yMin + (yRange * i) / 4)
-  const pathD = projected.map((v, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(v)}`).join(" ")
+  const pathD = series.map((v, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(v)}`).join(" ")
   const goalY = goal > 0 ? toY(goal) : null
   const capY = mrrCap != null ? toY(mrrCap) : null
 
@@ -62,7 +70,7 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
             <text x={PL - 8} y={toY(tick) + 4} textAnchor="end" fontSize={10} fill="#9C9590">{fmtAxis(tick, sym)}</text>
           </g>
         ))}
-        {monthLabels.map((label, i) => {
+        {labels.map((label, i) => {
           if (i % labelStep !== 0 && i !== lastIdx) return null
           return <text key={i} x={toX(i)} y={H - 6} textAnchor="middle" fontSize={10} fill="#9C9590">{label}</text>
         })}
@@ -85,10 +93,10 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
           </>
         )}
         {ceilingHitMonth >= 0 && (
-          <line x1={toX(ceilingHitMonth)} y1={PT} x2={toX(ceilingHitMonth)} y2={PT + plotH} stroke="#6B6760" strokeWidth={1} strokeDasharray="3,2" opacity={0.3} />
+          <line x1={toX(ceilingHitMonth + 1)} y1={PT} x2={toX(ceilingHitMonth + 1)} y2={PT + plotH} stroke="#6B6760" strokeWidth={1} strokeDasharray="3,2" opacity={0.3} />
         )}
         <path d={pathD} fill="none" stroke={accent} strokeWidth={2} strokeDasharray="5,3" />
-        {projected.map((v, i) => (
+        {series.map((v, i) => (
           <circle key={i} cx={toX(i)} cy={toY(v)} r={3.5}
             fill={mrrCap != null && v >= mrrCap ? "#6B6760" : accent}
             stroke={mrrCap != null && v >= mrrCap ? "#6B6760" : accent}
@@ -97,22 +105,22 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
         {hover !== null && (
           <>
             <line x1={toX(hover)} y1={PT} x2={toX(hover)} y2={PT + plotH} stroke="#1A1916" strokeWidth={1} opacity={0.18} />
-            <circle cx={toX(hover)} cy={toY(projected[hover])} r={5}
-              fill="#fff" stroke={mrrCap != null && projected[hover] >= mrrCap ? "#6B6760" : accent} strokeWidth={2.5} />
+            <circle cx={toX(hover)} cy={toY(series[hover])} r={5}
+              fill="#fff" stroke={mrrCap != null && series[hover] >= mrrCap ? "#6B6760" : accent} strokeWidth={2.5} />
           </>
         )}
-        {projected.map((_, i) => (
+        {series.map((_, i) => (
           <rect key={`h${i}`} x={toX(i) - plotW / (lastIdx * 2)} y={PT} width={plotW / lastIdx} height={plotH}
             fill="transparent" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
         ))}
       </svg>
       {hover !== null && (() => {
-        const v = projected[hover]
+        const v = series[hover]
         const atCap = mrrCap != null && v >= mrrCap
         const toGoal = goal - v
         return (
           <div style={{ position: "absolute", left: `${(toX(hover) / W) * 100}%`, top: `${(toY(v) / H) * 100}%`, transform: "translate(-50%, -118%)", pointerEvents: "none", background: "#1A1916", color: "#fff", borderRadius: 8, padding: "7px 10px", fontSize: 12, whiteSpace: "nowrap", boxShadow: "0 4px 16px rgba(0,0,0,0.22)", zIndex: 5 }}>
-            <div style={{ fontWeight: 700 }}>{monthLabels[hover]}</div>
+            <div style={{ fontWeight: 700 }}>{labels[hover]}</div>
             <div style={{ color: "#F0C9BB" }}>{fmt$(v)}/mo</div>
             <div style={{ fontSize: 11, color: "#C9C4BC", marginTop: 1 }}>
               {atCap ? "At capacity ceiling" : goal > 0 ? (toGoal > 0 ? `${fmt$(toGoal)} to goal` : "Goal reached") : ""}
