@@ -988,27 +988,6 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={labelStyle}>{addForm.type === "oneoff" ? "Total" : "Monthly Value"}</label>
-                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff" }}>
-                    <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0 }}>$</span>
-                    <input
-                      style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "7px 10px 7px 4px" }}
-                      type="number" min={0} step="any" value={addForm.monthly}
-                      onChange={e => setAddForm(f => ({ ...f, monthly: e.target.value }))}
-                      placeholder="5000" />
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>Stage</label>
-                  <select style={inputStyle} value={addForm.stage}
-                    onChange={e => setAddForm(f => ({ ...f, stage: e.target.value as "opportunity" | "potential" }))}>
-                    <option value="opportunity">Opportunity</option>
-                    <option value="potential">Qualified</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
                   <label style={labelStyle}>Type</label>
                   <select style={inputStyle} value={addForm.type}
                     onChange={e => setAddForm(f => ({ ...f, type: e.target.value as "retainer" | "ongoing" | "oneoff" }))}>
@@ -1030,6 +1009,27 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                     onChange={e => setAddForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
                 </div>
               )}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>{addForm.type === "oneoff" ? "Total" : "Monthly Value"}</label>
+                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff" }}>
+                    <span style={{ padding: "0 2px 0 10px", fontSize: 13, color: "#9C9590", flexShrink: 0 }}>$</span>
+                    <input
+                      style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: "#1A1916", padding: "7px 10px 7px 4px" }}
+                      type="number" min={0} step="any" value={addForm.monthly}
+                      onChange={e => setAddForm(f => ({ ...f, monthly: e.target.value }))}
+                      placeholder="5000" />
+                  </div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Stage</label>
+                  <select style={inputStyle} value={addForm.stage}
+                    onChange={e => setAddForm(f => ({ ...f, stage: e.target.value as "opportunity" | "potential" }))}>
+                    <option value="opportunity">Opportunity</option>
+                    <option value="potential">Qualified</option>
+                  </select>
+                </div>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Account <span style={{ color: "#E9532A" }}>*</span></label>
