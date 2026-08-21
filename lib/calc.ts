@@ -174,27 +174,40 @@ export interface CapacityInputs {
 export interface CapacityResult {
   projected: number[]            // MRR for each of `months` future months
   maxClients: number | null      // clients the billable hours can serve
-  mrrCap: number | null          // MRR ceiling implied by capacity
-  capacityHitMonth: number       // index into projected where cap is hit, -1 if never
+  churnRate: number              // fraction of the book lost per month
+  capacityCeiling: number | null // MRR ceiling from delivery hours running out
+  demandCeiling: number | null   // MRR ceiling where new wins equal churn losses
+  mrrCap: number | null          // the binding ceiling — lower of the two above
+  bindingConstraint: "capacity" | "demand" | null
+  ceilingHitMonth: number        // index into projected where the ceiling is reached, -1 if never
   goalHitMonth: number           // index where goal is reached, -1 if never / no goal
   newClientsPerMonth: number
-  netMRRChange: number           // new MRR − churned MRR per month
+  netMRRChange: number           // new MRR − churned MRR in the first month
   currentHoursUsed: number
   hoursAvailable: number
   slotsAvailable: number | null  // open client slots at current hrs/client
 }
 
+// A book is "at" its ceiling once it is within this fraction of it. The demand
+// ceiling is an asymptote — revenue approaches it but never equals it — so an
+// exact comparison would report "never reached" forever.
+export const CEILING_REACHED_AT = 0.99
+
+// `churnRate` is the fraction of the book lost each month, NOT a client count.
+// Churn scales with how many clients you have: an agency losing 1 of 7 clients a
+// month is losing 14% of its book, and is still losing 14% once it has 70. The
+// old fixed-count model held the headcount constant as the book grew, which
+// quietly assumed retention improved as you scaled.
 export function projectMRR(
   startMRR: number, leads: number, closeRate: number,
-  avgDeal: number, churnCount: number, months: number,
+  avgDeal: number, churnRate: number, months: number,
   cap?: number
 ): number[] {
   const result: number[] = []
+  const newMRR = leads * (closeRate / 100) * avgDeal
   let mrr = startMRR
   for (let i = 0; i < months; i++) {
-    const newMRR = leads * (closeRate / 100) * avgDeal
-    const churnedMRR = churnCount * avgDeal
-    mrr = Math.max(0, mrr + newMRR - churnedMRR)
+    mrr = Math.max(0, mrr + newMRR - mrr * churnRate)
     if (cap !== undefined) mrr = Math.min(mrr, cap)
     result.push(Math.round(mrr))
   }
@@ -205,26 +218,51 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   const maxClients = inp.hoursPerClient > 0 && inp.billableHours > 0
     ? Math.floor(inp.billableHours / inp.hoursPerClient)
     : null
-  const mrrCap = maxClients !== null && inp.avgDeal > 0 ? maxClients * inp.avgDeal : null
+
+  // Ceiling 1 — delivery hours run out. A hard wall: you cannot serve more.
+  const capacityCeiling = maxClients !== null && inp.avgDeal > 0 ? maxClients * inp.avgDeal : null
+
+  // The churn figure is entered as "clients lost per month", which is a rate
+  // measured against the book they have today.
+  const churnRate = inp.activeClients > 0
+    ? Math.min(1, Math.max(0, inp.churn / inp.activeClients))
+    : 0
+
+  // Ceiling 2 — growth stalls where new wins equal churn losses. An asymptote,
+  // not a wall, so it is never passed to projectMRR as a hard cap. With no churn
+  // there is no demand ceiling: revenue grows without bound.
+  const newMRRPerMonth = inp.leads * (inp.closeRate / 100) * inp.avgDeal
+  const demandCeiling = churnRate > 0 ? newMRRPerMonth / churnRate : null
+
+  const ceilings = [capacityCeiling, demandCeiling].filter((v): v is number => v !== null)
+  const mrrCap = ceilings.length > 0 ? Math.min(...ceilings) : null
+  const bindingConstraint: "capacity" | "demand" | null =
+    mrrCap === null ? null
+      : demandCeiling !== null && (capacityCeiling === null || demandCeiling < capacityCeiling)
+        ? "demand"
+        : "capacity"
 
   const projected = projectMRR(
-    inp.startRevenue, inp.leads, inp.closeRate, inp.avgDeal, inp.churn, months,
-    mrrCap ?? undefined
+    inp.startRevenue, inp.leads, inp.closeRate, inp.avgDeal, churnRate, months,
+    capacityCeiling ?? undefined
   )
 
-  const capacityHitMonth = mrrCap !== null ? projected.findIndex(v => v >= mrrCap) : -1
+  const ceilingHitMonth = mrrCap !== null
+    ? projected.findIndex(v => v >= mrrCap * CEILING_REACHED_AT)
+    : -1
   const goal = inp.goalMRR ?? 0
   const goalHitMonth = goal > 0 ? projected.findIndex(v => v >= goal) : -1
 
   const newClientsPerMonth = inp.leads * (inp.closeRate / 100)
-  const netMRRChange = newClientsPerMonth * inp.avgDeal - inp.churn * inp.avgDeal
+  const netMRRChange = newMRRPerMonth - inp.startRevenue * churnRate
 
   const currentHoursUsed = inp.activeClients * inp.hoursPerClient
   const hoursAvailable = inp.billableHours - currentHoursUsed
   const slotsAvailable = inp.hoursPerClient > 0 ? Math.floor(hoursAvailable / inp.hoursPerClient) : null
 
   return {
-    projected, maxClients, mrrCap, capacityHitMonth, goalHitMonth,
+    projected, maxClients, churnRate, capacityCeiling, demandCeiling, mrrCap,
+    bindingConstraint, ceilingHitMonth, goalHitMonth,
     newClientsPerMonth, netMRRChange, currentHoursUsed, hoursAvailable, slotsAvailable,
   }
 }

@@ -53,7 +53,7 @@ export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; 
   const r = useMemo(() => projectCapacity(inputs), [inputs])
   const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
   const monthLabels = useMemo(() => Array.from({ length: 12 }, (_, i) => ymLabel(ymAdd(now, i + 1))), [now])
-  const capMonthLabel = r.capacityHitMonth >= 0 ? monthLabels[r.capacityHitMonth] : null
+  const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goal = inputs.goalMRR ?? 0
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
 
@@ -62,8 +62,8 @@ export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; 
     const outcome = (patch: Partial<CapacityInputs>) => {
       const res = projectCapacity({ ...inputs, ...patch })
       if (res.mrrCap == null) return "no capacity ceiling at these settings"
-      return res.capacityHitMonth >= 0
-        ? `tops out at ${fmtCurrency(res.mrrCap, lead.currency)} in ${monthLabels[res.capacityHitMonth]}`
+      return res.ceilingHitMonth >= 0
+        ? `tops out at ${fmtCurrency(res.mrrCap, lead.currency)} in ${monthLabels[res.ceilingHitMonth]}`
         : `lifts your ceiling to ${fmtCurrency(res.mrrCap, lead.currency)} — beyond the next 12 months at this pace`
     }
     const cut = Math.max(1, Math.round(inputs.hoursPerClient * 0.75))
@@ -233,7 +233,7 @@ export default function LeadDetailClient({ lead, schedulingUrl }: { lead: Lead; 
             startValue={inputs.startRevenue}
             mrrCap={r.mrrCap}
             goal={goal}
-            capacityHitMonth={r.capacityHitMonth}
+            ceilingHitMonth={r.ceilingHitMonth}
             monthLabels={monthLabels}
             currency={lead.currency}
           />

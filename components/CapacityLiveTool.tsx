@@ -1,6 +1,6 @@
 "use client"
 import { useMemo, useState } from "react"
-import { projectCapacity, fmtCurrency, ymAdd, ymLabel, type CapacityInputs } from "@/lib/calc"
+import { projectCapacity, fmtCurrency, fmtPercent, ymAdd, ymLabel, type CapacityInputs } from "@/lib/calc"
 import CapacityChart from "@/components/CapacityChart"
 
 type Currency = "USD" | "GBP" | "EUR"
@@ -59,16 +59,26 @@ export default function CapacityLiveTool({
   const monthLabels = useMemo(() => Array.from({ length: 12 }, (_, i) => ymLabel(ymAdd(now, i + 1))), [now])
 
   const goal = inputs.goalMRR ?? 0
-  const capMonthLabel = r.capacityHitMonth >= 0 ? monthLabels[r.capacityHitMonth] : null
+  const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
 
   const scenarios = useMemo(() => {
+    const base = r
     const outcome = (patch: Partial<CapacityInputs>) => {
       const res = projectCapacity({ ...inputs, ...patch })
-      if (res.mrrCap == null) return "no capacity ceiling at these settings"
-      return res.capacityHitMonth >= 0
-        ? `tops out at ${fmtCurrency(res.mrrCap, currency)} in ${monthLabels[res.capacityHitMonth]}`
-        : `lifts the ceiling to ${fmtCurrency(res.mrrCap, currency)} — beyond the next 12 months`
+      if (res.mrrCap == null) return "removes the ceiling entirely"
+      // A lever that does not move the binding ceiling is the most useful thing
+      // this list can tell you — say so plainly instead of reporting a "lift"
+      // to the number it already was.
+      if (base.mrrCap != null && Math.round(res.mrrCap) === Math.round(base.mrrCap)) {
+        return res.bindingConstraint === "demand"
+          ? `no change — churn still caps you at ${fmtCurrency(res.mrrCap, currency)}`
+          : `no change — capacity still caps you at ${fmtCurrency(res.mrrCap, currency)}`
+      }
+      const direction = base.mrrCap != null && res.mrrCap < base.mrrCap ? "lowers" : "lifts"
+      return res.ceilingHitMonth >= 0
+        ? `${direction} the ceiling to ${fmtCurrency(res.mrrCap, currency)}, reached ${monthLabels[res.ceilingHitMonth]}`
+        : `${direction} the ceiling to ${fmtCurrency(res.mrrCap, currency)} — beyond the projection`
     }
     const cut = Math.max(1, Math.round(inputs.hoursPerClient * 0.75))
     return [
@@ -77,7 +87,7 @@ export default function CapacityLiveTool({
       { label: `Double delivery capacity (to ${inputs.billableHours * 2} billable hrs/mo)`, result: outcome({ billableHours: inputs.billableHours * 2 }) },
       { label: `Double your leads (to ${inputs.leads * 2}/mo)`, result: outcome({ leads: inputs.leads * 2 }) },
     ]
-  }, [inputs, monthLabels, currency])
+  }, [inputs, monthLabels, currency, r])
 
   return (
     <div>
@@ -117,18 +127,46 @@ export default function CapacityLiveTool({
       <div style={{ background: capMonthLabel ? "#FBF0EB" : "#F4F7F2", border: `1px solid ${capMonthLabel ? "#F0C3B0" : "#D6E3CE"}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
         {capMonthLabel ? (
           <div style={{ fontSize: 16, color: "#1A1916", lineHeight: 1.5 }}>
-            At this pace your delivery capacity caps you at{" "}
-            <strong style={{ color: accent }}>{fmt$(r.mrrCap!)}/mo</strong> around <strong>{capMonthLabel}</strong>
-            {r.maxClients != null && <> — about <strong>{r.maxClients} clients</strong>, all the billable hours your team has</>}.
+            {r.bindingConstraint === "demand" ? (
+              <>
+                At this pace growth stalls at{" "}
+                <strong style={{ color: accent }}>{fmt$(r.mrrCap!)}/mo</strong> around <strong>{capMonthLabel}</strong>
+                {" "}— you start losing clients as fast as you win them
+                {r.churnRate > 0 && <> (churn is <strong>{fmtPercent(r.churnRate * 100)}</strong> a month)</>}.
+                {r.capacityCeiling != null && (
+                  <div style={{ marginTop: 8, fontSize: 14, color: "#6F6B64" }}>
+                    Your team could deliver {fmt$(r.capacityCeiling)}/mo, so hiring is not the fix here — retention is.
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                At this pace your delivery capacity caps you at{" "}
+                <strong style={{ color: accent }}>{fmt$(r.mrrCap!)}/mo</strong> around <strong>{capMonthLabel}</strong>
+                {r.maxClients != null && <> — about <strong>{r.maxClients} clients</strong>, all the billable hours your team has</>}.
+              </>
+            )}
             {goalBlockedByCap && (
               <div style={{ marginTop: 8, fontSize: 14, color: "#9A3412" }}>
-                ⚠ The {fmt$(goal)}/mo goal is above that ceiling — unreachable without more capacity or higher pricing.
+                ⚠ The {fmt$(goal)}/mo goal is above that ceiling — unreachable without{" "}
+                {r.bindingConstraint === "demand" ? "better retention, more leads, or higher pricing" : "more capacity or higher pricing"}.
               </div>
             )}
           </div>
         ) : (
           <div style={{ fontSize: 16, color: "#1A1916", lineHeight: 1.5 }}>
-            Not capacity-constrained in the next 12 months at this pace. Add billable hours or a capacity figure to find the ceiling.
+            {r.mrrCap != null ? (
+              <>
+                Still climbing at the end of the projection — {fmt$(r.projected[r.projected.length - 1])}/mo by{" "}
+                <strong>{monthLabels[monthLabels.length - 1]}</strong>, heading toward a ceiling of{" "}
+                <strong style={{ color: accent }}>{fmt$(r.mrrCap)}/mo</strong>
+                {r.bindingConstraint === "demand"
+                  ? <> set by churn, not by your team&apos;s capacity.</>
+                  : <> set by your delivery capacity.</>}
+              </>
+            ) : (
+              <>Nothing caps this model at these settings — no churn and no capacity limit, so revenue grows without bound. Add a churn figure or billable hours to find the ceiling.</>
+            )}
           </div>
         )}
       </div>
@@ -140,7 +178,8 @@ export default function CapacityLiveTool({
           startValue={inputs.startRevenue}
           mrrCap={r.mrrCap}
           goal={goal}
-          capacityHitMonth={r.capacityHitMonth}
+          ceilingHitMonth={r.ceilingHitMonth}
+          ceilingLabel={r.bindingConstraint === "demand" ? "Growth stalls" : "Capacity ceiling"}
           monthLabels={monthLabels}
           currency={currency}
         />

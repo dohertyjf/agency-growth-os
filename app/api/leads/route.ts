@@ -105,8 +105,8 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date().toISOString().slice(0, 7)
-  const capMonthLabel = result.capacityHitMonth >= 0
-    ? ymLabel(ymAdd(now, result.capacityHitMonth + 1))
+  const capMonthLabel = result.ceilingHitMonth >= 0
+    ? ymLabel(ymAdd(now, result.ceilingHitMonth + 1))
     : null
 
   await notifySlack({

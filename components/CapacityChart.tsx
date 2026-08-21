@@ -15,14 +15,16 @@ interface Props {
   startValue: number
   mrrCap: number | null
   goal: number
-  capacityHitMonth: number
+  ceilingHitMonth: number
   monthLabels: string[]
   currency: string
+  /** What the ceiling line represents — depends on which constraint binds. */
+  ceilingLabel?: string
 }
 
 const accent = "#E9532A"
 
-export default function CapacityChart({ projected, startValue, mrrCap, goal, capacityHitMonth, monthLabels, currency }: Props) {
+export default function CapacityChart({ projected, startValue, mrrCap, goal, ceilingHitMonth, monthLabels, currency, ceilingLabel = "Capacity ceiling" }: Props) {
   const sym = currSym(currency)
   const fmt$ = (v: number) => fmtCurrency(v, currency)
   const [hover, setHover] = useState<number | null>(null)
@@ -60,7 +62,7 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cap
         {capY !== null && mrrCap != null && (
           <>
             <line x1={PL} y1={capY} x2={W - PR} y2={capY} stroke="#6B6760" strokeWidth={1} strokeDasharray="3,3" opacity={0.4} />
-            <text x={W - PR - 4} y={capY - 4} fontSize={10} fill="#6B6760" textAnchor="end" opacity={0.7}>Capacity ceiling {fmt$(mrrCap)}</text>
+            <text x={W - PR - 4} y={capY - 4} fontSize={10} fill="#6B6760" textAnchor="end" opacity={0.7}>{ceilingLabel} {fmt$(mrrCap)}</text>
           </>
         )}
         {goalY !== null && (
@@ -69,8 +71,8 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cap
             <text x={W - PR - 4} y={goalY - 4} fontSize={10} fill={accent} textAnchor="end" opacity={0.8}>Goal {fmt$(goal)}</text>
           </>
         )}
-        {capacityHitMonth >= 0 && (
-          <line x1={toX(capacityHitMonth)} y1={PT} x2={toX(capacityHitMonth)} y2={PT + plotH} stroke="#6B6760" strokeWidth={1} strokeDasharray="3,2" opacity={0.3} />
+        {ceilingHitMonth >= 0 && (
+          <line x1={toX(ceilingHitMonth)} y1={PT} x2={toX(ceilingHitMonth)} y2={PT + plotH} stroke="#6B6760" strokeWidth={1} strokeDasharray="3,2" opacity={0.3} />
         )}
         <path d={pathD} fill="none" stroke={accent} strokeWidth={2} strokeDasharray="5,3" />
         {projected.map((v, i) => (
