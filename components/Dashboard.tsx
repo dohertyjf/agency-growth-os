@@ -9,7 +9,7 @@ import MonthTable, { BulkMetricsModal } from "./MonthTable"
 import GrowthProjection from "./GrowthProjection"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
-  projectMetric, ymAdd, ymLabel, currentMRR, bookedActive, bookedPotential, bookedOpportunity, bookedAhead, BOOKED_AHEAD_MONTHS,
+  projectMetric, ymAdd, ymLabel, currentMRR, bookedAhead, BOOKED_AHEAD_MONTHS,
   mrrGoal, goalProgress,
   type ContractRow, type ProjectionInput, type ProjectableMetric,
 } from "@/lib/calc"
@@ -254,6 +254,29 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     type: (c.type ?? "retainer") as "retainer" | "oneoff",
   }))
 
+  // Contracted revenue by month: retainers = MRR (monthly across their term);
+  // one-offs = their scheduled payments that month (falls back to the full total in
+  // the start month only when no payment plan is set). Keeps a lump one-off from
+  // inflating a single month's Contracted figure.
+  const paysByContract = new Map<string, { month: string; amount: number }[]>()
+  payments.forEach(p => { const a = paysByContract.get(p.contractId); if (a) a.push(p); else paysByContract.set(p.contractId, [p]) })
+  const ACTIVE_STATUSES = ["active", "finished"]
+  function bookedSched(ym: string, statuses: string[]): number {
+    let total = 0
+    for (const c of contracts) {
+      if (!statuses.includes(c.status)) continue
+      if ((c.type ?? "retainer") === "oneoff") {
+        const pays = paysByContract.get(c.id) ?? []
+        if (pays.length) total += pays.reduce((sub, p) => p.month === ym ? sub + p.amount : sub, 0)
+        else if (c.start === ym) total += c.monthly
+      } else if (c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym)) {
+        total += c.monthly
+      }
+    }
+    return total
+  }
+  const contractedFor = (ym: string) => bookedSched(ym, ACTIVE_STATUSES)
+
   const nowYM = new Date().toISOString().slice(0, 7)
   const currentYM = latest?.month ?? nowYM
 
@@ -267,7 +290,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
 
   // Contract MRR sparkline over range months, ending at the selected month
   const contractMRRSparkline = useMemo(() => {
-    return Array.from({ length: range }, (_, i) => currentMRR(contractRows, ymAdd(cardMonth, i - range + 1)))
+    return Array.from({ length: range }, (_, i) => contractedFor(ymAdd(cardMonth, i - range + 1)))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, range, cardMonth])
 
@@ -278,11 +301,11 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
       const pts: ChartPoint[] = []
       for (let i = range - 1; i >= 0; i--) {
         const ym = ymAdd(nowYM, -i)
-        pts.push({ label: ymLabel(ym), value: currentMRR(contractRows, ym) })
+        pts.push({ label: ymLabel(ym), value: contractedFor(ym) })
       }
       for (let j = 1; j <= 6; j++) {
         const ym = ymAdd(nowYM, j)
-        pts.push({ label: ymLabel(ym), value: currentMRR(contractRows, ym), projected: true })
+        pts.push({ label: ymLabel(ym), value: contractedFor(ym), projected: true })
       }
       return pts
     }
@@ -294,13 +317,13 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
       let ym = earliest
       let i = 0
       while (ym <= nowYM && i < 60) {
-        pts.push({ label: ymLabel(ym), value: currentMRR(contractRows, ym) })
+        pts.push({ label: ymLabel(ym), value: contractedFor(ym) })
         ym = ymAdd(ym, 1)
         i++
       }
       for (let j = 1; j <= 6; j++) {
         const fym = ymAdd(nowYM, j)
-        pts.push({ label: ymLabel(fym), value: currentMRR(contractRows, fym), projected: true })
+        pts.push({ label: ymLabel(fym), value: contractedFor(fym), projected: true })
       }
       return pts
     }
@@ -313,7 +336,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
       const gap = range - metrics.length
       for (let i = gap; i >= 1; i--) {
         const ym = ymAdd(firstMonth, -i)
-        pts.push({ label: ymLabel(ym), value: currentMRR(contractRows, ym), projected: true })
+        pts.push({ label: ymLabel(ym), value: contractedFor(ym), projected: true })
       }
     }
 
@@ -321,7 +344,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     const hist: ChartPoint[] = metrics.map(m => {
       const val = m[selectedCard] as number
       if (selectedCard === "revenue" && val === 0 && contractRows.length > 0)
-        return { label: ymLabel(m.month), value: currentMRR(contractRows, m.month), projected: true }
+        return { label: ymLabel(m.month), value: contractedFor(m.month), projected: true }
       return { label: ymLabel(m.month), value: val }
     })
     pts.push(...hist)
@@ -346,11 +369,11 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     const pts: ChartPoint[] = []
     for (let i = range - 1; i >= 0; i--) {
       const ym = ymAdd(nowYM, -i)
-      pts.push({ label: ymLabel(ym), value: bookedActive(contractRows, ym) + bookedPotential(contractRows, ym) })
+      pts.push({ label: ymLabel(ym), value: contractedFor(ym) + bookedSched(ym, ["potential"]) })
     }
     for (let j = 1; j <= 6; j++) {
       const ym = ymAdd(nowYM, j)
-      pts.push({ label: ymLabel(ym), value: bookedActive(contractRows, ym) + bookedPotential(contractRows, ym), projected: true })
+      pts.push({ label: ymLabel(ym), value: contractedFor(ym) + bookedSched(ym, ["potential"]), projected: true })
     }
     return pts
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -359,7 +382,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   // Third funnel line: contracted + qualified + opportunity (contractMRR card only)
   const chartPoints4: ChartPoint[] | undefined = useMemo(() => {
     if (selectedCard !== "contractMRR") return undefined
-    const withOpp = (ym: string) => bookedActive(contractRows, ym) + bookedPotential(contractRows, ym) + bookedOpportunity(contractRows, ym)
+    const withOpp = (ym: string) => contractedFor(ym) + bookedSched(ym, ["potential"]) + bookedSched(ym, ["opportunity"])
     const pts: ChartPoint[] = []
     for (let i = range - 1; i >= 0; i--) { const ym = ymAdd(nowYM, -i); pts.push({ label: ymLabel(ym), value: withOpp(ym) }) }
     for (let j = 1; j <= 6; j++) { const ym = ymAdd(nowYM, j); pts.push({ label: ymLabel(ym), value: withOpp(ym), projected: true }) }
@@ -414,7 +437,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   }, [showCashCollected, payments, rawMetrics, contractRows, contracts, range, nowYM])
 
   // Goals
-  const mrr = currentMRR(contractRows, currentYM)
+  const mrr = contractedFor(currentYM)
   const booked = bookedAhead(contractRows, currentYM)
   const mrrTarget = currentGoal
     ? (currentGoal.monthlyRevenue > 0 ? currentGoal.monthlyRevenue : mrrGoal(currentGoal.annualRevenue))
@@ -459,7 +482,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   }, [contracts, contractHours, accountMonths, goal, cardMonth])
 
   // Avg Client Monthly Value: reported revenue / active contracts (falls back to contract MRR)
-  const revenueForACMV = (latest?.revenue ?? 0) > 0 ? latest!.revenue : currentMRR(contractRows, nowYM)
+  const revenueForACMV = (latest?.revenue ?? 0) > 0 ? latest!.revenue : contractedFor(nowYM)
   const acmv = activeClientCount > 0 ? revenueForACMV / activeClientCount : 0
 
   // Avg Client Lifetime Value: ACMV × avg contract duration in months
@@ -671,7 +694,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 24 }}>
         <MetricCard
           label="Contracted MRR"
-          value={fmt$(currentMRR(contractRows, cardMonth))}
+          value={fmt$(contractedFor(cardMonth))}
           delta={contractMRRSparkline.length >= 2 ? momDelta(contractMRRSparkline[contractMRRSparkline.length - 1], contractMRRSparkline[contractMRRSparkline.length - 2]) : null}
           sparkline={contractMRRSparkline}
           selected={selectedCard === "contractMRR"}
