@@ -110,7 +110,7 @@ export default function CapacityLiveTool({
   const secondCeiling = useMemo(() => {
     const other = r.bindingConstraint === "demand" ? r.capacityCeiling : r.demandCeiling
     if (other == null || r.mrrCap == null || other <= r.mrrCap || other > r.mrrCap * 2) return null
-    return { value: other, label: r.bindingConstraint === "demand" ? "Capacity ceiling" : "Growth stalls" }
+    return { value: other, label: r.bindingConstraint === "demand" ? "Capacity ceiling" : "Churn ceiling" }
   }, [r])
 
   const goal = inputs.goalMRR ?? 0
@@ -357,7 +357,7 @@ export default function CapacityLiveTool({
           mrrCap={r.mrrCap}
           goal={goal}
           ceilingHitMonth={r.ceilingHitMonth}
-          ceilingLabel={r.bindingConstraint === "demand" ? "Growth stalls" : "Capacity ceiling"}
+          ceilingLabel={r.bindingConstraint === "demand" ? "Churn ceiling" : "Capacity ceiling"}
           secondCeiling={secondCeiling}
           monthLabels={monthLabels}
           startLabel={ymLabel(now)}
