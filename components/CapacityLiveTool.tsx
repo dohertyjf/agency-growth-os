@@ -28,7 +28,7 @@ const FIELDS: { key: keyof CapacityInputs; label: string; money?: boolean; step?
 
 const DEFAULTS: Record<string, string> = {
   startRevenue: "20000", leads: "10", closeRate: "20", avgDeal: "3000",
-  churnPct: "14.3", hoursPerClient: "20", billableHours: "320", activeClients: "7", goalMRR: "50000",
+  churnPct: "10", hoursPerClient: "20", billableHours: "320", activeClients: "7", goalMRR: "50000",
 }
 
 interface Props {
@@ -71,6 +71,15 @@ export default function CapacityLiveTool({
     billableHours: r.maxClients != null ? `room for ${r.maxClients} clients` : undefined,
   }), [inputs.activeClients, inputs.hoursPerClient, inputs.billableHours, r])
 
+  // The constraint you would hit next, once the current one is cleared. Skipped
+  // when it sits so far above the binding ceiling that plotting it would flatten
+  // the projection into the bottom of the chart.
+  const secondCeiling = useMemo(() => {
+    const other = r.bindingConstraint === "demand" ? r.capacityCeiling : r.demandCeiling
+    if (other == null || r.mrrCap == null || other <= r.mrrCap || other > r.mrrCap * 2) return null
+    return { value: other, label: r.bindingConstraint === "demand" ? "Capacity ceiling" : "Growth stalls" }
+  }, [r])
+
   const goal = inputs.goalMRR ?? 0
   const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
@@ -94,12 +103,24 @@ export default function CapacityLiveTool({
         : `${direction} the ceiling to ${fmtCurrency(res.mrrCap, currency)} — beyond the projection`
     }
     const cut = Math.max(1, Math.round(inputs.hoursPerClient * 0.75))
-    return [
-      { label: `Raise average client value 50% (to ${fmtCurrency(Math.round(inputs.avgDeal * 1.5), currency)}/mo)`, result: outcome({ avgDeal: inputs.avgDeal * 1.5 }) },
-      { label: `Cut hours per client to ${cut} (−25% delivery time)`, result: outcome({ hoursPerClient: cut }) },
-      { label: `Double delivery capacity (to ${inputs.billableHours * 2} billable hrs/mo)`, result: outcome({ billableHours: inputs.billableHours * 2 }) },
-      { label: `Double your leads (to ${inputs.leads * 2}/mo)`, result: outcome({ leads: inputs.leads * 2 }) },
-    ]
+    const halfChurn = (inputs.churnPct ?? 0) / 2
+    const rows = [
+      { patch: { avgDeal: inputs.avgDeal * 1.5 }, label: `Raise average client value 50% (to ${fmtCurrency(Math.round(inputs.avgDeal * 1.5), currency)}/mo)` },
+      { patch: { hoursPerClient: cut }, label: `Cut hours per client to ${cut} (−25% delivery time)` },
+      { patch: { billableHours: inputs.billableHours * 2 }, label: `Double delivery capacity (to ${inputs.billableHours * 2} billable hrs/mo)` },
+      { patch: { leads: inputs.leads * 2 }, label: `Double your leads (to ${inputs.leads * 2}/mo)` },
+      { patch: { churnPct: halfChurn }, label: `Halve your churn (to ${fmtPercent(halfChurn)}/mo)` },
+    ].map(row => ({ ...row, cap: projectCapacity({ ...inputs, ...row.patch }).mrrCap ?? 0, result: outcome(row.patch) }))
+    // Rank to call out the biggest move, but keep the printed order fixed — a
+    // list that reshuffles as you type is unreadable.
+    const best = Math.max(...rows.map(x => x.cap))
+    const baseCap = base.mrrCap ?? 0
+    return rows.map(x => ({
+      label: x.label,
+      result: x.result,
+      isBest: x.cap === best && x.cap > baseCap,
+      isNoChange: Math.round(x.cap) === Math.round(baseCap),
+    }))
   }, [inputs, monthLabels, currency, r])
 
   return (
@@ -198,6 +219,7 @@ export default function CapacityLiveTool({
           goal={goal}
           ceilingHitMonth={r.ceilingHitMonth}
           ceilingLabel={r.bindingConstraint === "demand" ? "Growth stalls" : "Capacity ceiling"}
+          secondCeiling={secondCeiling}
           monthLabels={monthLabels}
           currency={currency}
         />
@@ -207,8 +229,13 @@ export default function CapacityLiveTool({
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", margin: "0 0 12px" }}>Ways to grow past the ceiling</div>
       <ul style={{ margin: 0, paddingLeft: 20 }}>
         {scenarios.map((s, i) => (
-          <li key={i} style={{ fontSize: 14, lineHeight: 1.55, marginBottom: 12, color: "#1A1916" }}>
+          <li key={i} style={{ fontSize: 14, lineHeight: 1.55, marginBottom: 12, color: s.isNoChange ? "#9C9590" : "#1A1916" }}>
             <strong>{s.label}</strong> → {s.result}.
+            {s.isBest && (
+              <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#fff", background: accent, borderRadius: 5, padding: "2px 7px", whiteSpace: "nowrap" }}>
+                biggest lever right now
+              </span>
+            )}
           </li>
         ))}
       </ul>

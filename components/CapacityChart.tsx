@@ -20,16 +20,18 @@ interface Props {
   currency: string
   /** What the ceiling line represents — depends on which constraint binds. */
   ceilingLabel?: string
+  /** The constraint waiting behind the binding one, drawn faintly. */
+  secondCeiling?: { value: number; label: string } | null
 }
 
 const accent = "#E9532A"
 
-export default function CapacityChart({ projected, startValue, mrrCap, goal, ceilingHitMonth, monthLabels, currency, ceilingLabel = "Capacity ceiling" }: Props) {
+export default function CapacityChart({ projected, startValue, mrrCap, goal, ceilingHitMonth, monthLabels, currency, ceilingLabel = "Capacity ceiling", secondCeiling = null }: Props) {
   const sym = currSym(currency)
   const fmt$ = (v: number) => fmtCurrency(v, currency)
   const [hover, setHover] = useState<number | null>(null)
 
-  const allVals = [startValue, ...projected, goal, mrrCap ?? 0].filter(v => v > 0)
+  const allVals = [startValue, ...projected, goal, mrrCap ?? 0, secondCeiling?.value ?? 0].filter(v => v > 0)
   const dataMax = allVals.length ? Math.max(...allVals) : 1
   const dataMin = allVals.length ? Math.min(...allVals) : 0
   const spread = dataMax - dataMin || dataMax * 0.15 || 1
@@ -62,7 +64,13 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
         {capY !== null && mrrCap != null && (
           <>
             <line x1={PL} y1={capY} x2={W - PR} y2={capY} stroke="#6B6760" strokeWidth={1} strokeDasharray="3,3" opacity={0.4} />
-            <text x={W - PR - 4} y={capY - 4} fontSize={10} fill="#6B6760" textAnchor="end" opacity={0.7}>{ceilingLabel} {fmt$(mrrCap)}</text>
+            <text x={W - PR - 4} y={capY + (goalY !== null && Math.abs(capY - goalY) < 13 ? 12 : -4)} fontSize={10} fill="#6B6760" textAnchor="end" opacity={0.7}>{ceilingLabel} {fmt$(mrrCap)}</text>
+          </>
+        )}
+        {secondCeiling && (
+          <>
+            <line x1={PL} y1={toY(secondCeiling.value)} x2={W - PR} y2={toY(secondCeiling.value)} stroke="#9C9590" strokeWidth={1} strokeDasharray="2,4" opacity={0.45} />
+            <text x={PL + 4} y={toY(secondCeiling.value) - 4} fontSize={10} fill="#9C9590" textAnchor="start" opacity={0.75}>{secondCeiling.label} {fmt$(secondCeiling.value)}</text>
           </>
         )}
         {goalY !== null && (
