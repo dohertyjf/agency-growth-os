@@ -38,6 +38,35 @@ interface Props {
   subtitle?: string
 }
 
+
+type Lever = {
+  key: string
+  label: string
+  patch: Partial<CapacityInputs>
+  /** Which ceiling this lever actually moves. */
+  addresses: ("capacity" | "demand")[]
+}
+
+// Defined against a given state rather than the user's original inputs, so the
+// sequence can stack moves — step two's "double capacity" is relative to what
+// step one left behind.
+function leversFor(inp: CapacityInputs, currency: string): Lever[] {
+  const cut = Math.max(1, Math.round(inp.hoursPerClient * 0.75))
+  const halfChurn = (inp.churnPct ?? 0) / 2
+  return [
+    { key: "price", label: `Raise average client value 50% (to ${fmtCurrency(Math.round(inp.avgDeal * 1.5), currency)}/mo)`,
+      patch: { avgDeal: inp.avgDeal * 1.5 }, addresses: ["capacity", "demand"] },
+    { key: "hours", label: `Cut hours per client to ${cut} (−25% delivery time)`,
+      patch: { hoursPerClient: cut }, addresses: ["capacity"] },
+    { key: "capacity", label: `Double delivery capacity (to ${inp.billableHours * 2} billable hrs/mo)`,
+      patch: { billableHours: inp.billableHours * 2 }, addresses: ["capacity"] },
+    { key: "leads", label: `Double your leads (to ${inp.leads * 2}/mo)`,
+      patch: { leads: inp.leads * 2 }, addresses: ["demand"] },
+    { key: "churn", label: `Halve your churn (to ${fmtPercent(halfChurn)}/mo)`,
+      patch: { churnPct: halfChurn }, addresses: ["demand"] },
+  ]
+}
+
 export default function CapacityLiveTool({
   title = "Growth Projection — live",
   subtitle = "Type a prospect's numbers and adjust live on a call. Nothing is saved.",
@@ -122,6 +151,44 @@ export default function CapacityLiveTool({
   const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
 
+  // The order to pull the levers in. At each step only moves that address the
+  // ceiling currently binding are considered — recommending "fix churn" to an
+  // agency that is out of delivery hours is how people waste a year. Apply the
+  // winner, recompute, and let the next constraint pick the next move.
+  const sequence = useMemo(() => {
+    if (goal <= 0 || r.goalHitMonth >= 0) return null
+    let state: CapacityInputs = inputs
+    const used = new Set<string>()
+    const steps: { label: string; ceiling: number; binds: "capacity" | "demand" | null; reached: string | null }[] = []
+
+    for (let i = 0; i < 4; i++) {
+      const cur = projectCapacity(state, horizon)
+      if (cur.goalHitMonth >= 0 || cur.bindingConstraint == null) break
+
+      let best: { lever: Lever; res: ReturnType<typeof projectCapacity> } | null = null
+      for (const lever of leversFor(state, currency)) {
+        if (used.has(lever.key)) continue
+        if (!lever.addresses.includes(cur.bindingConstraint)) continue
+        const res = projectCapacity({ ...state, ...lever.patch }, horizon)
+        // Ignore moves that do not meaningfully lift the binding ceiling.
+        if ((res.mrrCap ?? 0) <= (cur.mrrCap ?? 0) + 1) continue
+        if (best == null || (res.mrrCap ?? 0) > (best.res.mrrCap ?? 0)) best = { lever, res }
+      }
+      if (best == null) break
+
+      used.add(best.lever.key)
+      state = { ...state, ...best.lever.patch }
+      steps.push({
+        label: best.lever.label,
+        ceiling: best.res.mrrCap ?? 0,
+        binds: best.res.bindingConstraint,
+        reached: best.res.goalHitMonth >= 0 ? monthLabels[best.res.goalHitMonth] : null,
+      })
+      if (best.res.goalHitMonth >= 0) break
+    }
+    return steps.length > 0 ? steps : null
+  }, [inputs, goal, r, horizon, currency, monthLabels])
+
   const scenarios = useMemo(() => {
     const base = r
     const outcome = (patch: Partial<CapacityInputs>) => {
@@ -140,15 +207,8 @@ export default function CapacityLiveTool({
         ? `${direction} the ceiling to ${fmtCurrency(res.mrrCap, currency)}, reached ${monthLabels[res.ceilingHitMonth]}`
         : `${direction} the ceiling to ${fmtCurrency(res.mrrCap, currency)} — beyond the projection`
     }
-    const cut = Math.max(1, Math.round(inputs.hoursPerClient * 0.75))
-    const halfChurn = (inputs.churnPct ?? 0) / 2
-    const rows = [
-      { patch: { avgDeal: inputs.avgDeal * 1.5 }, label: `Raise average client value 50% (to ${fmtCurrency(Math.round(inputs.avgDeal * 1.5), currency)}/mo)` },
-      { patch: { hoursPerClient: cut }, label: `Cut hours per client to ${cut} (−25% delivery time)` },
-      { patch: { billableHours: inputs.billableHours * 2 }, label: `Double delivery capacity (to ${inputs.billableHours * 2} billable hrs/mo)` },
-      { patch: { leads: inputs.leads * 2 }, label: `Double your leads (to ${inputs.leads * 2}/mo)` },
-      { patch: { churnPct: halfChurn }, label: `Halve your churn (to ${fmtPercent(halfChurn)}/mo)` },
-    ].map(row => ({ ...row, cap: projectCapacity({ ...inputs, ...row.patch }, horizon).mrrCap ?? 0, result: outcome(row.patch) }))
+    const rows = leversFor(inputs, currency)
+      .map(row => ({ ...row, cap: projectCapacity({ ...inputs, ...row.patch }, horizon).mrrCap ?? 0, result: outcome(row.patch) }))
     // Rank to call out the biggest move, but keep the printed order fixed — a
     // list that reshuffles as you type is unreadable.
     const best = Math.max(...rows.map(x => x.cap))
@@ -306,6 +366,42 @@ export default function CapacityLiveTool({
       </div>
 
       {/* Scenarios */}
+      {sequence && (
+        <div style={{ marginBottom: 26 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", margin: "0 0 12px" }}>
+            In what order — your path to {fmt$(goal)}/mo
+          </div>
+          <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none", counterReset: "step" }}>
+            {sequence.map((st, i) => (
+              <li key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 10 }}>
+                <span style={{ flex: "0 0 auto", width: 22, height: 22, borderRadius: 11, background: st.reached ? "#1F7A4D" : accent, color: "#fff", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
+                  {i + 1}
+                </span>
+                <span style={{ fontSize: 14, lineHeight: 1.55, color: "#1A1916" }}>
+                  <strong>{st.label}</strong> → takes you to <strong>{fmt$(st.ceiling)}/mo</strong>.
+                  {st.reached
+                    ? <span style={{ color: "#1F7A4D", fontWeight: 600 }}> Goal reached {st.reached}.</span>
+                    : <span style={{ color: "#6B6760" }}> {st.binds === "demand" ? "Churn becomes the constraint." : "Delivery capacity becomes the constraint."}</span>}
+                </span>
+              </li>
+            ))}
+          </ol>
+          {!sequence[sequence.length - 1].reached && (
+            // Two different failures: the ceiling is still too low, or the
+            // ceiling clears but the projection cannot climb that far in time.
+            sequence[sequence.length - 1].ceiling >= goal ? (
+              <div style={{ fontSize: 13, color: "#6B6760", marginTop: 8 }}>
+                That puts {fmt$(goal)}/mo within reach — but not within {horizon} months. Try a longer horizon.
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: "#9A3412", marginTop: 8 }}>
+                Even after all of these, {fmt$(goal)}/mo is still above the ceiling — it needs a bigger change than any single move here.
+              </div>
+            )
+          )}
+        </div>
+      )}
+
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", margin: "0 0 12px" }}>Ways to grow past the ceiling</div>
       <ul style={{ margin: 0, paddingLeft: 20 }}>
         {scenarios.map((s, i) => (
