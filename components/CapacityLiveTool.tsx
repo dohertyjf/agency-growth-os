@@ -18,7 +18,7 @@ const FIELDS: { key: keyof CapacityInputs; label: string; money?: boolean; step?
   { key: "startRevenue", label: "Current Revenue / mo", money: true, step: 500 },
   { key: "leads", label: "Leads / mo", step: 0.5 },
   { key: "closeRate", label: "Close Rate %", step: 0.1 },
-  { key: "avgDeal", label: "Avg Deal Size / mo", money: true, step: 100 },
+  { key: "avgDeal", label: "Avg Deal Size / mo (new clients)", money: true, step: 100 },
   { key: "churnPct", label: "Churn % / mo", step: 0.5 },
   { key: "hoursPerClient", label: "Avg monthly hours per client", step: 0.5 },
   { key: "billableHours", label: "Billable Hrs / mo", step: 10 },
@@ -97,12 +97,15 @@ export default function CapacityLiveTool({
     churnPct: r.churnRate > 0
       ? `\u2248 ${(r.churnRate * inputs.activeClients).toFixed(1)} of ${inputs.activeClients} clients \u00b7 avg stay ${Math.round(1 / r.churnRate)} mo`
       : "no churn — clients stay forever",
-    activeClients: inputs.hoursPerClient > 0
-      ? `using ${Math.round(r.currentHoursUsed)} of ${inputs.billableHours} hrs`
-        + (r.slotsAvailable != null ? ` \u00b7 ${r.slotsAvailable > 0 ? `${r.slotsAvailable} slots open` : "at capacity"}` : "")
+    activeClients: inputs.activeClients > 0
+      ? `today's average ${fmtCurrency(Math.round(inputs.startRevenue / inputs.activeClients), currency)}/client`
+        + (inputs.hoursPerClient > 0
+            ? ` \u00b7 ${Math.round(r.currentHoursUsed)} of ${inputs.billableHours} hrs`
+              + (r.slotsAvailable != null ? ` \u00b7 ${r.slotsAvailable > 0 ? `${r.slotsAvailable} open` : "at capacity"}` : "")
+            : "")
       : undefined,
     billableHours: r.maxClients != null ? `room for ${r.maxClients} clients` : undefined,
-  }), [inputs.activeClients, inputs.hoursPerClient, inputs.billableHours, r])
+  }), [inputs.activeClients, inputs.hoursPerClient, inputs.billableHours, inputs.startRevenue, currency, r])
 
   // The constraint you would hit next, once the current one is cleared. Skipped
   // when it sits so far above the binding ceiling that plotting it would flatten
@@ -150,6 +153,30 @@ export default function CapacityLiveTool({
   }, [goal, r, monthLabels, horizon, currency, inputs.avgDeal, inputs.activeClients])
   const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
+
+  // How many clients the goal takes at a range of average client values,
+  // anchored on what they actually average today (revenue over clients) rather
+  // than the price they sell at. The capacity check on each row is the point:
+  // the cheaper rows need more clients than the team can physically serve.
+  const clientsNeeded = useMemo(() => {
+    if (goal <= 0 || inputs.activeClients <= 0 || inputs.startRevenue <= 0) return null
+    const todayAvg = inputs.startRevenue / inputs.activeClients
+    if (!(todayAvg > 0)) return null
+    const prices = [todayAvg, todayAvg * 1.2, todayAvg * 1.6, todayAvg * 2]
+    const seen = new Set<number>()
+    return prices
+      .map(p => Math.round(p / 50) * 50 || Math.round(p))
+      .filter(p => p > 0 && !seen.has(p) && seen.add(p) !== undefined)
+      .map((price, i) => {
+        const need = Math.ceil(goal / price)
+        return {
+          price,
+          need,
+          isToday: i === 0,
+          overCapacity: r.maxClients != null && need > r.maxClients,
+        }
+      })
+  }, [goal, inputs.startRevenue, inputs.activeClients, r.maxClients])
 
   // The smallest price rise that actually reaches the goal, given everything
   // else they typed. Raising price lifts both ceilings and speeds the climb, so
@@ -367,6 +394,32 @@ export default function CapacityLiveTool({
             <div style={{ color: goalVerdict.overMax ? "#9A3412" : "#6B6760", marginTop: 4 }}>
               {goalVerdict.clients}
               {goalVerdict.overMax && <strong> More than your team can serve at these hours.</strong>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {clientsNeeded && clientsNeeded.length > 1 && (
+        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", marginBottom: 10 }}>
+            To hit {fmt$(goal)}/mo
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {clientsNeeded.map(row => (
+              <div key={row.price} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 14, fontVariantNumeric: "tabular-nums", color: row.overCapacity ? "#9C9590" : "#1A1916" }}>
+                <span style={{ minWidth: 96, fontWeight: 600 }}>{fmt$(row.price)}</span>
+                {row.isToday && <span style={{ fontSize: 11, color: "#9C9590" }}>today</span>}
+                <span style={{ color: "#C9C4BC" }}>→</span>
+                <span><strong>{row.need}</strong> client{row.need === 1 ? "" : "s"}</span>
+                <span style={{ fontSize: 12, color: row.overCapacity ? "#9A3412" : "#1F7A4D" }}>
+                  {row.overCapacity ? "✗ more than your team can serve" : "✓ within your capacity"}
+                </span>
+              </div>
+            ))}
+          </div>
+          {r.maxClients != null && (
+            <div style={{ fontSize: 12, color: "#6B6760", marginTop: 9 }}>
+              You have <strong>{inputs.activeClients}</strong> today; your hours cover <strong>{r.maxClients}</strong>.
             </div>
           )}
         </div>
