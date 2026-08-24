@@ -315,6 +315,17 @@ function stageOf(c: Contract): Stage {
   return "opportunity"
 }
 
+// Stage is derived state — it is stored as status + verbal. One mapping, shared
+// by the board dropdown, the drag-and-drop handler and the edit modal, so the
+// three cannot drift apart.
+function stageToPatch(stage: Stage): Record<string, string | boolean | null> {
+  return stage === "opportunity" ? { status: "opportunity", verbal: false }
+    : stage === "qualified" ? { status: "potential", verbal: false }
+    : stage === "verbal" ? { status: "potential", verbal: true }
+    : stage === "won" ? { status: "active", verbal: false }
+    : { status: "lost" }
+}
+
 const STAGE_COLS: { stage: Stage; label: string; hint: string; accent: string }[] = [
   { stage: "opportunity", label: "Opportunity", hint: "Initial contact", accent: "#6366F1" },
   { stage: "qualified", label: "Qualified", hint: "In negotiation", accent: "#0EA5E9" },
@@ -322,6 +333,32 @@ const STAGE_COLS: { stage: Stage; label: string; hint: string; accent: string }[
   { stage: "won", label: "Won", hint: "Signed & paid", accent: "#1F7A4D" },
   { stage: "lost", label: "Lost", hint: "Didn't close", accent: "#C2410C" },
 ]
+
+
+// The deal name doubles as the way into the edit modal. It is a button rather
+// than a click-handled span so it stays keyboard-reachable, and it underlines on
+// hover — a click target with no affordance is no more discoverable than plain
+// text. The Edit button stays put alongside it.
+function DealNameButton({ name, onClick, fontSize }: { name: string; onClick: () => void; fontSize: number }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Edit deal"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: "none", border: "none", padding: 0, margin: 0,
+        fontFamily: "inherit", fontSize, fontWeight: 600, color: "#1A1916",
+        lineHeight: 1.25, textAlign: "left", cursor: "pointer",
+        textDecoration: hover ? "underline" : "none", textUnderlineOffset: 2,
+      }}
+    >
+      {name}
+    </button>
+  )
+}
 
 interface DealCardProps {
   deal: Contract
@@ -348,7 +385,7 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, o
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 10, padding: "14px 16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1916" }}>{deal.name}</div>
+          <div><DealNameButton name={deal.name} fontSize={14} onClick={() => onEdit(deal)} /></div>
           {product && (
             <div style={{ fontSize: 9, fontWeight: 700, color: "#4B5563", background: "#F0EBE3", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.03em", display: "inline-block", marginTop: 3 }}>{product}</div>
           )}
@@ -487,7 +524,7 @@ function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage
       onDragStart={e => { e.dataTransfer.setData("text/plain", deal.id); e.dataTransfer.effectAllowed = "move" }}
       style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 8, padding: "9px 11px", cursor: "grab", display: "flex", flexDirection: "column", gap: 5 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", lineHeight: 1.25 }}>{deal.name}</span>
+        <DealNameButton name={deal.name} fontSize={13} onClick={() => onEdit(deal)} />
         <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1916", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{fmt$(deal.monthly)}</span>
       </div>
       {accountName && <div style={{ fontSize: 11, color: "#9C9590" }}>{accountName}</div>}
@@ -613,6 +650,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     type: "retainer" as "retainer" | "ongoing" | "oneoff",
     start: "",
     contractedThrough: "",
+    stage: "opportunity" as Stage,
   })
   const [editSaving, setEditSaving] = useState(false)
   const [scheduleDeal, setScheduleDeal] = useState<Contract | null>(null)
@@ -634,6 +672,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       type: uiType,
       start: deal.start,
       contractedThrough: deal.contractedThrough ?? "",
+      stage: stageOf(deal),
     })
   }
 
@@ -661,13 +700,16 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
         accountId: editForm.accountId || null,
         ownerId: editForm.ownerId || null,
         callDate: editForm.callDate || null,
-        signedDate: editForm.signedDate || null,
         productId: editForm.productId || null,
         deliveryStart: editForm.deliveryStart || null,
         deliveryEnd: editForm.deliveryEnd || null,
         type: isOngoing ? "retainer" : editForm.type,
         start: editForm.start,
         contractedThrough: isOngoing ? null : editForm.type === "oneoff" ? editForm.start : editForm.contractedThrough || null,
+        ...stageToPatch(editForm.stage),
+        // Moving a deal to Won stamps a signed date, but never over one the
+        // user typed in this same form.
+        signedDate: editForm.signedDate || (editForm.stage === "won" ? today : null),
       }),
     })
     setEditSaving(false)
@@ -730,12 +772,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   // Single source of truth for moving a deal between pipeline stages (board DnD + list buttons).
   async function setStage(id: string, stage: Stage) {
     const deal = contracts.find(c => c.id === id)
-    const patch: Record<string, string | boolean | null> =
-      stage === "opportunity" ? { status: "opportunity", verbal: false }
-      : stage === "qualified" ? { status: "potential", verbal: false }
-      : stage === "verbal" ? { status: "potential", verbal: true }
-      : stage === "won" ? { status: "active", verbal: false }
-      : { status: "lost" }
+    const patch = stageToPatch(stage)
     if (stage === "won" && deal && !deal.signedDate) patch.signedDate = today
     await updateContract(id, patch)
   }
@@ -1122,6 +1159,13 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                     <option value="oneoff">One-off</option>
                   </select>
                 </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Stage</label>
+                <select style={inputStyle} value={editForm.stage}
+                  onChange={e => setEditForm(f => ({ ...f, stage: e.target.value as Stage }))}>
+                  {STAGE_COLS.map(c => <option key={c.stage} value={c.stage}>{c.label} — {c.hint}</option>)}
+                </select>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: editForm.type === "retainer" ? "1fr 1fr" : "1fr", gap: 12 }}>
                 <div>
