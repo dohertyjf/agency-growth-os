@@ -145,6 +145,16 @@ export default function ReconciliationTable({ contracts, accounts, products = []
     return c.start <= month && (c.contractedThrough === null || c.contractedThrough >= month)
   }
 
+  // Whether to project *expected* money for this month. Same window as active, but a
+  // finished (ended/churned) project stops forecasting anything past the current month —
+  // its future expected payments won't come in. Logged actuals/payments always still count.
+  function forecastsInMonth(c: Contract, month: string) {
+    if (c.start > month) return false
+    if (c.contractedThrough !== null && c.contractedThrough < month) return false
+    if (c.status === "finished" && month > now) return false
+    return true
+  }
+
   async function handleSave(contractId: string, month: string, rawValue: string) {
     const actual = parseFloat(rawValue.replace(/[$,\s]/g, ""))
     if (isNaN(actual) || actual < 0) { setEditing(null); return }
@@ -287,8 +297,8 @@ export default function ReconciliationTable({ contracts, accounts, products = []
                     </button>
                   </td>
                   {months.map(month => {
-                    const active = contractActiveInMonth(contract, month)
                     const am = getActual(contract.id, month)
+                    const active = forecastsInMonth(contract, month) || !!am
                     const key = `${contract.id}:${month}`
                     const isEditing = editing?.contractId === contract.id && editing?.month === month
                     const isSaving = saving === key
@@ -373,7 +383,7 @@ export default function ReconciliationTable({ contracts, accounts, products = []
                             style={{
                               padding: "5px 10px", fontSize: 11, textAlign: "right",
                               cursor: "pointer", fontVariantNumeric: "tabular-nums",
-                              color: pm ? "#0F766E" : contractActiveInMonth(contract, month) ? "#99D6CE" : "#A7D8D2",
+                              color: pm ? "#0F766E" : forecastsInMonth(contract, month) ? "#99D6CE" : "#A7D8D2",
                               fontWeight: pm ? 600 : 400,
                               background: isSaving ? "#CCFBF1" : "transparent",
                               minWidth: 80,
@@ -381,7 +391,7 @@ export default function ReconciliationTable({ contracts, accounts, products = []
                           >
                             {pm
                               ? fmtCurrency(pm.amount)
-                              : contractActiveInMonth(contract, month)
+                              : forecastsInMonth(contract, month)
                                 ? fmtCurrency(getActual(contract.id, month)?.actual ?? contract.monthly)
                                 : "—"}
                           </div>
@@ -399,9 +409,9 @@ export default function ReconciliationTable({ contracts, accounts, products = []
               {months.map(month => {
                 let total = 0
                 for (const c of signedContracts) {
-                  if (!contractActiveInMonth(c, month)) continue
                   const am = getActual(c.id, month)
-                  total += am ? am.actual : c.monthly
+                  if (am) total += am.actual
+                  else if (forecastsInMonth(c, month)) total += c.monthly
                 }
                 return (
                   <td key={month} style={{ padding: "7px 10px", textAlign: "right", fontSize: 12, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums", borderRight: "1px solid #F5F1EC", background: month === now ? "#FFF8F5" : "transparent" }}>
@@ -418,9 +428,9 @@ export default function ReconciliationTable({ contracts, accounts, products = []
                 {months.map(month => {
                   let total = 0
                   for (const c of shownContracts) {
-                    if (!contractActiveInMonth(c, month)) continue
                     const am = getActual(c.id, month)
-                    total += am ? am.actual : c.monthly
+                    if (am) total += am.actual
+                    else if (forecastsInMonth(c, month)) total += c.monthly
                   }
                   return (
                     <td key={month} style={{ padding: "7px 10px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "#6B6760", fontVariantNumeric: "tabular-nums", borderRight: "1px solid #F5F1EC", background: month === now ? "#FFF8F5" : "transparent" }}>
@@ -436,11 +446,12 @@ export default function ReconciliationTable({ contracts, accounts, products = []
               <td style={{ ...labelStyle, fontWeight: 700, color: "#0D9488", background: "#F0FDFA" }}>Total Cash In</td>
               {months.map(month => {
                 const total = signedContracts.reduce((sum, c) => {
-                  if (!contractActiveInMonth(c, month)) return sum
                   const pm = getPayment(c.id, month)
-                  return sum + (pm ? pm.amount : (getActual(c.id, month)?.actual ?? c.monthly))
+                  if (pm) return sum + pm.amount
+                  if (forecastsInMonth(c, month)) return sum + (getActual(c.id, month)?.actual ?? c.monthly)
+                  return sum
                 }, 0)
-                const isOverridden = signedContracts.some(c => contractActiveInMonth(c, month) && getPayment(c.id, month))
+                const isOverridden = signedContracts.some(c => getPayment(c.id, month))
                 return (
                   <td key={month} style={{ padding: "7px 10px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isOverridden ? "#0D9488" : "#99D6CE", fontVariantNumeric: "tabular-nums", borderRight: "1px solid #CCFBF1", background: "transparent" }}>
                     {fmtCurrency(total)}
