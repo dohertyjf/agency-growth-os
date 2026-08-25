@@ -9,7 +9,7 @@ import MonthTable, { BulkMetricsModal } from "./MonthTable"
 import GrowthProjection from "./GrowthProjection"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
-  projectMetric, ymAdd, ymLabel, currentMRR, bookedAhead, BOOKED_AHEAD_MONTHS,
+  projectMetric, ymAdd, ymLabel, bookedAhead, BOOKED_AHEAD_MONTHS,
   mrrGoal, goalProgress,
   type ContractRow, type ProjectionInput, type ProjectableMetric,
 } from "@/lib/calc"
@@ -270,6 +270,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
         if (pays.length) total += pays.reduce((sub, p) => p.month === ym ? sub + p.amount : sub, 0)
         else if (c.start === ym) total += c.monthly
       } else if (c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym)) {
+        if (c.status === "finished" && ym > nowYM) continue  // finished/churned: no future forecast
         total += c.monthly
       }
     }
@@ -423,13 +424,13 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     for (let i = range - 1; i >= 0; i--) {
       const ym = ymAdd(nowYM, -i)
       const explicit = paymentByMonth.get(ym)
-      const value = explicit !== undefined ? explicit : (mrrByMonth.get(ym) ?? currentMRR(contractRows, ym))
+      const value = explicit !== undefined ? explicit : (mrrByMonth.get(ym) ?? contractedFor(ym))
       pts.push({ label: ymLabel(ym), value })
     }
     for (let j = 1; j <= 6; j++) {
       const ym = ymAdd(nowYM, j)
       const explicit = paymentByMonth.get(ym)
-      const value = explicit !== undefined ? explicit : currentMRR(contractRows, ym)
+      const value = explicit !== undefined ? explicit : contractedFor(ym)
       pts.push({ label: ymLabel(ym), value, projected: true })
     }
     return pts
