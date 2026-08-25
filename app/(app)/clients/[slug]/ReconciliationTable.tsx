@@ -128,8 +128,15 @@ export default function ReconciliationTable({ contracts, accounts, products = []
     const forwardHorizon = [yearEnd, ymAdd(now, 5)].reduce((a, b) => a > b ? a : b)
     const allEnds = shownContracts.map(c => c.contractedThrough ?? forwardHorizon)
     const rangeEnd = [now, ...allEnds].reduce((a, b) => a > b ? a : b)
+    const earliestStart = shownContracts.map(c => c.start).reduce((a, b) => a < b ? a : b)
     const windowStart = range === "all"
-      ? shownContracts.map(c => c.start).reduce((a, b) => a < b ? a : b)
+      ? (() => {
+          // Center the current month: mirror the forward span backward, but never before
+          // the client's first project (so a since-2020 client doesn't start years ago).
+          const forwardSpan = Math.max(0, monthsBetween(now, rangeEnd).length - 1)
+          const centered = ymAdd(now, -forwardSpan)
+          return centered > earliestStart ? centered : earliestStart
+        })()
       : ymAdd(now, -(range - 1))
     const hasEarlyPayment = payments.some(p => p.month < windowStart)
     const effectiveStart = hasEarlyPayment ? ymAdd(windowStart, -1) : windowStart
