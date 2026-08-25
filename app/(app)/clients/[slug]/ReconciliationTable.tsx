@@ -112,6 +112,9 @@ export default function ReconciliationTable({ contracts, accounts, products = []
     .filter(c => bands[c.status])
     .sort((a, b) => (BAND_ORDER[a.status] - BAND_ORDER[b.status]) || a.start.localeCompare(b.start))
   const signedContracts = shownContracts.filter(c => c.status === "active" || c.status === "finished")
+  // Totals sum ALL projects, even bands hidden from the grid (e.g. Finished) — if a
+  // project has money in a month, it counts.
+  const allSigned = allBandContracts.filter(c => c.status === "active" || c.status === "finished")
 
   // Only bands actually present in the data get a filter chip.
   const availableBands = BAND_FILTERS.filter(b => allBandContracts.some(c => c.status === b.key))
@@ -408,7 +411,7 @@ export default function ReconciliationTable({ contracts, accounts, products = []
               <td style={{ ...labelStyle, fontWeight: 700, color: "#1A1916", background: "#F8F6F2" }}>Total MRR</td>
               {months.map(month => {
                 let total = 0
-                for (const c of signedContracts) {
+                for (const c of allSigned) {
                   const am = getActual(c.id, month)
                   if (am) total += am.actual
                   else if (forecastsInMonth(c, month)) total += c.monthly
@@ -422,12 +425,12 @@ export default function ReconciliationTable({ contracts, accounts, products = []
             </tr>
 
             {/* Projected row — all bands, incl. Qualified + Opportunity (shown only if any exist) */}
-            {shownContracts.length > signedContracts.length && (
+            {allBandContracts.length > allSigned.length && (
               <tr style={{ background: "#FBFAF7" }}>
                 <td style={{ ...labelStyle, fontWeight: 600, color: "#6B6760", background: "#FBFAF7" }}>Projected · all bands</td>
                 {months.map(month => {
                   let total = 0
-                  for (const c of shownContracts) {
+                  for (const c of allBandContracts) {
                     const am = getActual(c.id, month)
                     if (am) total += am.actual
                     else if (forecastsInMonth(c, month)) total += c.monthly
@@ -445,13 +448,13 @@ export default function ReconciliationTable({ contracts, accounts, products = []
             <tr style={{ background: "#F0FDFA" }}>
               <td style={{ ...labelStyle, fontWeight: 700, color: "#0D9488", background: "#F0FDFA" }}>Total Cash In</td>
               {months.map(month => {
-                const total = signedContracts.reduce((sum, c) => {
+                const total = allSigned.reduce((sum, c) => {
                   const pm = getPayment(c.id, month)
                   if (pm) return sum + pm.amount
                   if (forecastsInMonth(c, month)) return sum + (getActual(c.id, month)?.actual ?? c.monthly)
                   return sum
                 }, 0)
-                const isOverridden = signedContracts.some(c => getPayment(c.id, month))
+                const isOverridden = allSigned.some(c => getPayment(c.id, month))
                 return (
                   <td key={month} style={{ padding: "7px 10px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isOverridden ? "#0D9488" : "#99D6CE", fontVariantNumeric: "tabular-nums", borderRight: "1px solid #CCFBF1", background: "transparent" }}>
                     {fmtCurrency(total)}
