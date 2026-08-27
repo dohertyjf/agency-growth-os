@@ -114,6 +114,7 @@ export default function CapacityLiveTool({
     const d: MonthDrivers = {
       leads: inputs.leads, closeRate: inputs.closeRate,
       avgDeal: inputs.avgDeal, churnPct: inputs.churnPct ?? 0,
+      hoursPerClient: inputs.hoursPerClient,
     }
     for (let m = 0; m <= i; m++) {
       const o = overrides[m]
@@ -123,8 +124,8 @@ export default function CapacityLiveTool({
   }, [inputs, overrides])
 
   const rows = useMemo(
-    () => projectSchedule(inputs.startRevenue, driversAt, inputs.hoursPerClient, inputs.billableHours, horizon),
-    [inputs.startRevenue, inputs.hoursPerClient, inputs.billableHours, horizon, driversAt]
+    () => projectSchedule(inputs.startRevenue, driversAt, inputs.billableHours, horizon),
+    [inputs.startRevenue, inputs.billableHours, horizon, driversAt]
   )
   const editedPath = useMemo(() => rows.map(x => x.mrr), [rows])
 
@@ -206,7 +207,7 @@ export default function CapacityLiveTool({
   const editSummary = useMemo(() => {
     if (!hasOverrides || goal <= 0) return null
     const final = driversAt(horizon - 1)
-    const order: (keyof MonthDrivers)[] = ["closeRate", "avgDeal", "leads", "churnPct"]
+    const order: (keyof MonthDrivers)[] = ["closeRate", "avgDeal", "leads", "churnPct", "hoursPerClient"]
     const parts: string[] = []
     for (const k of order) {
       let lastIdx = -1
@@ -220,7 +221,8 @@ export default function CapacityLiveTool({
         k === "leads" ? `leads at ${Math.round(v)}/mo`
         : k === "closeRate" ? `close rate at ${fmtPercent(v)}`
         : k === "avgDeal" ? `average deal at ${fmtCurrency(Math.round(v), currency)}`
-        : `churn at ${fmtPercent(v)}`
+        : k === "churnPct" ? `churn at ${fmtPercent(v)}`
+        : `${Math.round(v)} hrs per client`
       parts.push(`${label} from ${monthLabels[lastIdx]}`)
     }
     if (parts.length === 0) return null
@@ -576,7 +578,7 @@ export default function CapacityLiveTool({
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
               <thead>
                 <tr style={{ position: "sticky", top: 0, background: "#F5F1EC", zIndex: 1 }}>
-                  {["Month", "Leads", "Close %", "Avg deal", "Churn %", "Won", "Lost", "Clients", "MRR"].map((h, i) => (
+                  {["Month", "Leads", "Close %", "Avg deal", "Churn %", "Hrs/client", "Won", "Lost", "Clients", "MRR"].map((h, i) => (
                     <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "7px 9px", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6B6760", whiteSpace: "nowrap", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
                   ))}
                 </tr>
@@ -605,6 +607,7 @@ export default function CapacityLiveTool({
                       {cell("closeRate", row.closeRate, 1)}
                       {cell("avgDeal", row.avgDeal, 100)}
                       {cell("churnPct", row.churnPct, 0.5)}
+                      {cell("hoursPerClient", row.hoursPerClient, 1)}
                       <td style={{ textAlign: "right", padding: "2px 9px", color: "#1F7A4D", borderBottom: "1px solid #F5F1EC" }}>+{row.won.toFixed(1)}</td>
                       <td style={{ textAlign: "right", padding: "2px 9px", color: "#9A3412", borderBottom: "1px solid #F5F1EC" }}>−{row.churnedClients.toFixed(1)}</td>
                       <td style={{ textAlign: "right", padding: "2px 9px", color: "#1A1916", fontWeight: 600, borderBottom: "1px solid #F5F1EC" }}>{row.clients.toFixed(1)}</td>

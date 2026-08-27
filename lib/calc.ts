@@ -214,9 +214,10 @@ export const CEILING_REACHED_AT = 0.99
 // rather than something you schedule.
 export interface MonthDrivers {
   leads: number
-  closeRate: number   // percent
+  closeRate: number     // percent
   avgDeal: number
-  churnPct: number    // percent of the book lost that month
+  churnPct: number      // percent of the book lost that month
+  hoursPerClient: number // delivery hours each client consumes per month
 }
 
 export interface MonthRow {
@@ -225,6 +226,7 @@ export interface MonthRow {
   closeRate: number
   avgDeal: number
   churnPct: number
+  hoursPerClient: number
   won: number         // clients won
   churnedClients: number
   clients: number     // at end of month
@@ -241,13 +243,9 @@ export interface MonthRow {
 export function projectSchedule(
   startRevenue: number,
   driversAt: (monthIndex: number) => MonthDrivers,
-  hoursPerClient: number,
   billableHours: number,
   months: number,
 ): MonthRow[] {
-  const maxClients = hoursPerClient > 0 && billableHours > 0
-    ? Math.floor(billableHours / hoursPerClient)
-    : null
   const rows: MonthRow[] = []
   let mrr = startRevenue
   for (let i = 0; i < months; i++) {
@@ -257,6 +255,11 @@ export function projectSchedule(
     const newRev = won * d.avgDeal
     const churnedRev = mrr * churnRate
     const churnedClients = d.avgDeal > 0 ? churnedRev / d.avgDeal : 0
+    // Cutting delivery time per client raises how many the team can carry, so
+    // the ceiling is recomputed each month alongside price.
+    const maxClients = d.hoursPerClient > 0 && billableHours > 0
+      ? Math.floor(billableHours / d.hoursPerClient)
+      : null
     const ceiling = maxClients !== null && d.avgDeal > 0 ? maxClients * d.avgDeal : null
     let next = Math.max(0, mrr + newRev - churnedRev)
     const atCeiling = ceiling !== null && next >= ceiling
@@ -265,6 +268,7 @@ export function projectSchedule(
     rows.push({
       month: i + 1,
       leads: d.leads, closeRate: d.closeRate, avgDeal: d.avgDeal, churnPct: d.churnPct,
+      hoursPerClient: d.hoursPerClient,
       won, churnedClients,
       clients: d.avgDeal > 0 ? mrr / d.avgDeal : 0,
       newRev, churnedRev,
@@ -302,10 +306,11 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   // Delegate to the scheduled engine with every driver held constant, so the
   // constant case and the edited-per-month case cannot diverge.
   const constant: MonthDrivers = {
-    leads: inp.leads, closeRate: inp.closeRate, avgDeal: inp.avgDeal, churnPct: churnRate * 100,
+    leads: inp.leads, closeRate: inp.closeRate, avgDeal: inp.avgDeal,
+    churnPct: churnRate * 100, hoursPerClient: inp.hoursPerClient,
   }
   const projected = projectSchedule(
-    inp.startRevenue, () => constant, inp.hoursPerClient, inp.billableHours, months,
+    inp.startRevenue, () => constant, inp.billableHours, months,
   ).map(r => r.mrr)
 
   const ceilingHitMonth = mrrCap !== null
@@ -318,7 +323,7 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   // The gap between this and `projected` is the revenue capacity is costing
   // them, and it is what says how much capacity they need to build.
   const uncapped = projectSchedule(
-    inp.startRevenue, () => constant, inp.hoursPerClient, 0, months,
+    inp.startRevenue, () => constant, 0, months,
   ).map(r => r.mrr)
   const hoursNeeded = inp.avgDeal > 0
     ? uncapped.map(v => Math.ceil((v / inp.avgDeal) * inp.hoursPerClient))
