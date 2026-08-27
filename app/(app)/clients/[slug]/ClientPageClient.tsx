@@ -154,7 +154,7 @@ interface Call {
   questions: CallQuestion[]
 }
 
-type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "team" | "calls"
+type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "team" | "calls" | "projection"
 
 interface Props {
   clientId: string
@@ -188,6 +188,7 @@ interface Props {
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "dashboard", label: "Overview" },
+  { key: "projection", label: "Projection" },
   { key: "accounts", label: "Accounts" },
   { key: "projects", label: "Projects" },
   { key: "pipeline", label: "Pipeline" },
@@ -332,6 +333,29 @@ export default function ClientPageClient({
           totalCapacityHours={totalCapacityHours}
           totalHoursWorked={totalHoursWorked}
           payrollByMonth={payrollByMonth}
+        />
+      )}
+
+      {currentTab === "projection" && (
+        <Dashboard
+          clientId={clientId}
+          projectionState={projectionState}
+          clientSlug={clientSlug}
+          clientName={clientName}
+          metrics={metrics}
+          contracts={contracts}
+          goal={goal}
+          payments={payments}
+          contractHours={initialContractHours}
+          deliveryMonths={initialDeliveryMonths}
+          accountMonths={initialAccountMonths}
+          initialStatus={initialStatus}
+          initialStartDate={initialStartDate}
+          initialEndDate={initialEndDate}
+          totalCapacityHours={totalCapacityHours}
+          totalHoursWorked={totalHoursWorked}
+          payrollByMonth={payrollByMonth}
+          only="projection"
         />
       )}
 

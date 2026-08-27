@@ -67,6 +67,8 @@ interface Props {
   clientSlug: string
   clientName: string
   totalCapacityHours?: number
+  /** Render only the growth projection, for its own tab. */
+  only?: "projection"
   totalHoursWorked?: number
   payrollByMonth?: Map<string, number>
   metrics: Metric[]
@@ -127,7 +129,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#6B6760", display: "block", marginBottom: 4 }
 
-export default function Dashboard({ clientId, projectionState, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, contractHours = [], deliveryMonths = [], accountMonths = [], initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, totalHoursWorked = 0, payrollByMonth }: Props) {
+export default function Dashboard({ clientId, projectionState, clientSlug, clientName, metrics: rawMetricsProp, contracts, goal, payments: paymentsProp, contractHours = [], deliveryMonths = [], accountMonths = [], initialStatus, initialStartDate, initialEndDate, totalCapacityHours = 0, totalHoursWorked = 0, payrollByMonth, only }: Props) {
   const router = useRouter()
   const fmt$ = useFmtCurrency()
   const currency = useCurrency()
@@ -508,6 +510,21 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   const cacTotalNewClients = cacMonths.reduce((s, m) => s + m.newClients, 0)
   const cac = cacTotalSpend > 0 && cacTotalNewClients > 0 ? cacTotalSpend / cacTotalNewClients : 0
 
+  const growthProjection = (
+    <GrowthProjection
+      metrics={rawMetrics}
+      startMRR={mrr}
+      avgContractSize={avgContractSize}
+      goalMRR={currentGoal ? mrrTarget : null}
+      totalCapacityHours={totalCapacityHours}
+      avgContractHours={avgContractHours}
+      activeClientCount={activeClientCount}
+      clientId={clientId}
+      savedProjection={(() => { try { return projectionState ? JSON.parse(projectionState) : null } catch { return null } })()}
+    />
+  )
+  if (only === "projection") return growthProjection
+
   return (
     <div>
       {/* Edit Client Modal */}
@@ -780,19 +797,6 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
           </div>
         )}
       </div>
-
-      {/* Growth Projection */}
-      <GrowthProjection
-        metrics={rawMetrics}
-        startMRR={mrr}
-        avgContractSize={avgContractSize}
-        goalMRR={currentGoal ? mrrTarget : null}
-        totalCapacityHours={totalCapacityHours}
-        avgContractHours={avgContractHours}
-        activeClientCount={activeClientCount}
-        clientId={clientId}
-        savedProjection={(() => { try { return projectionState ? JSON.parse(projectionState) : null } catch { return null } })()}
-      />
 
       {/* Month Table */}
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
