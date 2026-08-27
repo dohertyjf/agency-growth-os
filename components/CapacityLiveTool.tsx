@@ -166,11 +166,21 @@ export default function CapacityLiveTool({
   // The constraint you would hit next, once the current one is cleared. Skipped
   // when it sits so far above the binding ceiling that plotting it would flatten
   // the projection into the bottom of the chart.
+  // Both ceilings are functions of the drivers, so editing the table moves them.
+  // Once drivers vary by month there is no single ceiling — the honest summary is
+  // the one implied by where the drivers END UP, which is the state the
+  // projection is settling into. With no edits this is exactly `r`.
+  const shown = useMemo(() => {
+    if (!hasOverrides) return r
+    const last = driversAt(horizon - 1)
+    return projectCapacity({ ...inputs, ...last }, horizon)
+  }, [hasOverrides, r, inputs, driversAt, horizon])
+
   const secondCeiling = useMemo(() => {
-    const other = r.bindingConstraint === "demand" ? r.capacityCeiling : r.demandCeiling
-    if (other == null || r.mrrCap == null || other <= r.mrrCap || other > r.mrrCap * 2) return null
-    return { value: other, label: r.bindingConstraint === "demand" ? "Capacity ceiling" : "Churn ceiling" }
-  }, [r])
+    const other = shown.bindingConstraint === "demand" ? shown.capacityCeiling : shown.demandCeiling
+    if (other == null || shown.mrrCap == null || other <= shown.mrrCap || other > shown.mrrCap * 2) return null
+    return { value: other, label: shown.bindingConstraint === "demand" ? "Capacity ceiling" : "Churn ceiling" }
+  }, [shown])
 
   const goal = inputs.goalMRR ?? 0
   // Capacity is something you build, not a wall you hit. When it is what binds,
@@ -508,10 +518,10 @@ export default function CapacityLiveTool({
           projected={editedPath}
           baseline={hasOverrides ? r.projected : null}
           startValue={inputs.startRevenue}
-          mrrCap={r.mrrCap}
+          mrrCap={shown.mrrCap}
           goal={goal}
           ceilingHitMonth={r.ceilingHitMonth}
-          ceilingLabel={r.bindingConstraint === "demand" ? "Churn ceiling" : "Capacity ceiling"}
+          ceilingLabel={shown.bindingConstraint === "demand" ? "Churn ceiling" : "Capacity ceiling"}
           secondCeiling={secondCeiling}
           monthLabels={monthLabels}
           startLabel={ymLabel(now)}

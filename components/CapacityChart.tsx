@@ -132,7 +132,7 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
             <div style={{ fontWeight: 700 }}>{labels[hover]}</div>
             <div style={{ color: "#F0C9BB" }}>{fmt$(v)}/mo</div>
             <div style={{ fontSize: 11, color: "#C9C4BC", marginTop: 1 }}>
-              {atCap ? "At capacity ceiling" : goal > 0 ? (toGoal > 0 ? `${fmt$(toGoal)} to goal` : "Goal reached") : ""}
+              {atCap ? `At ${ceilingLabel.toLowerCase()}` : goal > 0 ? (toGoal > 0 ? `${fmt$(toGoal)} to goal` : "Goal reached") : ""}
             </div>
           </div>
         )
