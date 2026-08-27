@@ -12,6 +12,7 @@ export default auth((req) => {
     pathname.startsWith("/intake") ||
     pathname.startsWith("/calculator") ||
     pathname.startsWith("/growthreport") ||
+    pathname.startsWith("/growthgap") ||
     pathname.startsWith("/lead-goal") ||
     pathname.startsWith("/embed.js") ||
     pathname.startsWith("/auth/") ||

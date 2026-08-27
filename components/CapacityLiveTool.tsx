@@ -31,11 +31,23 @@ const DEFAULTS: Record<string, string> = {
   churnPct: "10", hoursPerClient: "20", billableHours: "320", activeClients: "7", goalMRR: "50000",
 }
 
+type Mode = "prescribe" | "diagnose"
+
 interface Props {
+  /**
+   * "prescribe" hands over the full plan — what to change, by how much, in what
+   * order. Right for a workshop or your own analysis.
+   * "diagnose" states the gap and names the constraint but withholds the fix.
+   * Right for a sales conversation, where the page should not answer the
+   * question you are there to answer.
+   */
+  mode?: Mode
   /** Headline above the tool. Defaults to the coach-facing sales-call framing. */
   title?: string
   /** Sub-line under the headline. */
   subtitle?: string
+  /** Booking link for the diagnose-mode call to action. */
+  schedulingUrl?: string
 }
 
 
@@ -68,6 +80,8 @@ function leversFor(inp: CapacityInputs, currency: string): Lever[] {
 }
 
 export default function CapacityLiveTool({
+  mode = "prescribe",
+  schedulingUrl = "",
   title = "Growth Projection — live",
   subtitle = "Type a prospect's numbers and adjust live on a call. Nothing is saved.",
 }: Props = {}) {
@@ -154,6 +168,21 @@ export default function CapacityLiveTool({
   }, [goal, r, monthLabels, horizon, currency, inputs.avgDeal, inputs.activeClients])
   const capMonthLabel = r.ceilingHitMonth >= 0 ? monthLabels[r.ceilingHitMonth] : null
   const goalBlockedByCap = goal > 0 && r.mrrCap != null && goal > r.mrrCap
+
+  // The cost of changing nothing: how far short of their own goal they run,
+  // every month, added up. It is a far larger and more concrete number than the
+  // ceiling, and the model already had it — it was just never shown.
+  const inaction = useMemo(() => {
+    if (goal <= 0 || r.mrrCap == null) return null
+    const shortfall = r.projected.reduce((sum, v) => sum + Math.max(0, goal - v), 0)
+    if (shortfall <= 0) return null
+    return {
+      shortfall,
+      endGap: Math.max(0, goal - r.projected[r.projected.length - 1]),
+      neverReaches: r.goalHitMonth < 0,
+      years: Math.round(horizon / 12),
+    }
+  }, [goal, r, horizon])
 
   // The smallest price rise that actually reaches the goal, given everything
   // else they typed. Raising price lifts both ceilings and speeds the climb, so
@@ -260,6 +289,14 @@ export default function CapacityLiveTool({
     }))
   }, [inputs, monthLabels, currency, r, horizon])
 
+  // The levers that will not move the binding ceiling. In a sales conversation
+  // this is the useful half: it takes away the plan they walked in with.
+  const deadLevers = useMemo(
+    () => scenarios.filter(x => x.isNoChange).map(x => x.label),
+    [scenarios]
+  )
+  const liveLeverCount = scenarios.length - deadLevers.length
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
@@ -359,6 +396,46 @@ export default function CapacityLiveTool({
         )}
       </div>
 
+      {mode === "diagnose" && inaction && (
+        <div style={{ background: "#1A1916", color: "#fff", borderRadius: 12, padding: "20px 22px", marginBottom: 20 }}>
+          <div style={{ fontSize: 18, lineHeight: 1.45, fontWeight: 600 }}>
+            {inaction.neverReaches
+              ? <>At these numbers you never reach {fmt$(goal)}/mo — not in {inaction.years} year{inaction.years === 1 ? "" : "s"}, and not after that.</>
+              : <>You reach {fmt$(goal)}/mo, but not before {monthLabels[r.goalHitMonth]}.</>}
+          </div>
+          <div style={{ fontSize: 15, lineHeight: 1.55, color: "#C9C4BC", marginTop: 10 }}>
+            {inaction.neverReaches ? (
+              // Only claim uncollected revenue when the goal genuinely goes
+              // unmet. Saying it to someone who hits their goal in month five
+              // invites the one pushback that costs the room.
+              <>
+                Running this model unchanged leaves{" "}
+                <strong style={{ color: "#F0A088" }}>{fmt$(inaction.shortfall)}</strong> of your own goal
+                uncollected over the next {inaction.years} year{inaction.years === 1 ? "" : "s"}
+                {inaction.endGap > 0 && <> — still {fmt$(inaction.endGap)}/mo short at the end of it</>}.
+              </>
+            ) : (
+              <>
+                You get there — and then the same model stops at{" "}
+                <strong style={{ color: "#F0A088" }}>{fmt$(r.mrrCap!)}/mo</strong>, held down by{" "}
+                {r.bindingConstraint === "demand" ? "the rate your clients leave" : "the hours your team can deliver"}.
+                The goal is not the ceiling.
+              </>
+            )}
+          </div>
+          {deadLevers.length > 0 && (
+            <div style={{ marginTop: 16, borderTop: "1px solid #3A3833", paddingTop: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", marginBottom: 8 }}>
+                What will not move that number
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.7, color: "#E6E1D9" }}>
+                {deadLevers.map(l => <li key={l}>{l}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {capacityPlan && (
         <div style={{ background: "#F5F1EC", border: "1px solid #ECE7DE", borderRadius: 10, padding: "13px 16px", marginBottom: 20 }}>
           <div style={{ fontSize: 14, lineHeight: 1.5, color: "#1A1916" }}>
@@ -395,7 +472,7 @@ export default function CapacityLiveTool({
       {goalVerdict && (
         <div style={{ fontSize: 14, lineHeight: 1.5, color: goalVerdict.ok ? "#1F7A4D" : "#9A3412", marginBottom: 20, padding: "0 2px" }}>
           {goalVerdict.ok ? "\u2713 " : "\u2192 "}{goalVerdict.text}
-          {minPriceRise && (
+          {mode === "prescribe" && minPriceRise && (
             <div style={{ color: "#1F7A4D", marginTop: 4, fontWeight: 600 }}>
               A {minPriceRise.pct}% price rise gets you there — {fmtCurrency(minPriceRise.price, currency)}/mo per client, reaching {fmt$(goal)} by {minPriceRise.month}.
             </div>
@@ -410,7 +487,26 @@ export default function CapacityLiveTool({
       )}
 
       {/* Scenarios */}
-      {sequence && (
+      {mode === "diagnose" && liveLeverCount > 0 && (
+        <div style={{ border: `1px solid ${accent}`, borderRadius: 12, padding: "20px 22px", marginBottom: 24, background: "#FBF0EB" }}>
+          <div style={{ fontSize: 16, lineHeight: 1.5, color: "#1A1916" }}>
+            There {liveLeverCount === 1 ? "is" : "are"} <strong>{liveLeverCount}</strong>{" "}
+            {liveLeverCount === 1 ? "move" : "moves"} that would break this ceiling
+            {deadLevers.length > 0 && <> — and {deadLevers.length} that would not</>}.
+            Which {liveLeverCount === 1 ? "one applies" : "ones apply"} to you depends on
+            why your {r.bindingConstraint === "demand" ? "clients leave" : "delivery capacity"} sits where it does,
+            and that is not a question a calculator can answer.
+          </div>
+          {schedulingUrl && (
+            <a href={schedulingUrl} target="_blank" rel="noopener noreferrer"
+              style={{ display: "inline-block", marginTop: 15, fontSize: 15, fontWeight: 600, color: "#fff", background: accent, borderRadius: 9, padding: "12px 26px", textDecoration: "none" }}>
+              Walk through your numbers with John →
+            </a>
+          )}
+        </div>
+      )}
+
+      {mode === "prescribe" && sequence && (
         <div style={{ marginBottom: 26 }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", margin: "0 0 12px" }}>
             In what order — your path to {fmt$(goal)}/mo
@@ -446,6 +542,7 @@ export default function CapacityLiveTool({
         </div>
       )}
 
+{mode === "prescribe" && (<>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", margin: "0 0 12px" }}>Ways to grow past the ceiling</div>
       <ul style={{ margin: 0, paddingLeft: 20 }}>
         {scenarios.map((s, i) => (
@@ -459,6 +556,7 @@ export default function CapacityLiveTool({
           </li>
         ))}
       </ul>
+      </>)}
     </div>
   )
 }
