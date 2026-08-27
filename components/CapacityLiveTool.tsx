@@ -107,7 +107,7 @@ export default function CapacityLiveTool({
   // close rate into month 4 means "from month 4, this is the rate", which is how
   // a change that takes time to land actually behaves.
   const [overrides, setOverrides] = useState<Record<number, Partial<MonthDrivers>>>({})
-  const [tableOpen, setTableOpen] = useState(false)
+  const [tableOpen, setTableOpen] = useState(true)
   const hasOverrides = Object.keys(overrides).length > 0
 
   const driversAt = useCallback((i: number): MonthDrivers => {
