@@ -71,7 +71,9 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
           </g>
         ))}
         {labels.map((label, i) => {
-          if (i % labelStep !== 0 && i !== lastIdx) return null
+          // Always label the last month; drop a step-label that would land on
+          // top of it (at 36 months the step lands one month short).
+          if (i !== lastIdx && (i % labelStep !== 0 || lastIdx - i < labelStep * 0.6)) return null
           return <text key={i} x={toX(i)} y={H - 6} textAnchor="middle" fontSize={10} fill="#9C9590">{label}</text>
         })}
         {capY !== null && mrrCap != null && (

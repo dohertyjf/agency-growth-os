@@ -16,8 +16,9 @@ export default function GrowthGapPage() {
       <div style={{ maxWidth: 940, margin: "0 auto", padding: "40px 24px" }}>
         <CapacityLiveTool
           mode="diagnose"
+          defaultHorizon={36}
           schedulingUrl={schedulingUrl}
-          title="Will your current model get you there?"
+          title="What is your current model costing you?"
           subtitle="Enter your real numbers. Nothing is saved or sent anywhere."
         />
       </div>
