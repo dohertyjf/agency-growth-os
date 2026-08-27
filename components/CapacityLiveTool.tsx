@@ -1,6 +1,6 @@
 "use client"
-import { useMemo, useState } from "react"
-import { projectCapacity, fmtCurrency, fmtPercent, ymAdd, ymLabel, type CapacityInputs } from "@/lib/calc"
+import { useCallback, useMemo, useState } from "react"
+import { projectCapacity, projectSchedule, fmtCurrency, fmtPercent, ymAdd, ymLabel, type CapacityInputs, type MonthDrivers } from "@/lib/calc"
 import CapacityChart from "@/components/CapacityChart"
 
 type Currency = "USD" | "GBP" | "EUR"
@@ -95,13 +95,51 @@ export default function CapacityLiveTool({
   // The horizon doubles as the goal deadline — "$50k within 2 years" is one
   // question, not two, so it gets one control.
   const [horizon, setHorizon] = useState(defaultHorizon)
-
   const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
   const inputs = useMemo<CapacityInputs>(() => ({
     startRevenue: num(v.startRevenue), leads: num(v.leads), closeRate: num(v.closeRate),
     avgDeal: num(v.avgDeal), churnPct: num(v.churnPct), hoursPerClient: num(v.hoursPerClient),
     billableHours: num(v.billableHours), activeClients: num(v.activeClients), goalMRR: num(v.goalMRR),
   }), [v])
+
+  // Per-month driver overrides, keyed by 0-based month index. An entry applies
+  // from that month onward until another entry supersedes it — so typing a
+  // close rate into month 4 means "from month 4, this is the rate", which is how
+  // a change that takes time to land actually behaves.
+  const [overrides, setOverrides] = useState<Record<number, Partial<MonthDrivers>>>({})
+  const [tableOpen, setTableOpen] = useState(false)
+  const hasOverrides = Object.keys(overrides).length > 0
+
+  const driversAt = useCallback((i: number): MonthDrivers => {
+    const d: MonthDrivers = {
+      leads: inputs.leads, closeRate: inputs.closeRate,
+      avgDeal: inputs.avgDeal, churnPct: inputs.churnPct ?? 0,
+    }
+    for (let m = 0; m <= i; m++) {
+      const o = overrides[m]
+      if (o) Object.assign(d, o)
+    }
+    return d
+  }, [inputs, overrides])
+
+  const rows = useMemo(
+    () => projectSchedule(inputs.startRevenue, driversAt, inputs.hoursPerClient, inputs.billableHours, horizon),
+    [inputs.startRevenue, inputs.hoursPerClient, inputs.billableHours, horizon, driversAt]
+  )
+  const editedPath = useMemo(() => rows.map(x => x.mrr), [rows])
+
+  function setOverride(monthIdx: number, key: keyof MonthDrivers, raw: string) {
+    const n = parseFloat(raw)
+    setOverrides(prev => {
+      const next = { ...prev }
+      const cur = { ...(next[monthIdx] ?? {}) }
+      if (raw.trim() === "" || isNaN(n)) delete cur[key]
+      else cur[key] = n
+      if (Object.keys(cur).length === 0) delete next[monthIdx]
+      else next[monthIdx] = cur
+      return next
+    })
+  }
 
   const r = useMemo(() => projectCapacity(inputs, horizon), [inputs, horizon])
   const now = useMemo(() => new Date().toISOString().slice(0, 7), [])
@@ -467,7 +505,8 @@ export default function CapacityLiveTool({
       {/* Chart */}
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginBottom: 24 }}>
         <CapacityChart
-          projected={r.projected}
+          projected={editedPath}
+          baseline={hasOverrides ? r.projected : null}
           startValue={inputs.startRevenue}
           mrrCap={r.mrrCap}
           goal={goal}
@@ -478,6 +517,70 @@ export default function CapacityLiveTool({
           startLabel={ymLabel(now)}
           currency={currency}
         />
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <button type="button" onClick={() => setTableOpen(o => !o)}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C9590", fontFamily: "inherit" }}>
+          {tableOpen ? "▾" : "▸"} Month by month{hasOverrides ? " · edited" : ""}
+        </button>
+        {hasOverrides && (
+          <button type="button" onClick={() => setOverrides({})}
+            style={{ marginLeft: 12, background: "none", border: "1px solid #ECE7DE", borderRadius: 6, padding: "2px 9px", cursor: "pointer", fontSize: 11, color: "#9C9590", fontFamily: "inherit" }}>
+            reset changes
+          </button>
+        )}
+        {tableOpen && (
+          <div style={{ marginTop: 10, border: "1px solid #ECE7DE", borderRadius: 10, background: "#fff", maxHeight: 420, overflow: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+              <thead>
+                <tr style={{ position: "sticky", top: 0, background: "#F5F1EC", zIndex: 1 }}>
+                  {["Month", "Leads", "Close %", "Avg deal", "Churn %", "Won", "Lost", "Clients", "MRR"].map((h, i) => (
+                    <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "7px 9px", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6B6760", whiteSpace: "nowrap", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => {
+                  const edited = overrides[i]
+                  const cell = (key: keyof MonthDrivers, val: number, step: number) => (
+                    <td style={{ textAlign: "right", padding: "2px 4px", borderBottom: "1px solid #F5F1EC" }}>
+                      <input
+                        type="number" step={step} value={String(Math.round(val * 100) / 100)}
+                        onChange={e => setOverride(i, key, e.target.value)}
+                        style={{
+                          width: 72, textAlign: "right", fontFamily: "inherit", fontSize: 12,
+                          padding: "4px 6px", borderRadius: 5, outline: "none",
+                          border: `1px solid ${edited?.[key] != null ? accent : "transparent"}`,
+                          background: edited?.[key] != null ? "#FBF0EB" : "transparent",
+                          color: "#1A1916", fontVariantNumeric: "tabular-nums",
+                        }} />
+                    </td>
+                  )
+                  return (
+                    <tr key={i} style={{ background: row.atCeiling ? "#FAF8F4" : "#fff" }}>
+                      <td style={{ padding: "2px 9px", color: "#6B6760", whiteSpace: "nowrap", borderBottom: "1px solid #F5F1EC" }}>{monthLabels[i]}</td>
+                      {cell("leads", row.leads, 1)}
+                      {cell("closeRate", row.closeRate, 1)}
+                      {cell("avgDeal", row.avgDeal, 100)}
+                      {cell("churnPct", row.churnPct, 0.5)}
+                      <td style={{ textAlign: "right", padding: "2px 9px", color: "#1F7A4D", borderBottom: "1px solid #F5F1EC" }}>+{row.won.toFixed(1)}</td>
+                      <td style={{ textAlign: "right", padding: "2px 9px", color: "#9A3412", borderBottom: "1px solid #F5F1EC" }}>−{row.churnedClients.toFixed(1)}</td>
+                      <td style={{ textAlign: "right", padding: "2px 9px", color: "#1A1916", fontWeight: 600, borderBottom: "1px solid #F5F1EC" }}>{row.clients.toFixed(1)}</td>
+                      <td style={{ textAlign: "right", padding: "2px 9px", color: "#1A1916", fontWeight: 600, whiteSpace: "nowrap", borderBottom: "1px solid #F5F1EC" }}>{fmt$(row.mrr)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {tableOpen && (
+          <div style={{ fontSize: 11, color: "#9C9590", marginTop: 7, lineHeight: 1.5 }}>
+            Change a number and it applies from that month onward — that is how you model a change that takes time to land.
+            Won, lost, clients and MRR are calculated. Shaded rows are at the ceiling.
+          </div>
+        )}
       </div>
 
       {goalVerdict && (

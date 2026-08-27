@@ -24,11 +24,13 @@ interface Props {
   ceilingLabel?: string
   /** The constraint waiting behind the binding one, drawn faintly. */
   secondCeiling?: { value: number; label: string } | null
+  /** Untouched projection, drawn faintly behind an edited one for comparison. */
+  baseline?: number[] | null
 }
 
 const accent = "#E9532A"
 
-export default function CapacityChart({ projected, startValue, mrrCap, goal, ceilingHitMonth, monthLabels, startLabel = "now", currency, ceilingLabel = "Capacity ceiling", secondCeiling = null }: Props) {
+export default function CapacityChart({ projected, startValue, mrrCap, goal, ceilingHitMonth, monthLabels, startLabel = "now", currency, ceilingLabel = "Capacity ceiling", secondCeiling = null, baseline = null }: Props) {
   const sym = currSym(currency)
   const fmt$ = (v: number) => fmtCurrency(v, currency)
   const [hover, setHover] = useState<number | null>(null)
@@ -39,7 +41,8 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
   const series = [startValue, ...projected]
   const labels = [startLabel, ...monthLabels]
 
-  const allVals = [...series, goal, mrrCap ?? 0, secondCeiling?.value ?? 0].filter(v => v > 0)
+  const baseSeries = baseline ? [startValue, ...baseline] : null
+  const allVals = [...series, ...(baseSeries ?? []), goal, mrrCap ?? 0, secondCeiling?.value ?? 0].filter(v => v > 0)
   const dataMax = allVals.length ? Math.max(...allVals) : 1
   const dataMin = allVals.length ? Math.min(...allVals) : 0
   const spread = dataMax - dataMin || dataMax * 0.15 || 1
@@ -96,6 +99,10 @@ export default function CapacityChart({ projected, startValue, mrrCap, goal, cei
         )}
         {ceilingHitMonth >= 0 && (
           <line x1={toX(ceilingHitMonth + 1)} y1={PT} x2={toX(ceilingHitMonth + 1)} y2={PT + plotH} stroke="#6B6760" strokeWidth={1} strokeDasharray="3,2" opacity={0.3} />
+        )}
+        {baseSeries && (
+          <path d={baseSeries.map((v, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(v)}`).join(" ")}
+            fill="none" stroke="#9C9590" strokeWidth={1.5} strokeDasharray="2,4" opacity={0.55} />
         )}
         <path d={pathD} fill="none" stroke={accent} strokeWidth={2} strokeDasharray="5,3" />
         {series.map((v, i) => (

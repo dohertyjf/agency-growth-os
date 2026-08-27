@@ -209,25 +209,70 @@ export interface CapacityResult {
 // exact comparison would report "never reached" forever.
 export const CEILING_REACHED_AT = 0.99
 
-// `churnRate` is the fraction of the book lost each month, NOT a client count.
-// Churn scales with how many clients you have: an agency losing 1 of 7 clients a
-// month is losing 14% of its book, and is still losing 14% once it has 70. The
-// old fixed-count model held the headcount constant as the book grew, which
-// quietly assumed retention improved as you scaled.
-export function projectMRR(
-  startMRR: number, leads: number, closeRate: number,
-  avgDeal: number, churnRate: number, months: number,
-  cap?: number
-): number[] {
-  const result: number[] = []
-  const newMRR = leads * (closeRate / 100) * avgDeal
-  let mrr = startMRR
+// The four inputs that can legitimately differ month to month. Everything else
+// about the model (hours per client, team capacity) is a property of the agency
+// rather than something you schedule.
+export interface MonthDrivers {
+  leads: number
+  closeRate: number   // percent
+  avgDeal: number
+  churnPct: number    // percent of the book lost that month
+}
+
+export interface MonthRow {
+  month: number       // 1-based
+  leads: number
+  closeRate: number
+  avgDeal: number
+  churnPct: number
+  won: number         // clients won
+  churnedClients: number
+  clients: number     // at end of month
+  newRev: number
+  churnedRev: number
+  mrr: number         // at end of month
+  atCeiling: boolean
+}
+
+// The single projection engine. Callers holding every driver constant pass a
+// function that ignores the month; the editable table passes one that reads its
+// overrides. Avg deal size can move, so the capacity ceiling is recomputed each
+// month rather than fixed up front.
+export function projectSchedule(
+  startRevenue: number,
+  driversAt: (monthIndex: number) => MonthDrivers,
+  hoursPerClient: number,
+  billableHours: number,
+  months: number,
+): MonthRow[] {
+  const maxClients = hoursPerClient > 0 && billableHours > 0
+    ? Math.floor(billableHours / hoursPerClient)
+    : null
+  const rows: MonthRow[] = []
+  let mrr = startRevenue
   for (let i = 0; i < months; i++) {
-    mrr = Math.max(0, mrr + newMRR - mrr * churnRate)
-    if (cap !== undefined) mrr = Math.min(mrr, cap)
-    result.push(Math.round(mrr))
+    const d = driversAt(i)
+    const churnRate = Math.min(1, Math.max(0, d.churnPct / 100))
+    const won = d.leads * (d.closeRate / 100)
+    const newRev = won * d.avgDeal
+    const churnedRev = mrr * churnRate
+    const churnedClients = d.avgDeal > 0 ? churnedRev / d.avgDeal : 0
+    const ceiling = maxClients !== null && d.avgDeal > 0 ? maxClients * d.avgDeal : null
+    let next = Math.max(0, mrr + newRev - churnedRev)
+    const atCeiling = ceiling !== null && next >= ceiling
+    if (ceiling !== null) next = Math.min(next, ceiling)
+    mrr = next
+    rows.push({
+      month: i + 1,
+      leads: d.leads, closeRate: d.closeRate, avgDeal: d.avgDeal, churnPct: d.churnPct,
+      won, churnedClients,
+      clients: d.avgDeal > 0 ? mrr / d.avgDeal : 0,
+      newRev, churnedRev,
+      mrr: Math.round(mrr),
+      atCeiling,
+    })
   }
-  return result
+  return rows
 }
 
 export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResult {
@@ -241,7 +286,7 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   const churnRate = churnRateOf(inp)
 
   // Ceiling 2 — growth stalls where new wins equal churn losses. An asymptote,
-  // not a wall, so it is never passed to projectMRR as a hard cap. With no churn
+  // not a wall, so it is never applied as a hard cap. With no churn
   // there is no demand ceiling: revenue grows without bound.
   const newMRRPerMonth = inp.leads * (inp.closeRate / 100) * inp.avgDeal
   const demandCeiling = churnRate > 0 ? newMRRPerMonth / churnRate : null
@@ -254,10 +299,14 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
         ? "demand"
         : "capacity"
 
-  const projected = projectMRR(
-    inp.startRevenue, inp.leads, inp.closeRate, inp.avgDeal, churnRate, months,
-    capacityCeiling ?? undefined
-  )
+  // Delegate to the scheduled engine with every driver held constant, so the
+  // constant case and the edited-per-month case cannot diverge.
+  const constant: MonthDrivers = {
+    leads: inp.leads, closeRate: inp.closeRate, avgDeal: inp.avgDeal, churnPct: churnRate * 100,
+  }
+  const projected = projectSchedule(
+    inp.startRevenue, () => constant, inp.hoursPerClient, inp.billableHours, months,
+  ).map(r => r.mrr)
 
   const ceilingHitMonth = mrrCap !== null
     ? projected.findIndex(v => v >= mrrCap * CEILING_REACHED_AT)
@@ -268,9 +317,9 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   // What the same agency would do if delivery capacity were never the limit.
   // The gap between this and `projected` is the revenue capacity is costing
   // them, and it is what says how much capacity they need to build.
-  const uncapped = projectMRR(
-    inp.startRevenue, inp.leads, inp.closeRate, inp.avgDeal, churnRate, months
-  )
+  const uncapped = projectSchedule(
+    inp.startRevenue, () => constant, inp.hoursPerClient, 0, months,
+  ).map(r => r.mrr)
   const hoursNeeded = inp.avgDeal > 0
     ? uncapped.map(v => Math.ceil((v / inp.avgDeal) * inp.hoursPerClient))
     : uncapped.map(() => 0)
