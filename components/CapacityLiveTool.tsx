@@ -199,6 +199,37 @@ export default function CapacityLiveTool({
     }
   }, [r, inputs.billableHours, monthLabels, horizon])
 
+  // Once the table has been edited, describing the untouched numbers is simply
+  // wrong. Summarise what was actually changed: for each driver, the value it
+  // ends on and the month it starts applying from — which is the whole point of
+  // editing at a month rather than at the top.
+  const editSummary = useMemo(() => {
+    if (!hasOverrides || goal <= 0) return null
+    const final = driversAt(horizon - 1)
+    const order: (keyof MonthDrivers)[] = ["closeRate", "avgDeal", "leads", "churnPct"]
+    const parts: string[] = []
+    for (const k of order) {
+      let lastIdx = -1
+      for (const key of Object.keys(overrides)) {
+        const m = Number(key)
+        if (overrides[m]?.[k] != null && m > lastIdx) lastIdx = m
+      }
+      if (lastIdx < 0) continue
+      const v = final[k]
+      const label =
+        k === "leads" ? `leads at ${Math.round(v)}/mo`
+        : k === "closeRate" ? `close rate at ${fmtPercent(v)}`
+        : k === "avgDeal" ? `average deal at ${fmtCurrency(Math.round(v), currency)}`
+        : `churn at ${fmtPercent(v)}`
+      parts.push(`${label} from ${monthLabels[lastIdx]}`)
+    }
+    if (parts.length === 0) return null
+    const list = parts.length === 1 ? parts[0]
+      : parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1]
+    const hit = rows.findIndex(x => x.mrr >= goal)
+    return { list, hitMonth: hit >= 0 ? monthLabels[hit] : null, end: rows[rows.length - 1].mrr }
+  }, [hasOverrides, goal, overrides, driversAt, horizon, monthLabels, currency, rows])
+
   const goalVerdict = useMemo(() => {
     if (goal <= 0) return null
     // The goal in clients, not just money — "17 clients" lands where "$50,000"
@@ -593,7 +624,15 @@ export default function CapacityLiveTool({
         )}
       </div>
 
-      {goalVerdict && (
+      {editSummary ? (
+        <div style={{ fontSize: 15, lineHeight: 1.55, marginBottom: 20, padding: "0 2px", color: editSummary.hitMonth ? "#1F7A4D" : "#9A3412" }}>
+          {editSummary.hitMonth ? (
+            <>&#10003; You reach <strong>{fmt$(goal)}/mo</strong> by <strong>{editSummary.hitMonth}</strong> — with {editSummary.list}.</>
+          ) : (
+            <>&#8594; Even with {editSummary.list}, you do not reach {fmt$(goal)}/mo — you end on <strong>{fmt$(editSummary.end)}/mo</strong>.</>
+          )}
+        </div>
+      ) : goalVerdict && (
         <div style={{ fontSize: 14, lineHeight: 1.5, color: goalVerdict.ok ? "#1F7A4D" : "#9A3412", marginBottom: 20, padding: "0 2px" }}>
           {goalVerdict.ok ? "\u2713 " : "\u2192 "}{goalVerdict.text}
           {mode === "prescribe" && minPriceRise && (
