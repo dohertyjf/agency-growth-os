@@ -3,6 +3,7 @@ import { useState } from "react"
 import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, BOOKED_AHEAD_MONTHS, type ContractRow } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import PaymentScheduleModal from "./PaymentScheduleModal"
+import ConfirmDialog from "./ConfirmDialog"
 import ProjectPulse, { type Pulse } from "./ProjectPulse"
 
 interface Contract {
@@ -548,6 +549,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   const [form, setForm] = useState({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null, ownerId: null as string | null, productId: null as string | null })
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showAllGantt, setShowAllGantt] = useState(false)
   const [view, setView] = useState<"timeline" | "yield">("timeline")
 
@@ -596,9 +598,16 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     setSaving(false)
   }
 
-  async function handleDelete(contractId: string) {
-    await fetch(`/api/contracts/${contractId}`, { method: "DELETE" })
-    updateContracts(contracts.filter(c => c.id !== contractId))
+  function handleDelete(contractId: string) {
+    setDeletingId(contractId)
+  }
+
+  async function confirmDelete() {
+    if (!deletingId) return
+    const id = deletingId
+    setDeletingId(null)
+    updateContracts(contracts.filter(c => c.id !== id))
+    await fetch(`/api/contracts/${id}`, { method: "DELETE" })
   }
 
   function handleEdited(updated: Contract) {
@@ -630,6 +639,12 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       <style>{contractsResponsiveStyle}</style>
+      <ConfirmDialog
+        open={!!deletingId}
+        title={`Delete "${contracts.find(c => c.id === deletingId)?.name ?? "this project"}"?`}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
       {editingContract && (
         <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} products={products} people={people} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
       )}

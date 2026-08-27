@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import PaymentScheduleModal from "./PaymentScheduleModal"
+import ConfirmDialog from "./ConfirmDialog"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Contract {
@@ -516,8 +517,8 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
   )
 }
 
-function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage }: {
-  deal: Contract; accountName: string | null; product?: string; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void; onSetStage: (id: string, stage: Stage) => void
+function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage, onDelete }: {
+  deal: Contract; accountName: string | null; product?: string; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void; onSetStage: (id: string, stage: Stage) => void; onDelete: (id: string) => void
 }) {
   return (
     <div draggable
@@ -538,6 +539,8 @@ function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage
         </select>
         <button onClick={() => onEdit(deal)} title="Edit"
           style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#9C9590", cursor: "pointer", padding: "1px 7px", lineHeight: 1.4 }}>Edit</button>
+        <button onClick={() => onDelete(deal.id)} title="Delete"
+          style={{ background: "none", border: "none", color: "#C4BFBA", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: "0 2px" }}>×</button>
       </div>
       <div style={{ fontSize: 10, color: "#C0BAB2", marginTop: 1 }}>
         Created {fmtStamp(deal.createdAt)}{deal.updatedAt && deal.updatedAt !== deal.createdAt && ` · Updated ${fmtStamp(deal.updatedAt)}`}
@@ -546,7 +549,7 @@ function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage
   )
 }
 
-function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage }: {
+function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage, onDelete }: {
   col: typeof STAGE_COLS[number]
   deals: Contract[]
   accounts: Account[]
@@ -555,6 +558,7 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
   fmt$: (v: number) => string
   onEdit: (d: Contract) => void
   onSetStage: (id: string, stage: Stage) => void
+  onDelete: (id: string) => void
 }) {
   const [over, setOver] = useState(false)
   const bounded = col.stage === "won" || col.stage === "lost"
@@ -581,7 +585,7 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 7, minHeight: 40 }}>
         {shown.map(deal => (
-          <BoardCard key={deal.id} deal={deal} count={noteCounts[deal.id] ?? 0} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage}
+          <BoardCard key={deal.id} deal={deal} count={noteCounts[deal.id] ?? 0} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage} onDelete={onDelete}
             accountName={deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name ?? null : null}
             product={deal.productId ? products.find(p => p.id === deal.productId)?.name ?? undefined : undefined} />
         ))}
@@ -592,7 +596,7 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
   )
 }
 
-function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage }: {
+function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage, onDelete }: {
   deals: Contract[]
   accounts: Account[]
   products: Product[]
@@ -600,12 +604,13 @@ function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, on
   fmt$: (v: number) => string
   onEdit: (d: Contract) => void
   onSetStage: (id: string, stage: Stage) => void
+  onDelete: (id: string) => void
 }) {
   return (
     <div>
       <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, alignItems: "stretch" }}>
         {STAGE_COLS.map(col => (
-          <BoardColumn key={col.stage} col={col} products={products}
+          <BoardColumn key={col.stage} col={col} products={products} onDelete={onDelete}
             deals={deals.filter(d => stageOf(d) === col.stage).sort((a, b) => {
               const key = (d: Contract) => col.stage === "opportunity" ? (d.createdAt ?? "") : (d.stageEnteredAt ?? d.createdAt ?? "")
               return key(b).localeCompare(key(a))
@@ -654,6 +659,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
   })
   const [editSaving, setEditSaving] = useState(false)
   const [scheduleDeal, setScheduleDeal] = useState<Contract | null>(null)
+  const [deletingDeal, setDeletingDeal] = useState<Contract | null>(null)
 
   function openEdit(deal: Contract) {
     const uiType: "retainer" | "ongoing" | "oneoff" =
@@ -777,9 +783,15 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     await updateContract(id, patch)
   }
 
-  async function handleDeleteDeal(id: string) {
+  function handleDeleteDeal(id: string) {
     const deal = contracts.find(c => c.id === id)
-    if (!confirm(`Delete "${deal?.name ?? "this deal"}"? This can't be undone.`)) return
+    if (deal) setDeletingDeal(deal)
+  }
+
+  async function confirmDeleteDeal() {
+    if (!deletingDeal) return
+    const id = deletingDeal.id
+    setDeletingDeal(null)
     onContractsChange(contracts.filter(c => c.id !== id))
     await fetch(`/api/contracts/${id}`, { method: "DELETE" })
   }
@@ -852,6 +864,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           fmt$={fmt$}
           onEdit={openEdit}
           onSetStage={setStage}
+          onDelete={handleDeleteDeal}
         />
       ) : (
       <div style={{ display: "grid", gridTemplateColumns: "7fr 3fr", gap: 24, alignItems: "start" }}>
@@ -1253,6 +1266,13 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deletingDeal}
+        title={deletingDeal ? `Delete "${deletingDeal.name}"?` : undefined}
+        onConfirm={confirmDeleteDeal}
+        onCancel={() => setDeletingDeal(null)}
+      />
 
       {scheduleDeal && (
         <PaymentScheduleModal
