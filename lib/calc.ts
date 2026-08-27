@@ -4,11 +4,11 @@
 export function grossProfit(revenue: number, salaries: number) {
   return revenue - salaries
 }
-export function netProfit(revenue: number, salaries: number, otherExpenses: number) {
-  return revenue - salaries - otherExpenses
+export function netProfit(revenue: number, totalExpenses: number) {
+  return revenue - totalExpenses
 }
-export function netMargin(revenue: number, salaries: number, otherExpenses: number) {
-  return revenue > 0 ? ((revenue - salaries - otherExpenses) / revenue) * 100 : 0
+export function netMargin(revenue: number, totalExpenses: number) {
+  return revenue > 0 ? ((revenue - totalExpenses) / revenue) * 100 : 0
 }
 export function momDelta(curr: number, prev: number) {
   if (prev === 0) return curr === 0 ? 0 : 100
