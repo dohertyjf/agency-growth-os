@@ -59,8 +59,9 @@ function GroupBadge() {
 
 export default function CallsClient({ calls: initialCalls, clients, isCoach, defaultClientId, embedded }: Props) {
   const isMobile = useIsMobile()
-  const [calls, setCalls] = useState<Call[]>(initialCalls)
-  const [selected, setSelected] = useState<Call | null>(calls[0] ?? null)
+  const byDateDesc = (a: Call, b: Call) => (b.date || "").localeCompare(a.date || "")
+  const [calls, setCalls] = useState<Call[]>([...initialCalls].sort(byDateDesc))
+  const [selected, setSelected] = useState<Call | null>([...initialCalls].sort(byDateDesc)[0] ?? null)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ clientId: defaultClientId ?? clients[0]?.id ?? "", date: new Date().toISOString().slice(0, 10), title: "", isGroupCall: false })
   const [saving, setSaving] = useState(false)
@@ -69,8 +70,9 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
   const [qForm, setQForm] = useState({ q: "" })
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
-  const visibleCalls = calls.slice(0, visibleCount)
-  const remaining = calls.length - visibleCount
+  const sortedCalls = [...calls].sort(byDateDesc)
+  const visibleCalls = sortedCalls.slice(0, visibleCount)
+  const remaining = sortedCalls.length - visibleCount
 
   async function handleAddCall(e: React.FormEvent) {
     e.preventDefault()
