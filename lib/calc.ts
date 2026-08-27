@@ -216,8 +216,9 @@ export interface MonthDrivers {
   leads: number
   closeRate: number     // percent
   avgDeal: number
-  churnPct: number      // percent of the book lost that month
+  churnPct: number       // percent of the book lost that month
   hoursPerClient: number // delivery hours each client consumes per month
+  billableHours: number  // total delivery hours the team has that month
 }
 
 export interface MonthRow {
@@ -227,6 +228,7 @@ export interface MonthRow {
   avgDeal: number
   churnPct: number
   hoursPerClient: number
+  billableHours: number
   won: number         // clients won
   churnedClients: number
   clients: number     // at end of month
@@ -243,7 +245,6 @@ export interface MonthRow {
 export function projectSchedule(
   startRevenue: number,
   driversAt: (monthIndex: number) => MonthDrivers,
-  billableHours: number,
   months: number,
 ): MonthRow[] {
   const rows: MonthRow[] = []
@@ -257,8 +258,8 @@ export function projectSchedule(
     const churnedClients = d.avgDeal > 0 ? churnedRev / d.avgDeal : 0
     // Cutting delivery time per client raises how many the team can carry, so
     // the ceiling is recomputed each month alongside price.
-    const maxClients = d.hoursPerClient > 0 && billableHours > 0
-      ? Math.floor(billableHours / d.hoursPerClient)
+    const maxClients = d.hoursPerClient > 0 && d.billableHours > 0
+      ? Math.floor(d.billableHours / d.hoursPerClient)
       : null
     const ceiling = maxClients !== null && d.avgDeal > 0 ? maxClients * d.avgDeal : null
     let next = Math.max(0, mrr + newRev - churnedRev)
@@ -268,7 +269,7 @@ export function projectSchedule(
     rows.push({
       month: i + 1,
       leads: d.leads, closeRate: d.closeRate, avgDeal: d.avgDeal, churnPct: d.churnPct,
-      hoursPerClient: d.hoursPerClient,
+      hoursPerClient: d.hoursPerClient, billableHours: d.billableHours,
       won, churnedClients,
       clients: d.avgDeal > 0 ? mrr / d.avgDeal : 0,
       newRev, churnedRev,
@@ -308,9 +309,10 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   const constant: MonthDrivers = {
     leads: inp.leads, closeRate: inp.closeRate, avgDeal: inp.avgDeal,
     churnPct: churnRate * 100, hoursPerClient: inp.hoursPerClient,
+    billableHours: inp.billableHours,
   }
   const projected = projectSchedule(
-    inp.startRevenue, () => constant, inp.billableHours, months,
+    inp.startRevenue, () => constant, months,
   ).map(r => r.mrr)
 
   const ceilingHitMonth = mrrCap !== null
@@ -322,8 +324,9 @@ export function projectCapacity(inp: CapacityInputs, months = 12): CapacityResul
   // What the same agency would do if delivery capacity were never the limit.
   // The gap between this and `projected` is the revenue capacity is costing
   // them, and it is what says how much capacity they need to build.
+  const noLimit: MonthDrivers = { ...constant, billableHours: 0 }
   const uncapped = projectSchedule(
-    inp.startRevenue, () => constant, 0, months,
+    inp.startRevenue, () => noLimit, months,
   ).map(r => r.mrr)
   const hoursNeeded = inp.avgDeal > 0
     ? uncapped.map(v => Math.ceil((v / inp.avgDeal) * inp.hoursPerClient))
