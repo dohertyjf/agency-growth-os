@@ -517,8 +517,8 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
   )
 }
 
-function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage, onDelete }: {
-  deal: Contract; accountName: string | null; product?: string; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void; onSetStage: (id: string, stage: Stage) => void; onDelete: (id: string) => void
+function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage }: {
+  deal: Contract; accountName: string | null; product?: string; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void; onSetStage: (id: string, stage: Stage) => void
 }) {
   return (
     <div draggable
@@ -539,8 +539,6 @@ function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage
         </select>
         <button onClick={() => onEdit(deal)} title="Edit"
           style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#9C9590", cursor: "pointer", padding: "1px 7px", lineHeight: 1.4 }}>Edit</button>
-        <button onClick={() => onDelete(deal.id)} title="Delete"
-          style={{ background: "none", border: "none", color: "#C4BFBA", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: "0 2px" }}>×</button>
       </div>
       <div style={{ fontSize: 10, color: "#C0BAB2", marginTop: 1 }}>
         Created {fmtStamp(deal.createdAt)}{deal.updatedAt && deal.updatedAt !== deal.createdAt && ` · Updated ${fmtStamp(deal.updatedAt)}`}
@@ -549,7 +547,7 @@ function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage
   )
 }
 
-function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage, onDelete }: {
+function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage }: {
   col: typeof STAGE_COLS[number]
   deals: Contract[]
   accounts: Account[]
@@ -558,7 +556,6 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
   fmt$: (v: number) => string
   onEdit: (d: Contract) => void
   onSetStage: (id: string, stage: Stage) => void
-  onDelete: (id: string) => void
 }) {
   const [over, setOver] = useState(false)
   const bounded = col.stage === "won" || col.stage === "lost"
@@ -585,7 +582,7 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 7, minHeight: 40 }}>
         {shown.map(deal => (
-          <BoardCard key={deal.id} deal={deal} count={noteCounts[deal.id] ?? 0} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage} onDelete={onDelete}
+          <BoardCard key={deal.id} deal={deal} count={noteCounts[deal.id] ?? 0} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage}
             accountName={deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name ?? null : null}
             product={deal.productId ? products.find(p => p.id === deal.productId)?.name ?? undefined : undefined} />
         ))}
@@ -596,7 +593,7 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
   )
 }
 
-function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage, onDelete }: {
+function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage }: {
   deals: Contract[]
   accounts: Account[]
   products: Product[]
@@ -604,13 +601,12 @@ function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, on
   fmt$: (v: number) => string
   onEdit: (d: Contract) => void
   onSetStage: (id: string, stage: Stage) => void
-  onDelete: (id: string) => void
 }) {
   return (
     <div>
       <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, alignItems: "stretch" }}>
         {STAGE_COLS.map(col => (
-          <BoardColumn key={col.stage} col={col} products={products} onDelete={onDelete}
+          <BoardColumn key={col.stage} col={col} products={products}
             deals={deals.filter(d => stageOf(d) === col.stage).sort((a, b) => {
               const key = (d: Contract) => col.stage === "opportunity" ? (d.createdAt ?? "") : (d.stageEnteredAt ?? d.createdAt ?? "")
               return key(b).localeCompare(key(a))
@@ -792,6 +788,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
     if (!deletingDeal) return
     const id = deletingDeal.id
     setDeletingDeal(null)
+    setEditDeal(null)
     onContractsChange(contracts.filter(c => c.id !== id))
     await fetch(`/api/contracts/${id}`, { method: "DELETE" })
   }
@@ -864,7 +861,6 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           fmt$={fmt$}
           onEdit={openEdit}
           onSetStage={setStage}
-          onDelete={handleDeleteDeal}
         />
       ) : (
       <div style={{ display: "grid", gridTemplateColumns: "7fr 3fr", gap: 24, alignItems: "start" }}>
@@ -1249,7 +1245,12 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                   </select>
                 </div>
               )}
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+              <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                <button type="button" onClick={() => editDeal && handleDeleteDeal(editDeal.id)}
+                  style={{ padding: "8px 14px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#C2410C", fontWeight: 600 }}>
+                  Delete
+                </button>
+                <div style={{ display: "flex", gap: 10 }}>
                 <button type="button" onClick={() => setEditDeal(null)}
                   style={{ padding: "8px 16px", background: "none", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, cursor: "pointer", color: "#6B6760" }}>
                   Cancel
@@ -1258,6 +1259,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                   style={{ padding: "8px 20px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: editSaving || !editForm.accountId ? 0.5 : 1 }}>
                   {editSaving ? "Saving…" : "Save Changes"}
                 </button>
+                </div>
               </div>
             </form>
             <div style={{ marginTop: 16, borderTop: "1px solid #ECE7DE", paddingTop: 4 }}>
