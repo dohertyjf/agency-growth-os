@@ -1170,7 +1170,11 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll, onS
     if ((mo - startMo) % step === 0) axisTicks.push(mo)
   }
 
-  const ganttColor: Record<string, string> = { active: "#E9532A", potential: "#F5C4B4", finished: "#D1D5DB" }
+  // Opportunity gets the same blue/amber split the Pipeline panel uses, kept at the tint
+  // weight of the warm bars so the row reads consistently. The fallback is deliberately a
+  // colour no status owns: an unmapped status should look unfamiliar, not impersonate a
+  // real one — that is exactly how "lost" spent its life looking like Qualified.
+  const ganttColor: Record<string, string> = { active: "#E9532A", potential: "#F5C4B4", opportunity: "#B4C4F5", finished: "#D1D5DB" }
   const AXIS_H = 18
   const BAR_H = 16
   const ROW_H = 24
@@ -1209,7 +1213,7 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll, onS
               title={`${label} — click to edit`}
               style={{
               position: "absolute", top: AXIS_H + i * ROW_H + 4, left: `${left}%`, width: `${width}%`,
-              height: BAR_H, background: ganttColor[c.status] ?? "#F5C4B4",
+              height: BAR_H, background: ganttColor[c.status] ?? "#E5E1DA",
               borderRadius: `${clippedLeft ? "0" : "4px"} ${isOngoing || clippedRight ? "0" : "4px"} ${isOngoing || clippedRight ? "0" : "4px"} ${clippedLeft ? "0" : "4px"}`, opacity: 0.85, display: "flex", alignItems: "center",
               paddingLeft: 6, overflow: "hidden", cursor: "pointer",
             }}>
