@@ -1175,14 +1175,27 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll, onS
   // colour no status owns: an unmapped status should look unfamiliar, not impersonate a
   // real one — that is exactly how "lost" spent its life looking like Qualified.
   const ganttColor: Record<string, string> = { active: "#E9532A", potential: "#F5C4B4", opportunity: "#B4C4F5", finished: "#D1D5DB" }
+  // Only label what's actually on the chart — no "Finished" swatch while Show all is off.
+  const legendStatuses = (["active", "potential", "opportunity", "finished"] as const)
+    .filter(st => visible.some(c => c.status === st))
   const AXIS_H = 18
   const BAR_H = 16
   const ROW_H = 24
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <div style={{ fontSize: 10, color: "#9C9590", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Account Runway</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 10, color: "#9C9590", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Account Runway</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+            {legendStatuses.map(st => (
+              <span key={st} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, color: "#9C9590", whiteSpace: "nowrap" }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: ganttColor[st], opacity: 0.85, flexShrink: 0 }} />
+                {STATUS_LABELS[st]}
+              </span>
+            ))}
+          </div>
+        </div>
         <button onClick={onToggleShowAll} style={{ background: "none", border: "none", fontSize: 10, color: "#9C9590", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
           {showAll ? "Active only" : "Show all"}
         </button>
