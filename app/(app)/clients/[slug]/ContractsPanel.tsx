@@ -529,6 +529,8 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
 }
 
 const contractsResponsiveStyle = `
+  .gantt-bar { transition: opacity 0.12s; }
+  .gantt-bar:hover { opacity: 1 !important; }
   @media (max-width: 640px) {
     .contract-row { flex-wrap: wrap !important; gap: 6px 10px !important; }
     .contract-row-actions { flex: 1 1 100% !important; }
@@ -777,11 +779,12 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
           {view === "timeline" && (
             <div className="contract-gantt-wrap">
               <ContractGantt
-                contracts={showAllGantt ? contracts : contracts.filter(c => c.status !== "finished")}
+                contracts={contracts.filter(c => c.status !== "lost" && (showAllGantt || c.status !== "finished"))}
                 accounts={localAccounts}
                 now={now}
                 showAll={showAllGantt}
                 onToggleShowAll={() => setShowAllGantt(v => !v)}
+                onSelect={setEditingContract}
               />
             </div>
           )}
@@ -1119,7 +1122,7 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }:
   )
 }
 
-function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: { contracts: Contract[]; accounts: Account[]; now: string; showAll: boolean; onToggleShowAll: () => void }) {
+function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll, onSelect }: { contracts: Contract[]; accounts: Account[]; now: string; showAll: boolean; onToggleShowAll: () => void; onSelect: (c: Contract) => void }) {
   if (!contracts.length) return null
 
   // One-offs display on their delivery (work) window, not the single payment month.
@@ -1200,13 +1203,17 @@ function ContractGantt({ contracts, accounts, now, showAll, onToggleShowAll }: {
           const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name : null
           const label = accountName ? `${c.name} - ${accountName}` : c.name
           return (
-            <div key={c.id} style={{
+            <div key={c.id} className="gantt-bar" role="button" tabIndex={0}
+              onClick={() => onSelect(c)}
+              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(c) } }}
+              title={`${label} — click to edit`}
+              style={{
               position: "absolute", top: AXIS_H + i * ROW_H + 4, left: `${left}%`, width: `${width}%`,
               height: BAR_H, background: ganttColor[c.status] ?? "#F5C4B4",
               borderRadius: `${clippedLeft ? "0" : "4px"} ${isOngoing || clippedRight ? "0" : "4px"} ${isOngoing || clippedRight ? "0" : "4px"} ${clippedLeft ? "0" : "4px"}`, opacity: 0.85, display: "flex", alignItems: "center",
-              paddingLeft: 6, overflow: "hidden",
+              paddingLeft: 6, overflow: "hidden", cursor: "pointer",
             }}>
-              <span style={{ fontSize: 9, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }} title={label}>{label}</span>
+              <span style={{ fontSize: 9, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{label}</span>
               {(isOngoing || clippedRight) && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, paddingRight: 4, flexShrink: 0 }}>→</span>}
             </div>
           )
