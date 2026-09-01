@@ -186,6 +186,10 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
     const overBudget = sold != null && actual != null && actual > sold
     return { c, accountName, perMonth, money, sold, actual, perHr, overBudget }
   })
+    // The month picker chooses *which* one-offs are on screen — those being delivered in
+    // it — while the figures stay whole-project. Scoping the list (not the money) is what
+    // keeps the picker meaningful without re-introducing the per-month fee split.
+    .filter(r => r.perMonth.some(pm => pm.month === month))
   // Same default as the monthly table: worst yield first, unlogged last.
   const sortedOneoffs = [...oneoffRows].sort((a, b) => (a.perHr ?? Infinity) - (b.perHr ?? Infinity))
 
@@ -314,9 +318,9 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
 
       {oneoffRows.length > 0 && (
         <div style={{ marginTop: 24, borderTop: "1px solid #ECE7DE", paddingTop: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>One-off projects</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>One-off projects delivering in {monthLabel(month)}</div>
           <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2, marginBottom: 10 }}>
-            Priced per project, so yield is the whole fee over every hour delivery took — not per month, and not affected by the month picker above. Click a project to log hours for each of its delivery months.
+            Priced per project, so the figures below are for the whole project, not this month alone. Click one to log hours against each of its delivery months.
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
