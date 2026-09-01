@@ -551,7 +551,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   const [showPast, setShowPast] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showAllGantt, setShowAllGantt] = useState(false)
-  const [view, setView] = useState<"timeline" | "yield">("timeline")
+  const [view, setView] = useState<"list" | "timeline" | "yield">("list")
 
   function handleAccountCreated(account: Account) {
     setLocalAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))
@@ -773,14 +773,14 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
       ) : (
         <>
           <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 12 }}>
-            {([["timeline", "Timeline"], ["yield", "Hourly yield"]] as const).map(([v, label]) => (
+            {([["list", "List"], ["timeline", "Timeline"], ["yield", "Hourly yield"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)}
                 style={{ padding: "4px 12px", fontSize: 11, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: view === v ? "#fff" : "transparent", color: view === v ? "#1A1916" : "#9C9590", boxShadow: view === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
                 {label}
               </button>
             ))}
           </div>
-          {view === "timeline" ? (
+          {view === "timeline" && (
             <div className="contract-gantt-wrap">
               <ContractGantt
                 contracts={showAllGantt ? contracts : contracts.filter(c => c.status !== "finished")}
@@ -790,7 +790,9 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
                 onToggleShowAll={() => setShowAllGantt(v => !v)}
               />
             </div>
-          ) : (
+          )}
+
+          {view === "yield" && (
             <HourlyYieldTable
               contracts={contracts}
               accounts={localAccounts}
@@ -799,6 +801,8 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
             />
           )}
 
+          {view === "list" && (
+            <>
           {/* Active */}
           {byStatus.active.length > 0 && (
             <ContractSection
@@ -863,6 +867,8 @@ onSchedule={setSchedulingContract}
                 />
               )}
             </div>
+          )}
+            </>
           )}
         </>
       )}
@@ -1014,8 +1020,10 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }:
     .map(c => ({ c, accountName: nameFor(c), perHr: c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null }))
     .sort((a, b) => (b.perHr ?? -1) - (a.perHr ?? -1))
 
+  // Active only, same as the retainers above. Finished work belongs in the List tab's
+  // "Past" section, not in a table headed "no active projects to measure yet".
   const oneoffs = contracts
-    .filter(c => c.type === "oneoff" && (c.status === "active" || c.status === "finished"))
+    .filter(c => c.type === "oneoff" && c.status === "active")
     .map(c => ({ c, accountName: nameFor(c), perHr: c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null }))
     .sort((a, b) => (b.perHr ?? -1) - (a.perHr ?? -1))
 
