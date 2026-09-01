@@ -434,6 +434,7 @@ export default function ClientPageClient({
               accounts={accounts}
               accountMonths={initialAccountMonths}
               initialHours={initialContractHours}
+              deliveryMonths={initialDeliveryMonths}
               minHourlyRate={goal?.minHourlyRate ?? null}
             />
           ) : (

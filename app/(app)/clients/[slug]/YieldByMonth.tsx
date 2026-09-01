@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Contract {
@@ -26,6 +26,15 @@ function ymAdd(ym: string, n: number): string {
   const t = y * 12 + (m - 1) + n
   return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`
 }
+function ymSpan(a: string, b: string): string[] {
+  const out: string[] = []
+  const [ay, am] = a.split("-").map(Number)
+  const [by, bm] = b.split("-").map(Number)
+  for (let t = ay * 12 + am - 1; t <= by * 12 + bm - 1; t++) {
+    out.push(`${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`)
+  }
+  return out
+}
 function monthLabel(ym: string): string {
   const [y, m] = ym.split("-").map(Number)
   const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -45,11 +54,12 @@ function activeInMonth(c: Contract, ym: string) {
   return c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym)
 }
 
-export default function YieldByMonth({ contracts, accounts, accountMonths, initialHours, minHourlyRate }: {
+export default function YieldByMonth({ contracts, accounts, accountMonths, initialHours, deliveryMonths, minHourlyRate }: {
   contracts: Contract[]
   accounts: Account[]
   accountMonths: AccountMonth[]
   initialHours: HoursRow[]
+  deliveryMonths: HoursRow[]
   minHourlyRate: number | null
 }) {
   const fmt$ = useFmtCurrency()
@@ -65,12 +75,19 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
   const [editing, setEditing] = useState<string | null>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null)
+  // One-off rows expand to reveal a per-month hours input for each delivery month.
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [editingCell, setEditingCell] = useState<string | null>(null)
 
   const hasMin = minHourlyRate != null && minHourlyRate > 0
 
   // Yield measures work actually delivered, so speculative pipeline (Qualified /
   // Opportunity) and lost deals are excluded — only signed work has real hours to log.
   const delivered = contracts.filter(c => c.status === "active" || c.status === "finished")
+  // Retainers bill by the month, so they belong in the month grid. One-offs are priced per
+  // project and roll up separately below.
+  const retainers = delivered.filter(c => c.type !== "oneoff")
+  const oneoffs = delivered.filter(c => c.type === "oneoff")
 
   // Month options: earliest contract start → last completed month (never the current month).
   const starts = delivered.map(c => c.start).filter(Boolean)
@@ -79,7 +96,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
   for (let m = earliest < lastComplete ? earliest : lastComplete; m <= lastComplete; m = ymAdd(m, 1)) monthOptions.push(m)
   const months = monthOptions.reverse()
 
-  const rows = delivered
+  const rows = retainers
     .filter(c => activeInMonth(c, month))
     .map(c => {
       const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name ?? null : null
@@ -134,11 +151,48 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
   const recoverable = hasMin && overHours > 0 ? overHours * (minHourlyRate as number) : 0
   const r1 = (n: number) => Math.round(n * 10) / 10
 
-  async function saveHours(contractId: string, raw: string) {
-    setEditing(null)
+  // Which months a one-off was actually delivered in. Explicit per-month delivery rows win
+  // when they exist — they're the finer truth, and capacityByMonth already reads them that
+  // way. Otherwise fall back to the delivery date window. Any month with hours already
+  // logged is always included, so shrinking a window can never hide logged work.
+  const deliveryByContract = new Map<string, string[]>()
+  for (const d of deliveryMonths) {
+    if (!deliveryByContract.has(d.contractId)) deliveryByContract.set(d.contractId, [])
+    deliveryByContract.get(d.contractId)!.push(d.month)
+  }
+  function oneoffMonths(c: Contract): string[] {
+    const explicit = deliveryByContract.get(c.id) ?? []
+    const dStart = c.deliveryStart || c.start
+    const dEnd = c.deliveryEnd || c.contractedThrough || dStart
+    const window = dEnd >= dStart ? ymSpan(dStart, dEnd) : [dStart]
+    const logged = [...hours.keys()]
+      .filter(k => k.startsWith(`${c.id}:`))
+      .map(k => k.slice(c.id.length + 1))
+    return [...new Set([...(explicit.length ? explicit : window), ...logged])].sort()
+  }
+
+  // A one-off is sold as one fee for one piece of work, so its yield is the whole fee over
+  // every hour delivery took — summed across its months. Splitting a fixed fee per month
+  // would invent a rate that doesn't correspond to anything real.
+  const oneoffRows = oneoffs.map(c => {
+    const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name ?? null : null
+    const ms = oneoffMonths(c)
+    const perMonth = ms.map(m => ({ month: m, hours: hours.get(`${c.id}:${m}`) ?? null }))
+    const anyLogged = perMonth.some(pm => pm.hours != null)
+    const actual = anyLogged ? perMonth.reduce((sum, pm) => sum + (pm.hours ?? 0), 0) : null
+    const money = c.monthly  // one-offs store the whole project price here, not a monthly rate
+    const sold = hasMin && (minHourlyRate as number) > 0 ? money / (minHourlyRate as number) : null
+    const perHr = actual != null && actual > 0 ? money / actual : null
+    const overBudget = sold != null && actual != null && actual > sold
+    return { c, accountName, perMonth, money, sold, actual, perHr, overBudget }
+  })
+  // Same default as the monthly table: worst yield first, unlogged last.
+  const sortedOneoffs = [...oneoffRows].sort((a, b) => (a.perHr ?? Infinity) - (b.perHr ?? Infinity))
+
+  async function saveHours(contractId: string, m: string, raw: string) {
     const v = parseFloat(raw)
     if (isNaN(v) || v < 0) return
-    const key = `${contractId}:${month}`
+    const key = `${contractId}:${m}`
     const current = hours.get(key) ?? null
     if ((v || null) === (current ?? null)) return
     setHours(prev => {
@@ -151,7 +205,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
     await fetch(`/api/contracts/${contractId}/hours`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ month, hours: v }),
+      body: JSON.stringify({ month: m, hours: v }),
     })
   }
 
@@ -180,7 +234,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
       </div>
 
       {rows.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#9C9590", padding: "16px 0" }}>No active projects in {monthLabel(month)}.</div>
+        <div style={{ fontSize: 13, color: "#9C9590", padding: "16px 0" }}>No retainers active in {monthLabel(month)}.</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
@@ -206,7 +260,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
                       {editing === c.id ? (
                         <input
                           autoFocus type="number" min={0} step={0.5} defaultValue={actual ?? ""}
-                          onBlur={e => saveHours(c.id, e.target.value)}
+                          onBlur={e => { setEditing(null); saveHours(c.id, month, e.target.value) }}
                           onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(null) }}
                           style={{ width: 60, padding: "5px 8px", border: "1px solid #E9532A", borderRadius: 6, fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none", background: "#FFF7ED", fontFamily: "inherit" }}
                         />
@@ -255,6 +309,77 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {oneoffRows.length > 0 && (
+        <div style={{ marginTop: 24, borderTop: "1px solid #ECE7DE", paddingTop: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>One-off projects</div>
+          <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2, marginBottom: 10 }}>
+            Priced per project, so yield is the whole fee over every hour delivery took — not per month, and not affected by the month picker above. Click a project to log hours for each of its delivery months.
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
+              <thead>
+                <tr>
+                  {(["Project", "Client", "Money", "Sold hrs", "Actual hrs", "$ / hr"] as const).map((label, i) => (
+                    <th key={label} style={{ ...th, textAlign: i < 2 ? "left" : "right" }}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedOneoffs.map(({ c, accountName, perMonth, money, sold, actual, perHr, overBudget }) => (
+                  <Fragment key={c.id}>
+                    <tr onClick={() => setExpanded(e => (e === c.id ? null : c.id))}
+                      style={{ borderBottom: "1px solid #F5F1EC", cursor: "pointer" }}>
+                      <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>
+                        <span style={{ color: "#C4BFB8", marginRight: 5 }}>{expanded === c.id ? "▾" : "▸"}</span>{c.name}
+                      </td>
+                      <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
+                      <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt$(money)}</td>
+                      <td style={{ padding: "8px 10px", fontSize: 13, color: "#9C9590", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{sold != null ? `${r1(sold)}h` : "—"}</td>
+                      <td style={{ padding: "8px 10px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: overBudget ? 700 : 400, color: actual != null ? (overBudget ? "#C2410C" : "#1A1916") : "#C4BFB8" }}>
+                        {actual != null ? `${r1(actual)}h` : "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", fontSize: 14, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums", color: perHrColor(perHr) }}>
+                        {perHr != null ? (
+                          <>{hasMin && <span style={{ fontSize: 10 }}>{perHr >= (minHourlyRate as number) ? "▲" : "▼"} </span>}{fmt$(perHr)}</>
+                        ) : "—"}
+                      </td>
+                    </tr>
+                    {expanded === c.id && (
+                      <tr style={{ borderBottom: "1px solid #F5F1EC" }}>
+                        <td colSpan={6} style={{ padding: 0 }}>
+                          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", padding: "10px 10px 12px 26px", background: "#FBFAF7" }}>
+                            {perMonth.map(pm => (
+                              <div key={pm.month}>
+                                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9C9590", marginBottom: 3 }}>{monthLabel(pm.month)}</div>
+                                {editingCell === `${c.id}:${pm.month}` ? (
+                                  <input
+                                    autoFocus type="number" min={0} step={0.5} defaultValue={pm.hours ?? ""}
+                                    onBlur={e => { setEditingCell(null); saveHours(c.id, pm.month, e.target.value) }}
+                                    onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditingCell(null) }}
+                                    style={{ width: 62, padding: "5px 8px", border: "1px solid #E9532A", borderRadius: 6, fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none", background: "#FFF7ED", fontFamily: "inherit" }}
+                                  />
+                                ) : (
+                                  <button onClick={() => setEditingCell(`${c.id}:${pm.month}`)} title="Click to log"
+                                    style={{ width: 62, background: "none", border: "1px dashed #E0DAD0", borderRadius: 6, padding: "4px 9px", fontSize: 13, color: pm.hours != null ? "#1A1916" : "#C4BFB8", cursor: "pointer", fontVariantNumeric: "tabular-nums" }}>
+                                    {pm.hours != null ? `${pm.hours}h` : "log"}
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            <span style={{ color: "#1F7A4D", fontSize: 13, fontWeight: 700, marginLeft: 4, opacity: savedId === c.id ? 1 : 0, transition: "opacity 0.2s" }}>✓ saved</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ fontSize: 10, color: "#B0A9A0", marginTop: 8 }}>Money is the whole project fee. Actual hrs sums every month logged above, so $/hr is the rate for the project end to end.</div>
+          </div>
         </div>
       )}
     </div>
