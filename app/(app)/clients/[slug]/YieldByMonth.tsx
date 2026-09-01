@@ -12,6 +12,8 @@ interface Contract {
   status: string
   type: string
   accountId?: string | null
+  deliveryStart?: string | null
+  deliveryEnd?: string | null
 }
 interface Account { id: string; name: string }
 interface AccountMonth { contractId: string; month: string; actual: number }
@@ -29,7 +31,17 @@ function monthLabel(ym: string): string {
   const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
   return `${names[m - 1]} '${String(y).slice(2)}`
 }
+// Was this project actually being delivered in this month? Retainers run for their
+// contracted term. One-offs run for their delivery window, which is decoupled from when
+// the money lands — so a one-off paid in Aug but delivered in Jun belongs to Jun. Falls
+// back to the contracted term, then to a single month, matching how one-offs are ended
+// in the client page's auto-finish rule.
 function activeInMonth(c: Contract, ym: string) {
+  if (c.type === "oneoff") {
+    const dStart = c.deliveryStart || c.start
+    const dEnd = c.deliveryEnd || c.contractedThrough || dStart
+    return dStart <= ym && ym <= dEnd
+  }
   return c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym)
 }
 
@@ -56,14 +68,18 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
 
   const hasMin = minHourlyRate != null && minHourlyRate > 0
 
+  // Yield measures work actually delivered, so speculative pipeline (Qualified /
+  // Opportunity) and lost deals are excluded — only signed work has real hours to log.
+  const delivered = contracts.filter(c => c.status === "active" || c.status === "finished")
+
   // Month options: earliest contract start → last completed month (never the current month).
-  const starts = contracts.map(c => c.start).filter(Boolean)
+  const starts = delivered.map(c => c.start).filter(Boolean)
   const earliest = starts.length ? starts.reduce((a, b) => (a < b ? a : b)) : lastComplete
   const monthOptions: string[] = []
   for (let m = earliest < lastComplete ? earliest : lastComplete; m <= lastComplete; m = ymAdd(m, 1)) monthOptions.push(m)
   const months = monthOptions.reverse()
 
-  const rows = contracts
+  const rows = delivered
     .filter(c => activeInMonth(c, month))
     .map(c => {
       const accountName = c.accountId ? accounts.find(a => a.id === c.accountId)?.name ?? null : null
