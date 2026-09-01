@@ -214,6 +214,7 @@ export default function ClientPageClient({
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
   const [reconView, setReconView] = useState<"reconcile" | "projection" | "yield" | "capacity">("reconcile")
+  const [projectView, setProjectView] = useState<"list" | "timeline" | "yield">("list")
   const [pulses, setPulses] = useState<Pulse[]>(initialPulses)
   const handlePulseChange = (pulse: Pulse) => setPulses(prev => [...prev.filter(p => !(p.contractId === pulse.contractId && p.month === pulse.month)), pulse])
 
@@ -388,7 +389,17 @@ export default function ClientPageClient({
       )}
 
       {currentTab === "projects" && (
-        <ContractsPanel
+        <div>
+          <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 16 }}>
+            {([["list", "List"], ["timeline", "Timeline"], ["yield", "Hourly yield"]] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setProjectView(v)}
+                style={{ padding: "4px 14px", fontSize: 12, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: projectView === v ? "#fff" : "transparent", color: projectView === v ? "#1A1916" : "#9C9590", boxShadow: projectView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <ContractsPanel
+            view={projectView}
           clientId={clientId}
           initialContracts={initialContracts}
           accounts={accounts}
@@ -400,6 +411,7 @@ export default function ClientPageClient({
           onContractsChange={updated => setContracts(updated)}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
         />
+        </div>
       )}
 
       {currentTab === "reconciliation" && (

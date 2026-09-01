@@ -55,6 +55,9 @@ interface Props {
   minHourlyRate?: number | null
   onContractsChange?: (contracts: Contract[]) => void
   onAccountCreated?: (account: Account) => void
+  // Owned by the client page so the switcher can sit above this card, matching the
+  // Reconciliation tab's layout.
+  view?: "list" | "timeline" | "yield"
 }
 
 type ContractStatus = "opportunity" | "potential" | "active" | "lost" | "finished"
@@ -535,7 +538,7 @@ const contractsResponsiveStyle = `
   }
 `
 
-export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, people = [], pulses = [], onPulseChange, minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp }: Props) {
+export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, people = [], pulses = [], onPulseChange, minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp, view = "list" }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
@@ -551,7 +554,6 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
   const [showPast, setShowPast] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showAllGantt, setShowAllGantt] = useState(false)
-  const [view, setView] = useState<"list" | "timeline" | "yield">("list")
 
   function handleAccountCreated(account: Account) {
     setLocalAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))
@@ -772,14 +774,6 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
         <div style={{ color: "#9C9590", fontSize: 13 }}>No contracts yet.</div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 12 }}>
-            {([["list", "List"], ["timeline", "Timeline"], ["yield", "Hourly yield"]] as const).map(([v, label]) => (
-              <button key={v} onClick={() => setView(v)}
-                style={{ padding: "4px 12px", fontSize: 11, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: view === v ? "#fff" : "transparent", color: view === v ? "#1A1916" : "#9C9590", boxShadow: view === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
-                {label}
-              </button>
-            ))}
-          </div>
           {view === "timeline" && (
             <div className="contract-gantt-wrap">
               <ContractGantt
