@@ -154,7 +154,7 @@ interface Call {
   questions: CallQuestion[]
 }
 
-type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "products" | "goals" | "team" | "calls" | "projection"
+type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "services" | "goals" | "team" | "calls" | "projection"
 
 interface Props {
   clientId: string
@@ -193,7 +193,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "projects", label: "Projects" },
   { key: "pipeline", label: "Pipeline" },
   { key: "team", label: "Team" },
-  { key: "products", label: "Products" },
+  { key: "services", label: "Services" },
   { key: "progress", label: "Progress" },
   { key: "calls", label: "Calls" },
   { key: "goals", label: "Settings" },
@@ -461,7 +461,7 @@ export default function ClientPageClient({
         <ProgressPanel clientId={clientId} initialItems={initialRoadmap} />
       )}
 
-      {currentTab === "products" && (
+      {currentTab === "services" && (
         <ProductsPanel
           clientId={clientId}
           initialProducts={clientProducts}

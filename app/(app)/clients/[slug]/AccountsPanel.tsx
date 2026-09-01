@@ -573,7 +573,7 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
                           {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                       ) : (
-                        <span style={{ fontSize: 11, color: "#C2956C" }}>No products yet — add them in the <strong>Products</strong> tab first.</span>
+                        <span style={{ fontSize: 11, color: "#C2956C" }}>No services yet — add them in the <strong>Services</strong> tab first.</span>
                       )}
                     </div>
                     <div className="account-project-grid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 8 }}>

@@ -99,18 +99,18 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1916" }}>Products</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1916" }}>Services</div>
           <div style={{ fontSize: 12, color: "#9C9590", marginTop: 2 }}>Reusable templates that pre-fill project details when you create a new project.</div>
         </div>
         <button onClick={() => setAdding(a => !a)}
           style={{ padding: "7px 16px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-          + Add Product
+          + Add Service
         </button>
       </div>
 
       {adding && (
         <form onSubmit={handleAdd} style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 10, padding: 20, marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>New Product</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>New Service</div>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Name</label>
@@ -140,7 +140,7 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
             </button>
             <button type="submit" disabled={saving}
               style={{ padding: "7px 18px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: saving ? 0.7 : 1 }}>
-              {saving ? "Saving…" : "Save Product"}
+              {saving ? "Saving…" : "Save Service"}
             </button>
           </div>
         </form>
@@ -148,7 +148,7 @@ export default function ProductsPanel({ clientId, initialProducts, onProductsCha
 
       {products.length === 0 && !adding ? (
         <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: "48px 0", textAlign: "center", color: "#9C9590", fontSize: 13 }}>
-          No products yet. Add one to use as a template when creating projects.
+          No services yet. Add one to use as a template when creating projects.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
