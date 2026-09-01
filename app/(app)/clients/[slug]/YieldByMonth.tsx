@@ -68,10 +68,9 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
     initialHours.forEach(h => m.set(`${h.contractId}:${h.month}`, h.hours))
     return m
   })
-  // Hours are logged in retrospect, so the current (incomplete) month isn't selectable —
-  // you log a month once it's finished.
-  const lastComplete = ymAdd(now, -1)
-  const [month, setMonth] = useState(lastComplete)
+  // Hours get logged as the month goes, not only once it's closed, so the current month is
+  // selectable and is where we open. Its yield is live and will move as more hours land.
+  const [month, setMonth] = useState(now)
   const [editing, setEditing] = useState<string | null>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null)
@@ -89,11 +88,11 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
   const retainers = delivered.filter(c => c.type !== "oneoff")
   const oneoffs = delivered.filter(c => c.type === "oneoff")
 
-  // Month options: earliest contract start → last completed month (never the current month).
+  // Month options: earliest contract start → the current month.
   const starts = delivered.map(c => c.start).filter(Boolean)
-  const earliest = starts.length ? starts.reduce((a, b) => (a < b ? a : b)) : lastComplete
+  const earliest = starts.length ? starts.reduce((a, b) => (a < b ? a : b)) : now
   const monthOptions: string[] = []
-  for (let m = earliest < lastComplete ? earliest : lastComplete; m <= lastComplete; m = ymAdd(m, 1)) monthOptions.push(m)
+  for (let m = earliest < now ? earliest : now; m <= now; m = ymAdd(m, 1)) monthOptions.push(m)
   const months = monthOptions.reverse()
 
   const rows = retainers
@@ -233,7 +232,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
         </div>
         <select value={month} onChange={e => setMonth(e.target.value)}
           style={{ padding: "6px 10px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, background: "#fff", color: "#1A1916", fontFamily: "inherit", cursor: "pointer" }}>
-          {months.map(m => <option key={m} value={m}>{monthLabel(m)}{m === lastComplete ? " (latest)" : ""}</option>)}
+          {months.map(m => <option key={m} value={m}>{monthLabel(m)}{m === now ? " (current)" : ""}</option>)}
         </select>
       </div>
 
