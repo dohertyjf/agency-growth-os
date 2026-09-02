@@ -554,10 +554,12 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
   onSetStage: (id: string, stage: Stage) => void
 }) {
   const [over, setOver] = useState(false)
-  const bounded = col.stage === "won" || col.stage === "lost"
+  // Lost still ages out — a deal lost two years ago is noise on a working board. Won
+  // doesn't: that column is the record of everything closed, and cutting it at 90 days
+  // hid real revenue while the column's own count and total still included it.
+  const bounded = col.stage === "lost"
   const isRecent = (c: Contract) => {
-    const d = col.stage === "won" ? (c.signedDate ?? c.start) : (c.callDate ?? c.start)
-    const days = daysSince(d)
+    const days = daysSince(c.callDate ?? c.start)
     return days === null || days <= 90
   }
   const shown = bounded ? deals.filter(isRecent) : deals
@@ -610,7 +612,7 @@ function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, on
             accounts={accounts} noteCounts={noteCounts} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage} />
         ))}
       </div>
-      <div style={{ fontSize: 11, color: "#9C9590", marginTop: 8 }}>Drag a card between columns to change its stage. Won &amp; Lost show the last 90 days.</div>
+      <div style={{ fontSize: 11, color: "#9C9590", marginTop: 8 }}>Drag a card between columns to change its stage. Lost shows the last 90 days.</div>
     </div>
   )
 }
