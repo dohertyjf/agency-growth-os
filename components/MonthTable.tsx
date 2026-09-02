@@ -247,8 +247,8 @@ function parseInput(raw: string, format: string): number {
 
 function monthLabel(ym: string): string {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  const [, m] = ym.split("-").map(Number)
-  return months[m - 1]
+  const [y, m] = ym.split("-").map(Number)
+  return `${months[m - 1]}-${String(y).slice(2)}`
 }
 
 export default function MonthTable({ clientId, months, onUpdate, onBulkImport, onDelete }: Props) {
