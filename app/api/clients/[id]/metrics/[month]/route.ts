@@ -47,3 +47,17 @@ export async function PATCH(
     netMargin: netMargin(m.revenue, m.totalExpenses),
   })
 }
+
+// Coach-only: PATCH edits one field, but DELETE drops the whole month's metrics and
+// there is no undo. Nothing in the client-facing surface needs it.
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string; month: string }> }
+) {
+  const session = await auth()
+  const { id, month } = await params
+  if (!session || session.user.role !== "coach") return Response.json({ error: "Forbidden" }, { status: 403 })
+
+  await prisma.monthlyMetric.deleteMany({ where: { clientId: id, month } })
+  return Response.json({ ok: true })
+}

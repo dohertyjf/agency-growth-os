@@ -854,9 +854,10 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
         <MonthTable
           key={rawMetrics.length}
           clientId={clientId}
-          months={[...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).slice(tableRange === "all" ? 0 : -tableRange)}
+          months={[...rawMetrics].sort((a, b) => a.month.localeCompare(b.month)).slice(tableRange === "all" ? 0 : -tableRange).reverse()}
           onUpdate={handleMetricUpdate}
           onBulkImport={handleBulkMetricImport}
+          onDelete={month => setRawMetrics(prev => prev.filter(m => m.month !== month))}
         />
       </div>
     </div>

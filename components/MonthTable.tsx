@@ -2,6 +2,7 @@
 import { useState, useCallback } from "react"
 import { netProfit, grossProfit, netMargin } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
+import ConfirmDialog from "@/app/(app)/clients/[slug]/ConfirmDialog"
 
 interface StoredRow {
   month: string
@@ -22,6 +23,7 @@ interface Props {
   months: StoredRow[]
   onUpdate?: (month: string, field: string, value: number) => void
   onBulkImport?: (rows: StoredRow[]) => void
+  onDelete?: (month: string) => void
 }
 
 // ── Bulk import ───────────────────────────────────────────────────────────────
@@ -249,7 +251,7 @@ function monthLabel(ym: string): string {
   return months[m - 1]
 }
 
-export default function MonthTable({ clientId, months, onUpdate, onBulkImport }: Props) {
+export default function MonthTable({ clientId, months, onUpdate, onBulkImport, onDelete }: Props) {
   const fmt$ = useFmtCurrency()
   const [data, setData] = useState<Record<string, Record<string, number>>>(() => {
     const m: Record<string, Record<string, number>> = {}
@@ -257,6 +259,15 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
     return m
   })
   const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [deletingMonth, setDeletingMonth] = useState<string | null>(null)
+
+  async function handleDelete(month: string) {
+    setDeletingMonth(null)
+    const res = await fetch(`/api/clients/${clientId}/metrics/${month}`, { method: "DELETE" })
+    if (!res.ok) return
+    setData(prev => { const next = { ...prev }; delete next[month]; return next })
+    onDelete?.(month)
+  }
 
   const getDerived = useCallback((month: string) => {
     const r = data[month] ?? {}
@@ -335,12 +346,29 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport }:
 
   return (
     <div style={{ overflowX: "auto", border: "1px solid #ECE7DE", borderRadius: 10, background: "#fff" }}>
+      <ConfirmDialog
+        open={deletingMonth != null}
+        title={`Delete ${deletingMonth ? monthLabel(deletingMonth) : ""}?`}
+        message="Every metric stored for this month will be removed. This can't be undone."
+        onConfirm={() => deletingMonth && handleDelete(deletingMonth)}
+        onCancel={() => setDeletingMonth(null)}
+      />
       <table style={{ borderCollapse: "collapse", width: "100%", minWidth: "max-content" }}>
         <thead>
           <tr>
             <th style={{ ...thStyle, textAlign: "left", position: "sticky", left: 0, zIndex: 2, minWidth: 120 }}>Metric</th>
             {months.map(m => (
-              <th key={m.month} style={thStyle}>{monthLabel(m.month)}</th>
+              <th key={m.month} style={thStyle}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  {monthLabel(m.month)}
+                  {onDelete && (
+                    <button onClick={() => setDeletingMonth(m.month)} title={`Delete ${monthLabel(m.month)}`}
+                      style={{ background: "none", border: "none", color: "#C4BFB8", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 }}>
+                      ×
+                    </button>
+                  )}
+                </span>
+              </th>
             ))}
           </tr>
         </thead>
