@@ -1,5 +1,5 @@
 "use client"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { netProfit, grossProfit, netMargin } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import ConfirmDialog from "@/app/(app)/clients/[slug]/ConfirmDialog"
@@ -260,6 +260,27 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport, o
   })
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [deletingMonth, setDeletingMonth] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const focusColRef = useRef<HTMLTableCellElement | null>(null)
+
+  // Columns stay oldest→newest; we just don't open on the oldest. Focus the current month,
+  // or the newest month before it when there's no row for today yet.
+  const nowYM = new Date().toISOString().slice(0, 7)
+  const upToNow = months.filter(m => m.month <= nowYM)
+  const focusMonth = (upToNow.length ? upToNow[upToNow.length - 1] : months[months.length - 1])?.month ?? null
+
+  useEffect(() => {
+    const wrap = scrollRef.current
+    if (!wrap) return
+    // Show as much recent data as fits, then pull back only if that scrolled past the
+    // month we care about — which happens when stray future months trail it.
+    wrap.scrollLeft = wrap.scrollWidth
+    const cell = focusColRef.current
+    if (!cell) return
+    const wrapRect = wrap.getBoundingClientRect()
+    const cellRect = cell.getBoundingClientRect()
+    if (cellRect.left < wrapRect.left) wrap.scrollLeft += cellRect.right - wrapRect.right
+  }, [focusMonth, months.length])
 
   async function handleDelete(month: string) {
     setDeletingMonth(null)
@@ -345,7 +366,7 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport, o
   }
 
   return (
-    <div style={{ overflowX: "auto", border: "1px solid #ECE7DE", borderRadius: 10, background: "#fff" }}>
+    <div ref={scrollRef} style={{ overflowX: "auto", border: "1px solid #ECE7DE", borderRadius: 10, background: "#fff" }}>
       <ConfirmDialog
         open={deletingMonth != null}
         title={`Delete ${deletingMonth ? monthLabel(deletingMonth) : ""}?`}
@@ -358,7 +379,7 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport, o
           <tr>
             <th style={{ ...thStyle, textAlign: "left", position: "sticky", left: 0, zIndex: 2, minWidth: 120 }}>Metric</th>
             {months.map(m => (
-              <th key={m.month} style={thStyle}>
+              <th key={m.month} ref={m.month === focusMonth ? focusColRef : undefined} style={thStyle}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                   {monthLabel(m.month)}
                   {onDelete && (
