@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { fmtCurrency } from "@/lib/calc"
+import { fmtCurrency, ymLabel } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import ContractEditModal from "./ContractEditModal"
 
@@ -64,11 +64,6 @@ function monthsBetween(start: string, end: string): string[] {
   return months
 }
 
-function monthLabel(ym: string): string {
-  const [y, m] = ym.split("-").map(Number)
-  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  return `${names[m - 1]} '${String(y).slice(2)}`
-}
 
 const now = new Date().toISOString().slice(0, 7)
 
@@ -281,7 +276,7 @@ export default function ReconciliationTable({ contracts, accounts, products = []
               <th style={{ ...thStyle, textAlign: "left", position: "sticky", left: 0, zIndex: 2, minWidth: 140 }}>Account</th>
               {months.map(m => (
                 <th key={m} style={{ ...thStyle, minWidth: 80, color: m === now ? "#E9532A" : "#9C9590" }}>
-                  {monthLabel(m)}
+                  {ymLabel(m)}
                 </th>
               ))}
             </tr>

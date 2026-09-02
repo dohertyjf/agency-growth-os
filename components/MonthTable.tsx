@@ -1,6 +1,6 @@
 "use client"
 import { useState, useCallback, useEffect, useRef } from "react"
-import { netProfit, grossProfit, netMargin } from "@/lib/calc"
+import { netProfit, grossProfit, netMargin, ymLabel } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import ConfirmDialog from "@/app/(app)/clients/[slug]/ConfirmDialog"
 
@@ -245,11 +245,6 @@ function parseInput(raw: string, format: string): number {
   return isNaN(n) ? 0 : n
 }
 
-function monthLabel(ym: string): string {
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  const [y, m] = ym.split("-").map(Number)
-  return `${months[m - 1]} '${String(y).slice(2)}`
-}
 
 export default function MonthTable({ clientId, months, onUpdate, onBulkImport, onDelete }: Props) {
   const fmt$ = useFmtCurrency()
@@ -369,7 +364,7 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport, o
     <div ref={scrollRef} style={{ overflowX: "auto", border: "1px solid #ECE7DE", borderRadius: 10, background: "#fff" }}>
       <ConfirmDialog
         open={deletingMonth != null}
-        title={`Delete ${deletingMonth ? monthLabel(deletingMonth) : ""}?`}
+        title={`Delete ${deletingMonth ? ymLabel(deletingMonth) : ""}?`}
         message="Every metric stored for this month will be removed. This can't be undone."
         onConfirm={() => deletingMonth && handleDelete(deletingMonth)}
         onCancel={() => setDeletingMonth(null)}
@@ -381,9 +376,9 @@ export default function MonthTable({ clientId, months, onUpdate, onBulkImport, o
             {months.map(m => (
               <th key={m.month} ref={m.month === focusMonth ? focusColRef : undefined} style={thStyle}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  {monthLabel(m.month)}
+                  {ymLabel(m.month)}
                   {onDelete && (
-                    <button onClick={() => setDeletingMonth(m.month)} title={`Delete ${monthLabel(m.month)}`}
+                    <button onClick={() => setDeletingMonth(m.month)} title={`Delete ${ymLabel(m.month)}`}
                       style={{ background: "none", border: "none", color: "#C4BFB8", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 }}>
                       ×
                     </button>

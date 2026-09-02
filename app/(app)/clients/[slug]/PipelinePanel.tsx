@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react"
 import PaymentScheduleModal from "./PaymentScheduleModal"
 import ConfirmDialog from "./ConfirmDialog"
+import { ymLabel } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Contract {
@@ -171,21 +172,16 @@ function fmtStamp(iso: string | undefined): string {
   return iso ? fmtDate(iso.slice(0, 10)) : "—"
 }
 
-function fmtYM(ym: string): string {
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  const [y, m] = ym.split("-")
-  return `${months[+m - 1]} '${y.slice(2)}`
-}
 
 function dealMeta(deal: Contract): string {
   if (deal.type === "oneoff") {
     const dEnd = deal.deliveryEnd || null
     const dStart = deal.deliveryStart || deal.start
-    if (dEnd && dEnd !== dStart) return `One-off · ${fmtYM(dStart)} – ${fmtYM(dEnd)}`
-    return `One-off · ${fmtYM(deal.start)}`
+    if (dEnd && dEnd !== dStart) return `One-off · ${ymLabel(dStart)} – ${ymLabel(dEnd)}`
+    return `One-off · ${ymLabel(deal.start)}`
   }
-  if (deal.contractedThrough) return `Retainer · ${fmtYM(deal.start)} – ${fmtYM(deal.contractedThrough)}`
-  return `Retainer · ${fmtYM(deal.start)} – Ongoing`
+  if (deal.contractedThrough) return `Retainer · ${ymLabel(deal.start)} – ${ymLabel(deal.contractedThrough)}`
+  return `Retainer · ${ymLabel(deal.start)} – Ongoing`
 }
 
 const inputStyle: React.CSSProperties = {

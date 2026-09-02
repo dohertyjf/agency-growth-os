@@ -1,6 +1,7 @@
 "use client"
 import { Fragment, useState } from "react"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
+import { ymLabel } from "@/lib/calc"
 
 interface Contract {
   id: string
@@ -34,11 +35,6 @@ function ymSpan(a: string, b: string): string[] {
     out.push(`${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`)
   }
   return out
-}
-function monthLabel(ym: string): string {
-  const [y, m] = ym.split("-").map(Number)
-  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-  return `${names[m - 1]} '${String(y).slice(2)}`
 }
 // Was this project actually being delivered in this month? Retainers run for their
 // contracted term. One-offs run for their delivery window, which is decoupled from when
@@ -232,12 +228,12 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
         </div>
         <select value={month} onChange={e => setMonth(e.target.value)}
           style={{ padding: "6px 10px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, background: "#fff", color: "#1A1916", fontFamily: "inherit", cursor: "pointer" }}>
-          {months.map(m => <option key={m} value={m}>{monthLabel(m)}{m === now ? " (current)" : ""}</option>)}
+          {months.map(m => <option key={m} value={m}>{ymLabel(m)}{m === now ? " (current)" : ""}</option>)}
         </select>
       </div>
 
       {rows.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#9C9590", padding: "16px 0" }}>No retainers active in {monthLabel(month)}.</div>
+        <div style={{ fontSize: 13, color: "#9C9590", padding: "16px 0" }}>No retainers active in {ymLabel(month)}.</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
@@ -317,7 +313,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
 
       {oneoffRows.length > 0 && (
         <div style={{ marginTop: 24, borderTop: "1px solid #ECE7DE", paddingTop: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>One-off projects delivering in {monthLabel(month)}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>One-off projects delivering in {ymLabel(month)}</div>
           <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2, marginBottom: 10 }}>
             Priced per project, so the figures below are for the whole project, not this month alone. Click one to log hours against each of its delivery months.
           </div>
@@ -356,7 +352,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
                           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", padding: "10px 10px 12px 26px", background: "#FBFAF7" }}>
                             {perMonth.map(pm => (
                               <div key={pm.month}>
-                                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9C9590", marginBottom: 3 }}>{monthLabel(pm.month)}</div>
+                                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9C9590", marginBottom: 3 }}>{ymLabel(pm.month)}</div>
                                 {editingCell === `${c.id}:${pm.month}` ? (
                                   <input
                                     autoFocus type="number" min={0} step={0.5} defaultValue={pm.hours ?? ""}

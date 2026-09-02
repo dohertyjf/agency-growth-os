@@ -1,6 +1,7 @@
 "use client"
 import { useState, useMemo, useRef, useEffect } from "react"
 import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
+import { ymLabel } from "@/lib/calc"
 
 const PEOPLE_STYLES = `
   .pm-cards { display: none; }
@@ -854,7 +855,7 @@ function HireModeler({ people, contracts, goal, metrics }: { people: Person[]; c
 
   // 12-month projection
   const projMonths = Array.from({ length: 12 }, (_, i) => addMonthsYM(nowYM, i + 1))
-  const monthLabels = projMonths.map(fmtYM)
+  const monthLabels = projMonths.map(ymLabel)
 
   const monthData = projMonths.map((_, i) => {
     const ramp = Math.min((i + 1) / 6, 1)
@@ -1276,11 +1277,6 @@ function genMonthsRange(from: string, to: string): string[] {
   return months
 }
 
-function fmtYM(ym: string): string {
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  const [y, m] = ym.split("-")
-  return `${months[+m - 1]} '${y.slice(2)}`
-}
 
 function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSalaryMonthChange, onHoursMonthChange }: {
   people: Person[]
@@ -1408,7 +1404,7 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
               </th>
               {months.map(mo => (
                 <th key={mo} style={{ textAlign: "right", fontSize: 11, fontWeight: 600, fontStyle: mo > nowYM ? "italic" : "normal", color: mo === nowYM ? "#E9532A" : mo > nowYM ? "#B7B0A8" : "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }}>
-                  {fmtYM(mo)}{mo === nowYM ? " ●" : mo > nowYM ? " ·proj" : ""}
+                  {ymLabel(mo)}{mo === nowYM ? " ●" : mo > nowYM ? " ·proj" : ""}
                 </th>
               ))}
             </tr>
