@@ -63,6 +63,7 @@ model Client {
   roadmapItems  RoadmapItem[]
   people        Person[]
   monthlyChecklists MonthlyChecklist[]
+  weeklyMetrics WeeklyMetric[]
   createdAt     DateTime        @default(now())
 }
 
@@ -97,6 +98,29 @@ model MonthlyMetric {
   marketingSpend  Float  @default(0)
 
   @@unique([clientId, month])
+}
+
+// Weekly activity tracker — the leading indicators, entered week by week and
+// summed into months and quarters for display. Weeks run Sunday–Saturday and
+// are filed under the month their Sunday falls in (see lib/weeks.ts), so a
+// month here is not the calendar month. Deliberately independent of
+// MonthlyMetric, which stays the authority on calendar-month figures.
+model WeeklyMetric {
+  id             String @id @default(cuid())
+  clientId       String
+  client         Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  weekStart      String // YYYY-MM-DD, always a Sunday
+  leads          Float  @default(0)
+  callsScheduled Float  @default(0)
+  callsHeld      Float  @default(0)
+  deepDives      Float  @default(0)
+  proposalsSent  Float  @default(0)
+  newClients     Float  @default(0)
+  marketingSpend Float  @default(0)
+  revenue        Float  @default(0) // collected — "revenue in bank"
+  updatedAt      DateTime @updatedAt
+
+  @@unique([clientId, weekStart])
 }
 
 model Goal {

@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import ClientPageClient from "../ClientPageClient"
 
-const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "services", "goals", "team", "calls", "projection"] as const
+const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "services", "goals", "team", "calls", "projection", "weekly"] as const
 type Tab = typeof VALID_TABS[number]
 
 export default async function ClientTabPage({ params }: { params: Promise<{ slug: string; tab: string }> }) {
@@ -67,6 +67,8 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
   const noteCounts: Record<string, number> = {}
   for (const r of noteCountRows) noteCounts[r.contractId] = r._count._all
 
+  const weeklyMetrics = await prisma.weeklyMetric.findMany({ where: { clientId: id }, orderBy: { weekStart: "asc" } })
+
   const checklistRow = await prisma.monthlyChecklist.findUnique({ where: { clientId_month: { clientId: id, month: nowYM } } })
   const initialChecklist = checklistRow ? { dismissed: checklistRow.dismissed, checkedKeys: JSON.parse(checklistRow.checkedKeys) as string[] } : null
 
@@ -78,6 +80,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       clientName={client.name}
       clientAgency={client.agency ?? null}
       currentTab={tab as Tab}
+      initialWeekly={weeklyMetrics.map(w => ({ weekStart: w.weekStart, leads: w.leads, callsScheduled: w.callsScheduled, callsHeld: w.callsHeld, deepDives: w.deepDives, proposalsSent: w.proposalsSent, newClients: w.newClients, marketingSpend: w.marketingSpend, revenue: w.revenue }))}
       initialStatus={client.status as "potential" | "active" | "paused"}
       initialStartDate={client.startDate ?? null}
       initialEndDate={client.endDate ?? null}

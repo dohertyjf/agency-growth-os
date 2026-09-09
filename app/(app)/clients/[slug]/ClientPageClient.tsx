@@ -14,6 +14,7 @@ import PeoplePanel from "./PeoplePanel"
 import PipelinePanel from "./PipelinePanel"
 import CapacitySold from "./CapacitySold"
 import MonthlyChecklist from "./MonthlyChecklist"
+import WeeklyTracker, { type WeeklyRow } from "@/components/WeeklyTracker"
 import CallsClient from "../../calls/CallsClient"
 import { CurrencyProvider } from "@/lib/CurrencyContext"
 import { ymDiff } from "@/lib/calc"
@@ -154,7 +155,7 @@ interface Call {
   questions: CallQuestion[]
 }
 
-type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "services" | "goals" | "team" | "calls" | "projection"
+type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "services" | "goals" | "team" | "calls" | "projection" | "weekly"
 
 interface Props {
   clientId: string
@@ -184,10 +185,12 @@ interface Props {
   initialPeople: Person[]
   initialSalaryMonths: PersonSalaryMonth[]
   initialHoursMonths: PersonHoursMonth[]
+  initialWeekly: WeeklyRow[]
 }
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "dashboard", label: "Overview" },
+  { key: "weekly", label: "Tracker" },
   { key: "projection", label: "Projection" },
   { key: "accounts", label: "Accounts" },
   { key: "projects", label: "Projects" },
@@ -203,7 +206,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -335,6 +338,10 @@ export default function ClientPageClient({
           totalHoursWorked={totalHoursWorked}
           payrollByMonth={payrollByMonth}
         />
+      )}
+
+      {currentTab === "weekly" && (
+        <WeeklyTracker clientId={clientId} initialRows={initialWeekly} />
       )}
 
       {currentTab === "projection" && (
