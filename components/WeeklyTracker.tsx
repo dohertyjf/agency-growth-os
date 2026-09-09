@@ -403,7 +403,11 @@ export default function WeeklyTracker({ clientId, initialRows, readOnly = false 
         />
       )}
 
-      <div style={{ overflowX: "auto", border: "1px solid #ECE7DE", borderRadius: 10, background: "#FDFCFA" }}>
+      {/* The header and the week column are both sticky, which only works if
+          this wrapper is itself the scroll container on both axes — `overflow-x`
+          alone makes overflow-y `auto` with no height to scroll against, and
+          the header then sticks to a box that scrolls off the page. */}
+      <div style={{ overflow: "auto", maxHeight: "calc(100vh - 240px)", border: "1px solid #ECE7DE", borderRadius: 10, background: "#FDFCFA" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 900 }}>
           <thead>
             <tr>
