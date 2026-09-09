@@ -50,6 +50,28 @@ interface Props {
   schedulingUrl?: string
   /** Months shown on load. */
   defaultHorizon?: number
+  /** Seed values for the inputs — a client's own numbers instead of the demo set. */
+  initialValues?: Partial<Record<keyof CapacityInputs, number>>
+  /** What Reset restores. Defaults to `initialValues`, else the demo set. */
+  resetValues?: Partial<Record<keyof CapacityInputs, number>>
+  /** Fixes the currency and hides the picker — for pages that already know it. */
+  currency?: Currency
+  /** Renders the header as a card heading rather than a page title. */
+  compact?: boolean
+  /** Shown as a "Save this state" button; hands back the current inputs. */
+  onSave?: (inputs: CapacityInputs) => Promise<boolean> | boolean
+}
+
+// The inputs are held as strings so a half-typed field stays editable; seeding
+// them means stringifying whatever the caller knows and leaving the rest at the
+// demo value.
+function seedValues(vals?: Partial<Record<keyof CapacityInputs, number>>): Record<string, string> {
+  if (!vals) return DEFAULTS
+  const out = { ...DEFAULTS }
+  for (const [k, n] of Object.entries(vals)) {
+    if (typeof n === "number" && isFinite(n)) out[k] = String(Math.round(n * 100) / 100)
+  }
+  return out
 }
 
 
@@ -87,11 +109,19 @@ export default function CapacityLiveTool({
   defaultHorizon = 12,
   title = "Growth Projection — live",
   subtitle = "Type a prospect's numbers and adjust live on a call. Nothing is saved.",
+  initialValues,
+  resetValues,
+  currency: fixedCurrency,
+  compact = false,
+  onSave,
 }: Props = {}) {
-  const [currency, setCurrency] = useState<Currency>("USD")
+  const [currency, setCurrency] = useState<Currency>(fixedCurrency ?? "USD")
   const sym = currSym(currency)
   const fmt$ = (val: number) => fmtCurrency(val, currency)
-  const [v, setV] = useState<Record<string, string>>(DEFAULTS)
+  const [v, setV] = useState<Record<string, string>>(() => seedValues(initialValues))
+  const resetTo = useMemo(() => seedValues(resetValues ?? initialValues), [resetValues, initialValues])
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   // The horizon doubles as the goal deadline — "$50k within 2 years" is one
   // question, not two, so it gets one control.
   const [horizon, setHorizon] = useState(defaultHorizon)
@@ -129,6 +159,14 @@ export default function CapacityLiveTool({
     [inputs.startRevenue, horizon, driversAt]
   )
   const editedPath = useMemo(() => rows.map(x => x.mrr), [rows])
+
+  async function handleSave() {
+    if (!onSave) return
+    setSaving(true)
+    try {
+      if (await onSave(inputs)) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+    } finally { setSaving(false) }
+  }
 
   function setOverride(monthIdx: number, key: keyof MonthDrivers, raw: string) {
     const n = parseFloat(raw)
@@ -387,16 +425,22 @@ export default function CapacityLiveTool({
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>
-            {title}
-          </h1>
-          <p style={{ fontSize: 13, color: "#9C9590", margin: 0 }}>{subtitle}</p>
+          {compact ? (
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1916", marginBottom: 2 }}>{title}</div>
+          ) : (
+            <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>
+              {title}
+            </h1>
+          )}
+          <p style={{ fontSize: compact ? 11 : 13, color: "#9C9590", margin: 0 }}>{subtitle}</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <select value={currency} onChange={e => setCurrency(e.target.value as Currency)}
-            style={{ ...inputStyle, width: "auto", padding: "8px 12px", cursor: "pointer" }} aria-label="Currency">
-            <option value="USD">$ USD</option><option value="GBP">£ GBP</option><option value="EUR">€ EUR</option>
-          </select>
+          {!fixedCurrency && (
+            <select value={currency} onChange={e => setCurrency(e.target.value as Currency)}
+              style={{ ...inputStyle, width: "auto", padding: "8px 12px", cursor: "pointer" }} aria-label="Currency">
+              <option value="USD">$ USD</option><option value="GBP">£ GBP</option><option value="EUR">€ EUR</option>
+            </select>
+          )}
           <div style={{ display: "flex", border: "1px solid #ECE7DE", borderRadius: 8, overflow: "hidden", background: "#fff" }}>
             {[{ m: 12, label: "1 yr" }, { m: 24, label: "2 yr" }, { m: 36, label: "3 yr" }].map(h => (
               <button key={h.m} onClick={() => setHorizon(h.m)} aria-pressed={horizon === h.m}
@@ -409,10 +453,16 @@ export default function CapacityLiveTool({
               </button>
             ))}
           </div>
-          <button onClick={() => setV(DEFAULTS)}
+          <button onClick={() => { setV(resetTo); setOverrides({}) }}
             style={{ fontSize: 12, fontWeight: 600, color: "#9C9590", background: "#fff", border: "1px solid #ECE7DE", borderRadius: 7, padding: "8px 14px", cursor: "pointer" }}>
-            Reset
+            {resetValues || initialValues ? "Reset to data" : "Reset"}
           </button>
+          {onSave && (
+            <button onClick={handleSave} disabled={saving}
+              style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: saved ? "#1F7A4D" : "#1A1916", border: "none", borderRadius: 7, padding: "8px 14px", cursor: saving ? "default" : "pointer" }}>
+              {saving ? "Saving…" : saved ? "✓ Saved" : "Save this state"}
+            </button>
+          )}
         </div>
       </div>
 

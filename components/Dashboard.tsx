@@ -6,12 +6,12 @@ import MetricCard from "./MetricCard"
 import MetricChart, { ChartPoint, FlowBars } from "./MetricChart"
 import CapacitySoldChart from "./CapacitySoldChart"
 import MonthTable, { BulkMetricsModal } from "./MonthTable"
-import GrowthProjection from "./GrowthProjection"
+import CapacityLiveTool from "./CapacityLiveTool"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
   projectMetric, ymAdd, ymLabel, bookedAhead, BOOKED_AHEAD_MONTHS,
   mrrGoal, goalProgress,
-  type ContractRow, type ProjectionInput, type ProjectableMetric,
+  type ContractRow, type ProjectionInput, type ProjectableMetric, type CapacityInputs,
 } from "@/lib/calc"
 
 interface Metric {
@@ -510,17 +510,69 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   const cacTotalNewClients = cacMonths.reduce((s, m) => s + m.newClients, 0)
   const cac = cacTotalSpend > 0 && cacTotalNewClients > 0 ? cacTotalSpend / cacTotalNewClients : 0
 
+  // Seed the projection from the client's own last six months, so the tool
+  // opens on their numbers rather than the demo set the public page uses.
+  const projectionSeed = useMemo<Partial<Record<keyof CapacityInputs, number>>>(() => {
+    const past = [...rawMetrics].filter(m => m.month <= nowYM).sort((a, b) => a.month.localeCompare(b.month)).slice(-6)
+    const avgOf = (sel: (m: (typeof past)[number]) => number) =>
+      past.length ? Math.round((past.reduce((s, m) => s + sel(m), 0) / past.length) * 10) / 10 : 0
+    const totalLeads = past.reduce((s, m) => s + m.leads, 0)
+    const totalNew = past.reduce((s, m) => s + m.newClients, 0)
+    // The model works in a churn rate; the metrics record a client count.
+    const churnClients = avgOf(m => m.churn)
+    return {
+      startRevenue: Math.round(mrr),
+      leads: avgOf(m => m.leads),
+      closeRate: totalLeads > 0 ? Math.round((totalNew / totalLeads) * 1000) / 10 : 0,
+      avgDeal: Math.round(avgContractSize),
+      churnPct: activeClientCount > 0 ? Math.round((churnClients / activeClientCount) * 1000) / 10 : 0,
+      hoursPerClient: Math.round(avgContractHours * 10) / 10,
+      billableHours: totalCapacityHours,
+      activeClients: activeClientCount,
+      goalMRR: currentGoal ? Math.round(mrrTarget) : 0,
+    }
+  }, [rawMetrics, nowYM, mrr, avgContractSize, activeClientCount, avgContractHours, totalCapacityHours, currentGoal, mrrTarget])
+
+  // States saved before the tool moved to a churn percentage stored a client
+  // count and different key names; read both so old saves still open.
+  const savedSeed = useMemo<Partial<Record<keyof CapacityInputs, number>> | null>(() => {
+    if (!projectionState) return null
+    try {
+      const s = JSON.parse(projectionState)
+      const clients = s.activeClients ?? s.clientCount ?? activeClientCount
+      return {
+        startRevenue: s.startRevenue,
+        leads: s.leads,
+        closeRate: s.closeRate,
+        avgDeal: s.avgDeal,
+        churnPct: s.churnPct ?? (clients > 0 ? ((s.churn ?? 0) / clients) * 100 : 0),
+        hoursPerClient: s.hoursPerClient,
+        billableHours: s.billableHours,
+        activeClients: clients,
+        goalMRR: s.goalMRR ?? s.revenueGoal,
+      }
+    } catch { return null }
+  }, [projectionState, activeClientCount])
+
+  async function saveProjection(inputs: CapacityInputs) {
+    if (!clientId) return false
+    const res = await fetch(`/api/clients/${clientId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectionState: JSON.stringify(inputs) }),
+    })
+    return res.ok
+  }
+
+  // The tool renders its own cards, so it sits directly on the tab background.
   const growthProjection = (
-    <GrowthProjection
-      metrics={rawMetrics}
-      startMRR={mrr}
-      avgContractSize={avgContractSize}
-      goalMRR={currentGoal ? mrrTarget : null}
-      totalCapacityHours={totalCapacityHours}
-      avgContractHours={avgContractHours}
-      activeClientCount={activeClientCount}
-      clientId={clientId}
-      savedProjection={(() => { try { return projectionState ? JSON.parse(projectionState) : null } catch { return null } })()}
+    <CapacityLiveTool
+      compact
+      currency={currency === "GBP" || currency === "EUR" ? currency : "USD"}
+      title="Growth Projection"
+      subtitle="Seeded from this client's last 6 months — adjust any input to model a scenario"
+      initialValues={savedSeed ?? projectionSeed}
+      resetValues={projectionSeed}
+      onSave={clientId ? saveProjection : undefined}
     />
   )
   if (only === "projection") return growthProjection
