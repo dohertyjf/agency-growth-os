@@ -63,6 +63,9 @@ interface Props {
 type ContractStatus = "opportunity" | "potential" | "active" | "lost" | "finished"
 
 const STATUS_LABELS: Record<ContractStatus, string> = { opportunity: "Opportunity", potential: "Qualified", active: "Active", lost: "Lost", finished: "Finished" }
+
+/** 20 → "20", 7.5 → "7.5" — hours are often halves, never trailing zeroes. */
+const fmtHours = (h: number) => String(Math.round(h * 10) / 10)
 const STATUS_COLORS: Record<ContractStatus, { bg: string; text: string }> = {
   opportunity: { bg: "#EFF6FF", text: "#1D4ED8" },
   potential: { bg: "#FFF7ED", text: "#92400E" },
@@ -924,6 +927,12 @@ function ContractSection({ title, contracts, accounts, products, people, pulses,
                   : c.contractedThrough
                   ? `${ymLabel(c.start)} – ${ymLabel(c.contractedThrough)}`
                   : `${ymLabel(c.start)} – Ongoing`}
+                {c.hoursPerMonth > 0 && (
+                  // One-offs sell a block of hours, not a monthly rate.
+                  <span style={{ color: "#6B6760", fontWeight: 500 }}>
+                    {" · "}{fmtHours(c.hoursPerMonth)} {isOneoff ? "hrs" : "hrs/mo"}
+                  </span>
+                )}
               </div>
               {teamMembers.length > 0 && (
                 <div style={{ fontSize: 11, color: "#9C9590", marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}>
