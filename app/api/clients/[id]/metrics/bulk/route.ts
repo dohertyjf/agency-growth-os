@@ -19,6 +19,7 @@ const rowSchema = z.object({
   newClients: z.number().default(0),
   churn: z.number().default(0),
   marketingSpend: z.number().default(0),
+  activeClients: z.number().default(0),
 })
 
 const schema = z.array(rowSchema).min(1).max(500)

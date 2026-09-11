@@ -10,8 +10,8 @@ import CapacityLiveTool from "./CapacityLiveTool"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
   projectMetric, ymAdd, ymLabel, bookedAhead, BOOKED_AHEAD_MONTHS,
-  mrrGoal, goalProgress,
-  type ContractRow, type ProjectionInput, type ProjectableMetric, type CapacityInputs,
+  mrrGoal, goalProgress, trailingChurn, activeAccountsIn, churnedStayMonths,
+  type ContractRow, type ProjectionInput, type ProjectableMetric, type CapacityInputs, type AccountContractRow,
 } from "@/lib/calc"
 
 interface Metric {
@@ -26,6 +26,7 @@ interface Metric {
   closeRate: number
   churn: number
   marketingSpend: number
+  activeClients: number
 }
 
 interface Contract {
@@ -37,6 +38,7 @@ interface Contract {
   contractedThrough: string | null
   status: string
   type?: string
+  accountId?: string | null
   deliveryStart?: string | null
   deliveryEnd?: string | null
 }
@@ -171,7 +173,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     })
     setRawMetrics(prev => {
       if (prev.find(m => m.month === newMonth)) return prev
-      return [...prev, { month: newMonth, revenue: 0, totalExpenses: 0, salaries: 0, software: 0, cashInBank: 0, leads: 0, newClients: 0, closeRate: 0, churn: 0, marketingSpend: 0 }]
+      return [...prev, { month: newMonth, revenue: 0, totalExpenses: 0, salaries: 0, software: 0, cashInBank: 0, leads: 0, newClients: 0, closeRate: 0, churn: 0, marketingSpend: 0, activeClients: 0 }]
     })
     setAddingMonth(false)
     setNewMonth("")
@@ -488,16 +490,31 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   const revenueForACMV = (latest?.revenue ?? 0) > 0 ? latest!.revenue : contractedFor(nowYM)
   const acmv = activeClientCount > 0 ? revenueForACMV / activeClientCount : 0
 
-  // Avg Client Lifetime Value: ACMV × avg contract duration in months
+  // Churn: trailing window over the entered monthly metrics, with the projects
+  // filling in any month where Active Clients wasn't entered.
+  const accountRows = useMemo<AccountContractRow[]>(() => contracts.map(c => ({
+    id: c.id, accountId: c.accountId, monthly: c.monthly, start: c.start, contractedThrough: c.contractedThrough,
+    status: c.status as ContractRow["status"], type: (c.type ?? "retainer") as ContractRow["type"],
+  })), [contracts])
+  const churnStats = useMemo(
+    () => trailingChurn(rawMetrics, ym => activeAccountsIn(accountRows, ym), cardMonth),
+    [rawMetrics, accountRows, cardMonth])
+  const churnRatePct = churnStats.rate !== null ? churnStats.rate * 100 : null
+  // Of the accounts that have churned, how many left within their first three months.
+  const stays = useMemo(() => churnedStayMonths(accountRows), [accountRows])
+  const shortStays = stays.filter(m => m <= 3).length
+
+  // Avg Client Lifetime Value: ACMV ÷ monthly churn (= ACMV × avg stay). Until there's
+  // churn data to divide by, fall back to the average retainer length so far.
   function monthsBetween(a: string, b: string) {
     const [ay, am] = a.split("-").map(Number)
     const [by, bm] = b.split("-").map(Number)
     return Math.max(1, (by - ay) * 12 + (bm - am) + 1)
   }
   const billableContracts = contracts.filter(c => c.type !== "oneoff")
-  const avgDurationMonths = billableContracts.length
+  const avgDurationMonths = churnStats.avgStay ?? (billableContracts.length
     ? billableContracts.reduce((s, c) => s + monthsBetween(c.start, c.contractedThrough ?? nowYM), 0) / billableContracts.length
-    : 0
+    : 0)
   const acltv = acmv * avgDurationMonths
 
   const totalActiveHours = activeContracts.reduce((s, c) => s + (c.hoursPerMonth ?? 0), 0)
@@ -518,20 +535,19 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
       past.length ? Math.round((past.reduce((s, m) => s + sel(m), 0) / past.length) * 10) / 10 : 0
     const totalLeads = past.reduce((s, m) => s + m.leads, 0)
     const totalNew = past.reduce((s, m) => s + m.newClients, 0)
-    // The model works in a churn rate; the metrics record a client count.
-    const churnClients = avgOf(m => m.churn)
+    // The model works in a churn rate; use the same trailing rate the Churn card shows.
     return {
       startRevenue: Math.round(mrr),
       leads: avgOf(m => m.leads),
       closeRate: totalLeads > 0 ? Math.round((totalNew / totalLeads) * 1000) / 10 : 0,
       avgDeal: Math.round(avgContractSize),
-      churnPct: activeClientCount > 0 ? Math.round((churnClients / activeClientCount) * 1000) / 10 : 0,
+      churnPct: churnRatePct !== null ? Math.round(churnRatePct * 10) / 10 : 0,
       hoursPerClient: Math.round(avgContractHours * 10) / 10,
       billableHours: totalCapacityHours,
       activeClients: activeClientCount,
       goalMRR: currentGoal ? Math.round(mrrTarget) : 0,
     }
-  }, [rawMetrics, nowYM, mrr, avgContractSize, activeClientCount, avgContractHours, totalCapacityHours, currentGoal, mrrTarget])
+  }, [rawMetrics, nowYM, mrr, avgContractSize, churnRatePct, activeClientCount, avgContractHours, totalCapacityHours, currentGoal, mrrTarget])
 
   // States saved before the tool moved to a churn percentage stored a client
   // count and different key names; read both so old saves still open.
@@ -794,11 +810,22 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
             sub={`${activeClientCount} active client${activeClientCount === 1 ? "" : "s"}`}
           />
         )}
+        {churnRatePct !== null && (
+          <InsightCard
+            label={`Churn · ${churnStats.months} mo`}
+            value={`${Math.round(churnRatePct * 10) / 10}%/mo`}
+            sub={[
+              churnStats.avgStay ? `~${Math.round(churnStats.avgStay)} mo avg stay` : "none lost",
+              `${churnStats.churned} lost`,
+              stays.length ? `${shortStays} of ${stays.length} gone by 3 mo` : null,
+            ].filter(Boolean).join(" · ")}
+          />
+        )}
         {acltv > 0 && (
           <InsightCard
             label="Avg Client Lifetime"
             value={fmt$(acltv)}
-            sub={`~${Math.round(avgDurationMonths)} mo avg length`}
+            sub={`~${Math.round(avgDurationMonths)} mo avg ${churnStats.avgStay ? "stay" : "length"}`}
           />
         )}
         {hourlyYield > 0 && (

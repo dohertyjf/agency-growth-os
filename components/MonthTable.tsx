@@ -16,6 +16,7 @@ interface StoredRow {
   closeRate: number
   churn: number
   marketingSpend: number
+  activeClients: number
 }
 
 interface Props {
@@ -39,6 +40,7 @@ interface ParsedMetricRow {
   newClients: number
   churn: number
   marketingSpend: number
+  activeClients: number
   errors: string[]
 }
 
@@ -65,7 +67,7 @@ function parseMetricsPaste(text: string): ParsedMetricRow[] {
     const cols = line.split(/\t/).map(s => s.trim())
     const [rawMonth = "", rawRevenue = "", rawExpenses = "", rawSalaries = "",
            rawSoftware = "", rawCash = "", rawLeads = "", rawNewClients = "", rawChurn = "",
-           rawMarketingSpend = ""] = cols
+           rawMarketingSpend = "", rawActiveClients = ""] = cols
 
     const errors: string[] = []
     const month = normalizeMonth(rawMonth)
@@ -82,13 +84,14 @@ function parseMetricsPaste(text: string): ParsedMetricRow[] {
       newClients: parseNum(rawNewClients),
       churn: parseNum(rawChurn),
       marketingSpend: parseNum(rawMarketingSpend),
+      activeClients: parseNum(rawActiveClients),
       errors,
     }
   })
 }
 
 function fmtPreview(v: number, col: number, fmt$: (n: number) => string): string {
-  // cols 0=month, 1-5=currency, 6-8=number
+  // cols 0=month, 1-5=currency, 6-10=number
   if (col >= 1 && col <= 5) return v === 0 ? "—" : fmt$(Math.round(v))
   return v === 0 ? "—" : String(Math.round(v))
 }
@@ -122,7 +125,7 @@ export function BulkMetricsModal({ clientId, onClose, onImport }: {
     onClose()
   }
 
-  const HEADERS = ["Month", "Revenue", "Total Expenses", "Salaries", "Software", "Cash in Bank", "Leads", "New Clients", "Churn", "Marketing Spend", ""]
+  const HEADERS = ["Month", "Revenue", "Total Expenses", "Salaries", "Software", "Cash in Bank", "Leads", "New Clients", "Churn", "Marketing Spend", "Active Clients", ""]
 
   return (
     <div
@@ -134,7 +137,7 @@ export function BulkMetricsModal({ clientId, onClose, onImport }: {
           <h2 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 22, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Bulk Import Monthly Metrics</h2>
           <p style={{ fontSize: 12, color: "#9C9590", margin: 0 }}>
             Paste from a spreadsheet — columns in order:<br />
-            <strong>Month · Revenue · Total Expenses · Salaries · Software · Cash in Bank · Leads · New Clients · Churn · Marketing Spend</strong>
+            <strong>Month · Revenue · Total Expenses · Salaries · Software · Cash in Bank · Leads · New Clients · Churn · Marketing Spend · Active Clients</strong>
             <br />Month format: YYYY-MM &nbsp;·&nbsp; Dollar signs and commas are stripped automatically &nbsp;·&nbsp; Existing months are overwritten
           </p>
         </div>
@@ -159,7 +162,7 @@ export function BulkMetricsModal({ clientId, onClose, onImport }: {
               </thead>
               <tbody>
                 {rows.map((row, i) => {
-                  const vals = [row.revenue, row.totalExpenses, row.salaries, row.software, row.cashInBank, row.leads, row.newClients, row.churn, row.marketingSpend]
+                  const vals = [row.revenue, row.totalExpenses, row.salaries, row.software, row.cashInBank, row.leads, row.newClients, row.churn, row.marketingSpend, row.activeClients]
                   return (
                     <tr key={i} style={{ background: row.errors.length ? "#FFF5F5" : "transparent" }}>
                       <td style={{ padding: "6px 10px", borderBottom: "1px solid #F5F1EC", fontVariantNumeric: "tabular-nums", color: row.month ? "#1A1916" : "#C2410C" }}>
@@ -221,6 +224,7 @@ const EDITABLE_ROWS = [
   { key: "leads", label: "Leads", format: "number" },
   { key: "newClients", label: "New Clients", format: "number" },
   { key: "churn", label: "Churn", format: "number" },
+  { key: "activeClients", label: "Active Clients", format: "number" },
 ] as const
 
 const DERIVED_ROWS = [

@@ -8,7 +8,7 @@ const accent = "#E9532A"
 type Grid = (string | number | Date)[][]
 
 interface AccountRow { accountName: string; projectName: string; type: string; monthly: number; status: string; start: string; contractedThrough: string | null }
-interface MetricRow { month: string; revenue: number; totalExpenses: number; salaries: number; software: number; cashInBank: number; leads: number; newClients: number; churn: number; marketingSpend: number }
+interface MetricRow { month: string; revenue: number; totalExpenses: number; salaries: number; software: number; cashInBank: number; leads: number; newClients: number; churn: number; marketingSpend: number; activeClients: number }
 interface TeamRow { name: string; role?: string; annualSalary: number; billableHours: number; isExternal: boolean }
 
 interface Parsed {
@@ -106,7 +106,7 @@ export default function ImportClient({ clients = [] }: { clients?: { id: string;
         if (isExample(r, "metrics")) continue
         const month = ym(r[0])
         if (!month) { skipped.push(`Metrics: skipped a row — Month must be YYYY-MM`); continue }
-        metrics.push({ month, revenue: num(r[1]), totalExpenses: num(r[2]), salaries: num(r[3]), software: num(r[4]), cashInBank: num(r[5]), leads: num(r[6]), newClients: num(r[7]), churn: num(r[8]), marketingSpend: num(r[9]) })
+        metrics.push({ month, revenue: num(r[1]), totalExpenses: num(r[2]), salaries: num(r[3]), software: num(r[4]), cashInBank: num(r[5]), leads: num(r[6]), newClients: num(r[7]), churn: num(r[8]), marketingSpend: num(r[9]), activeClients: num(r[10]) })
       }
 
       const team: TeamRow[] = []

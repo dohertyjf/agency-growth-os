@@ -130,6 +130,80 @@ export function currentMRR(contracts: ContractRow[], now: string) {
   return bookedActive(contracts, now)
 }
 
+// ── 9.3b Churn — trailing window over the monthly metrics ─────────────────────
+// Churned clients come from the hand-entered monthly metrics (the one record that
+// reliably reaches back before the projects were loaded). The denominator is the
+// entered Active Clients figure, falling back to the accounts with a signed retainer
+// that month when it was left blank. Rate = churned ÷ active-client-months, so a
+// month with more clients weighs more than a quiet one.
+export const CHURN_WINDOW_MONTHS = 6
+
+export interface ChurnMetricRow { month: string; churn: number; activeClients?: number }
+
+export interface ChurnStats {
+  months: number         // metric months actually in the window
+  churned: number        // clients lost across the window
+  activeMonths: number   // Σ active clients per month
+  rate: number | null    // monthly churn, 0–1; null when there's nothing to divide by
+  avgStay: number | null // 1 ÷ rate, in months; null when no churn observed
+}
+
+export function trailingChurn(
+  rows: ChurnMetricRow[],
+  fallbackActive: (ym: string) => number,
+  through: string,
+  window = CHURN_WINDOW_MONTHS,
+): ChurnStats {
+  const past = rows.filter(r => r.month <= through).sort((a, b) => a.month.localeCompare(b.month)).slice(-window)
+  let churned = 0, activeMonths = 0
+  for (const r of past) {
+    churned += r.churn
+    activeMonths += (r.activeClients ?? 0) > 0 ? r.activeClients! : fallbackActive(r.month)
+  }
+  const rate = activeMonths > 0 ? churned / activeMonths : null
+  return { months: past.length, churned, activeMonths, rate, avgStay: rate ? 1 / rate : null }
+}
+
+export interface AccountContractRow extends ContractRow {
+  id: string
+  accountId?: string | null
+}
+
+// Accounts with a signed retainer covering `ym`. A project with no account is its
+// own account, so unassigned work still counts as a client.
+export function activeAccountsIn(contracts: AccountContractRow[], ym: string) {
+  const ids = new Set<string>()
+  for (const c of contracts) {
+    if (c.type === "oneoff") continue
+    if (c.status !== "active" && c.status !== "finished") continue
+    if (c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym)) ids.add(c.accountId ?? c.id)
+  }
+  return ids.size
+}
+
+// How long each churned account stayed, in months, from its first retainer's start
+// to its last one's end. Accounts still holding an active retainer aren't churned
+// and are left out; so are ones whose end date was never recorded.
+export function churnedStayMonths(contracts: AccountContractRow[]): number[] {
+  const byAccount = new Map<string, AccountContractRow[]>()
+  for (const c of contracts) {
+    if (c.type === "oneoff") continue
+    if (c.status !== "active" && c.status !== "finished") continue
+    const key = c.accountId ?? c.id
+    const list = byAccount.get(key)
+    if (list) list.push(c); else byAccount.set(key, [c])
+  }
+  const stays: number[] = []
+  for (const list of byAccount.values()) {
+    if (list.some(c => c.status === "active")) continue
+    if (list.some(c => c.contractedThrough === null)) continue
+    const start = list.reduce((m, c) => c.start < m ? c.start : m, list[0].start)
+    const end = list.reduce((m, c) => c.contractedThrough! > m ? c.contractedThrough! : m, list[0].contractedThrough!)
+    stays.push(ymDiff(start, end) + 1)
+  }
+  return stays
+}
+
 // ── 9.4 Dashboard projection (6 future months, active only) ──────────────────
 export interface ProjectionInput {
   contracts: ContractRow[]

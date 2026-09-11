@@ -4,7 +4,7 @@ import { netProfit, grossProfit, netMargin } from "@/lib/calc"
 
 const INPUT_FIELDS = [
   "revenue", "totalExpenses", "salaries", "software",
-  "cashInBank", "leads", "newClients", "closeRate", "churn", "marketingSpend",
+  "cashInBank", "leads", "newClients", "closeRate", "churn", "marketingSpend", "activeClients",
 ]
 
 function authorize(session: import("next-auth").Session | null, clientId: string) {

@@ -96,6 +96,7 @@ model MonthlyMetric {
   closeRate       Float  @default(0)
   churn           Float  @default(0)
   marketingSpend  Float  @default(0)
+  activeClients   Float  @default(0) // clients served that month; 0 = not entered, derive from projects
 
   @@unique([clientId, month])
 }
