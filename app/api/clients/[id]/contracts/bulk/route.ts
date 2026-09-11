@@ -31,8 +31,22 @@ export async function POST(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid", details: parsed.error.flatten() }, { status: 422 })
 
+  // Ongoing retainers have no end — unless they're finished, in which case the sheet's
+  // end date is when they ended and must be present (otherwise they count as MRR forever).
+  const rows = parsed.data.map(row => ({
+    ...row,
+    contractedThrough:
+      row.type === "oneoff" ? row.start
+      : row.type === "ongoing" && row.status !== "finished" ? null
+      : (row.contractedThrough ?? null),
+  }))
+  const missingEnd = rows.filter(r => r.status === "finished" && r.type !== "oneoff" && !r.contractedThrough)
+  if (missingEnd.length) {
+    return Response.json({ error: `Finished retainers need an end month: ${missingEnd.map(r => r.name).join(", ")}` }, { status: 422 })
+  }
+
   const contracts = await prisma.$transaction(
-    parsed.data.map(row =>
+    rows.map(row =>
       prisma.contract.create({
         data: {
           clientId: id,
@@ -41,7 +55,7 @@ export async function POST(
           monthly: row.monthly,
           status: row.status,
           start: row.start,
-          contractedThrough: row.type === "oneoff" ? row.start : row.type === "ongoing" ? null : (row.contractedThrough ?? null),
+          contractedThrough: row.contractedThrough,
         },
       })
     )

@@ -69,6 +69,12 @@ export default function ContractEditModal({ contract, accounts, products = [], p
     setSaving(true)
     setError(null)
     const isOngoing = form.type === "ongoing"
+    // A finished retainer needs an end month, or it keeps counting as contracted MRR forever.
+    if (isOngoing && form.status === "finished" && !form.contractedThrough) {
+      setSaving(false)
+      setError("Enter the month this retainer ended")
+      return
+    }
     const payload = {
       name: form.name,
       monthly: parseFloat(form.monthly),
@@ -78,7 +84,7 @@ export default function ContractEditModal({ contract, accounts, products = [], p
       ownerId: form.ownerId,
       start: form.start,
       type: isOngoing ? "retainer" : form.type,
-      contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
+      contractedThrough: isOngoing && form.status !== "finished" ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
       productId: form.productId,
       deliveryStart: form.deliveryStart || null,
       deliveryEnd: form.deliveryEnd || null,
@@ -223,7 +229,7 @@ export default function ContractEditModal({ contract, accounts, products = [], p
             </div>
             </>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" ? "1fr" : "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" && form.status !== "finished" ? "1fr" : "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start</label>
                 <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
@@ -232,6 +238,12 @@ export default function ContractEditModal({ contract, accounts, products = [], p
                 <div>
                   <label style={labelStyle}>Through</label>
                   <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                </div>
+              )}
+              {form.type === "ongoing" && form.status === "finished" && (
+                <div>
+                  <label style={labelStyle}>Ended</label>
+                  <input style={inputStyle} type="month" value={form.contractedThrough} min={form.start} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
                 </div>
               )}
             </div>

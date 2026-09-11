@@ -252,12 +252,18 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
     setSaving(true)
     setError(null)
     const isOngoing = form.type === "ongoing"
+    // A finished retainer needs an end month, or it keeps counting as contracted MRR forever.
+    if (isOngoing && form.status === "finished" && !form.contractedThrough) {
+      setSaving(false)
+      setError("Enter the month this retainer ended")
+      return
+    }
     const payload = {
       ...form,
       monthly: parseFloat(form.monthly),
       hoursPerMonth: parseFloat(form.hoursPerMonth) || 0,
       type: isOngoing ? "retainer" : form.type,
-      contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
+      contractedThrough: isOngoing && form.status !== "finished" ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
       accountId: form.accountId || undefined,
       deliveryStart: form.deliveryStart || null,
       deliveryEnd: form.deliveryEnd || null,
@@ -335,7 +341,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
               <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value, contractedThrough: e.target.value }))} required />
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" ? "1fr" : "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" && form.status !== "finished" ? "1fr" : "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start</label>
                 <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
@@ -344,6 +350,12 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
                 <div>
                   <label style={labelStyle}>Through</label>
                   <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                </div>
+              )}
+              {form.type === "ongoing" && form.status === "finished" && (
+                <div>
+                  <label style={labelStyle}>Ended</label>
+                  <input style={inputStyle} type="month" value={form.contractedThrough} min={form.start} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
                 </div>
               )}
             </div>
@@ -390,12 +402,18 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
     setSaving(true)
     setError(null)
     const isOngoing = form.type === "ongoing"
+    // A finished retainer needs an end month, or it keeps counting as contracted MRR forever.
+    if (isOngoing && form.status === "finished" && !form.contractedThrough) {
+      setSaving(false)
+      setError("Enter the month this retainer ended")
+      return
+    }
     const payload = {
       ...form,
       monthly: parseFloat(form.monthly),
       hoursPerMonth: parseFloat(form.hoursPerMonth) || 0,
       type: isOngoing ? "retainer" : form.type,
-      contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
+      contractedThrough: isOngoing && form.status !== "finished" ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
       accountId: form.accountId,
       ownerId: form.ownerId,
       productId: form.productId,
@@ -501,7 +519,7 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
             </div>
             </>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" ? "1fr" : "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: form.type === "ongoing" && form.status !== "finished" ? "1fr" : "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Start</label>
                 <input style={inputStyle} type="month" value={form.start} onChange={e => setForm(f => ({ ...f, start: e.target.value }))} required />
@@ -510,6 +528,12 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
                 <div>
                   <label style={labelStyle}>Through</label>
                   <input style={inputStyle} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                </div>
+              )}
+              {form.type === "ongoing" && form.status === "finished" && (
+                <div>
+                  <label style={labelStyle}>Ended</label>
+                  <input style={inputStyle} type="month" value={form.contractedThrough} min={form.start} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
                 </div>
               )}
             </div>
@@ -584,12 +608,13 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
     e.preventDefault()
     setSaving(true)
     const isOngoing = form.type === "ongoing"
+    // A finished retainer needs an end month, or it keeps counting as contracted MRR forever.
     const payload = {
       ...form,
       monthly: parseFloat(form.monthly),
       hoursPerMonth: parseFloat(form.hoursPerMonth) || 0,
       type: isOngoing ? "retainer" : form.type,
-      contractedThrough: isOngoing ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
+      contractedThrough: isOngoing && form.status !== "finished" ? null : form.type === "oneoff" ? form.start : form.contractedThrough || null,
     }
     const res = await fetch(`/api/clients/${clientId}/contracts`, {
       method: "POST",
@@ -732,7 +757,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
               Save
             </button>
           </div>
-          <div className="contract-add-grid2" style={{ display: "grid", gridTemplateColumns: form.type === "retainer" ? "1fr 1fr 1fr 1fr" : "1fr 1fr 2fr", gap: 8 }}>
+          <div className="contract-add-grid2" style={{ display: "grid", gridTemplateColumns: form.type === "retainer" || (form.type === "ongoing" && form.status === "finished") ? "1fr 1fr 1fr 1fr" : "1fr 1fr 2fr", gap: 8 }}>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Account</label>
               <AccountCombobox
@@ -758,6 +783,12 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
                   <div>
                     <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Through</label>
                     <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.contractedThrough} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
+                  </div>
+                )}
+                {form.type === "ongoing" && form.status === "finished" && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Ended</label>
+                    <input style={{ ...inputStyle, background: "#FBFAF7" }} type="month" value={form.contractedThrough} min={form.start} onChange={e => setForm(f => ({ ...f, contractedThrough: e.target.value }))} required />
                   </div>
                 )}
               </>

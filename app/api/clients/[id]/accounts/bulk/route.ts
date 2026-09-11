@@ -32,6 +32,20 @@ export async function POST(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid", details: parsed.error.flatten() }, { status: 422 })
 
+  // Ongoing retainers have no end — unless they're finished, in which case the sheet's
+  // end date is when they ended and must be present (otherwise they count as MRR forever).
+  const rows = parsed.data.map(row => ({
+    ...row,
+    contractedThrough:
+      row.type === "oneoff" ? row.start
+      : row.type === "ongoing" && row.status !== "finished" ? null
+      : (row.contractedThrough ?? null),
+  }))
+  const missingEnd = rows.filter(r => r.status === "finished" && r.type !== "oneoff" && !r.contractedThrough)
+  if (missingEnd.length) {
+    return Response.json({ error: `Finished retainers need an end month: ${missingEnd.map(r => r.projectName).join(", ")}` }, { status: 422 })
+  }
+
   // Collect unique account names and find or create each
   const uniqueNames = [...new Set(parsed.data.map(r => r.accountName))]
   const existing = await prisma.account.findMany({
@@ -50,19 +64,18 @@ export async function POST(
 
   // Create all projects linked to their accounts
   const contracts = await prisma.$transaction(
-    parsed.data.map(row => {
+    rows.map(row => {
       const account = accountMap.get(row.accountName)!
-      const isOngoing = row.type === "ongoing"
       return prisma.contract.create({
         data: {
           clientId: id,
           accountId: account.id,
           name: row.projectName,
-          type: isOngoing ? "retainer" : row.type,
+          type: row.type === "ongoing" ? "retainer" : row.type,
           monthly: row.monthly,
           status: row.status,
           start: row.start,
-          contractedThrough: isOngoing ? null : row.type === "oneoff" ? row.start : (row.contractedThrough ?? null),
+          contractedThrough: row.contractedThrough,
         },
       })
     })

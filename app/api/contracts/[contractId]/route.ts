@@ -50,6 +50,13 @@ export async function PATCH(
     updateData.contractedThrough = updateData.start ?? contract.start
   }
 
+  // A finished retainer must have an end month, or it counts as contracted MRR forever.
+  const nextType = updateData.type ?? contract.type
+  const nextThrough = "contractedThrough" in updateData ? updateData.contractedThrough : contract.contractedThrough
+  if ((updateData.status ?? contract.status) === "finished" && nextType !== "oneoff" && !nextThrough) {
+    return Response.json({ error: "A finished retainer needs an end month" }, { status: 422 })
+  }
+
   // Bump stageEnteredAt when the pipeline stage actually changes (drives "age in stage" sorting).
   const stg = (status: string, verbal: boolean) =>
     status === "active" || status === "finished" ? "won"

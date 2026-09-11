@@ -154,7 +154,10 @@ export default function ImportClient({ clients = [] }: { clients?: { id: string;
         const r = await fetch(`/api/clients/${id}/${path}`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rows),
         })
-        if (!r.ok) throw new Error(`${label} import failed`)
+        if (!r.ok) {
+          const msg = (await r.json().catch(() => null))?.error
+          throw new Error(msg && msg !== "Invalid" ? `${label} import failed — ${msg}` : `${label} import failed`)
+        }
       }
       await bulk("accounts/bulk", parsed.accounts, "accounts & projects")
       await bulk("metrics/bulk", parsed.metrics, "monthly metrics")

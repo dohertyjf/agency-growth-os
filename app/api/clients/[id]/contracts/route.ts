@@ -56,6 +56,10 @@ export async function POST(
   const data = parsed.data
   // One-offs: contractedThrough = start; ongoing retainers: null
   const contractedThrough = data.type === "oneoff" ? data.start : (data.contractedThrough ?? null)
+  // A finished retainer must have an end month, or it counts as contracted MRR forever.
+  if (data.status === "finished" && data.type !== "oneoff" && !contractedThrough) {
+    return Response.json({ error: "A finished retainer needs an end month" }, { status: 422 })
+  }
 
   const contract = await prisma.contract.create({
     data: { clientId: id, ...data, contractedThrough },
