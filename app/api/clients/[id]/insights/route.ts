@@ -24,12 +24,11 @@ export async function GET(
     prisma.monthlyMetric.findMany({ where: { clientId: id }, orderBy: { month: "asc" } }),
     prisma.contract.findMany({
       where: { clientId: id },
-      select: { createdAt: true, signedDate: true, stageEnteredAt: true, status: true },
+      select: { createdAt: true, signedDate: true, stageEnteredAt: true, status: true, monthly: true },
     }),
   ])
-  const currentMonth = new Date().toISOString().slice(0, 7)
 
-  return Response.json(computeInsights(metrics, contracts, currentMonth))
+  return Response.json(computeInsights(metrics, contracts, new Date()))
 }
 
 const schema = z.object({ enabled: z.boolean() })

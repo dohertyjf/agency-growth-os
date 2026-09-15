@@ -49,7 +49,7 @@ export default function InsightsClient({ clientId, insights }: Props) {
     <div>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, color: "#1A1916", margin: "0 0 4px" }}>Insights</h1>
-        <p style={{ color: "#9C9590", fontSize: 13, margin: 0 }}>Rules-based analysis based on your last 6 months of data.</p>
+        <p style={{ color: "#9C9590", fontSize: 13, margin: 0 }}>Rules-based analysis of your last 30 days of pipeline and recent financials.</p>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

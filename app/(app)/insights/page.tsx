@@ -23,11 +23,10 @@ export default async function InsightsPage() {
     prisma.monthlyMetric.findMany({ where: { clientId }, orderBy: { month: "asc" } }),
     prisma.contract.findMany({
       where: { clientId },
-      select: { createdAt: true, signedDate: true, stageEnteredAt: true, status: true },
+      select: { createdAt: true, signedDate: true, stageEnteredAt: true, status: true, monthly: true },
     }),
   ])
-  const currentMonth = new Date().toISOString().slice(0, 7)
-  const insights = computeInsights(metrics, contracts, currentMonth)
+  const insights = computeInsights(metrics, contracts, new Date())
 
   return <InsightsClient clientId={clientId} insights={insights} />
 }

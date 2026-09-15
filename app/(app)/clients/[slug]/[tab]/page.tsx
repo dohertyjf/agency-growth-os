@@ -82,7 +82,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   // Insights (flagged tab): leads/close-rate live from the Pipeline (contracts),
   // financials from completed months only.
-  const insights = showInsights ? computeInsights(metrics, contracts, nowYM) : { enabled: true, cards: [] }
+  const insights = showInsights ? computeInsights(metrics, contracts, new Date()) : { enabled: true, cards: [] }
 
   return (
     <ClientPageClient

@@ -1,4 +1,4 @@
-import { netProfit, netMargin } from "@/lib/calc"
+import { netProfit, netMargin, fmtCurrency } from "@/lib/calc"
 
 // Phased rollout flag (server-side only). Comma-separated client slugs allowed
 // to see Insights, e.g. INSIGHTS_CLIENT_SLUGS="john-doherty,acme". Unset = none.
@@ -29,17 +29,21 @@ export interface InsightMetric {
   software: number
 }
 
-// The funnel (leads, wins) comes live from the Pipeline (Contract records).
+// The funnel comes live from the Pipeline (Contract records).
 export interface InsightContract {
   createdAt: string | Date
   signedDate?: string | null
   stageEnteredAt?: string | Date | null
   status: string
+  monthly: number
 }
 
-function ym(d: string | Date | null | undefined): string {
-  if (!d) return ""
-  return typeof d === "string" ? d.slice(0, 7) : new Date(d).toISOString().slice(0, 7)
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function toTime(d: string | Date | null | undefined): number | null {
+  if (!d) return null
+  const t = (typeof d === "string" ? new Date(d) : d).getTime()
+  return isNaN(t) ? null : t
 }
 
 const pct = (arr: number[]) => {
@@ -47,70 +51,108 @@ const pct = (arr: number[]) => {
   return f === 0 ? 0 : Math.round((l - f) / Math.abs(f) * 100)
 }
 
-const signed = (n: number) => `${n >= 0 ? "+" : ""}${n}`
+const signedPct = (n: number) => `${n >= 0 ? "+" : ""}${n}%`
 
-// Rules-based insights.
-//   - Leads & close rate are derived LIVE from the Pipeline: a "lead" is a deal
-//     added that month (by created date); a "win" is a deal that became active
-//     that month; close rate = wins / leads.
-//   - Financial trends (net profit, margin, software) use MonthlyMetric but only
-//     COMPLETED months — the in-progress current month is excluded so a not-yet-
-//     entered month can't show a bogus -100%.
+// Rules-based insights, two frames that suit the data:
+//   - PIPELINE (leads, win rate, deal size): trailing 30 days vs the prior 30.
+//     A calendar-month view is misleading for a lagging funnel (deals created
+//     this month rarely close this month), so we use rolling 30-day windows.
+//     Leads = deals created in the window; win rate = won / (won+lost) among
+//     deals that RESOLVED in the window; deal size = avg monthly value of wins.
+//   - FINANCIALS (net profit, margin, software): completed calendar months only,
+//     so a not-yet-entered current month can't show a bogus -100%.
 //
-// `metrics` ascending by month (may include the current month). `contracts` is
-// the client's full deal list. `currentMonth` is "YYYY-MM".
+// `metrics` ascending by month; `contracts` the client's full deal list; `now`
+// the reference instant (usually new Date()).
 export function computeInsights(
   metrics: InsightMetric[],
   contracts: InsightContract[],
-  currentMonth: string,
+  now: Date,
 ): { enabled: boolean; cards: InsightCard[] } {
-  // ── Pipeline funnel by month (live) ──
-  const leadsByMonth: Record<string, number> = {}
-  const winsByMonth: Record<string, number> = {}
-  for (const c of contracts) {
-    const created = ym(c.createdAt)
-    if (created) leadsByMonth[created] = (leadsByMonth[created] ?? 0) + 1
-    if (c.status === "active" || c.status === "finished") {
-      const wonMonth = ym(c.signedDate) || ym(c.stageEnteredAt) || created
-      if (wonMonth) winsByMonth[wonMonth] = (winsByMonth[wonMonth] ?? 0) + 1
-    }
-  }
-  const currentLeads = leadsByMonth[currentMonth] ?? 0
-
-  // ── Completed months only (exclude the in-progress month) ──
-  const completed = metrics.filter(m => m.month < currentMonth).slice(-6)
-  const months = completed.map(m => m.month)
-  const n = months.length
-  const hasTrend = n >= 2
-
   const cards: InsightCard[] = []
+  const t0 = now.getTime()
+  const last30 = t0 - 30 * DAY_MS
+  const prior60 = t0 - 60 * DAY_MS
 
-  // ── Card 1: leads / conversion (live pipeline) ──
-  if (hasTrend) {
-    const leadsSeries = months.map(m => leadsByMonth[m] ?? 0)
-    const winsSeries = months.map(m => winsByMonth[m] ?? 0)
-    const closeSeries = months.map((_, i) => leadsSeries[i] > 0 ? (winsSeries[i] / leadsSeries[i]) * 100 : 0)
-    cards.push({
-      tone: "leverage",
-      tag: "Highest leverage",
-      title: "Tighten sales conversion before buying more traffic",
-      body: `You've added ${currentLeads} ${currentLeads === 1 ? "lead" : "leads"} to the pipeline so far this month. Across the last ${n} completed months, leads moved ${signed(pct(leadsSeries))}% and close rate ${signed(pct(closeSeries))}%. Lifting close rate a few points is worth more than chasing more leads — and costs nothing.`,
-      metric: "closeRate",
-      metricLabel: "close rate",
+  // ── Pipeline (trailing 30 days) ──
+  const createdIn = (start: number, end: number) =>
+    contracts.filter(c => { const t = toTime(c.createdAt); return t !== null && t >= start && t < end })
+
+  const wonResolvedIn = (start: number, end: number) =>
+    contracts.filter(c => {
+      if (c.status !== "active" && c.status !== "finished") return false
+      const t = toTime(c.signedDate) ?? toTime(c.stageEnteredAt)
+      return t !== null && t >= start && t < end
     })
-  } else if (currentLeads > 0) {
+  const lostResolvedIn = (start: number, end: number) =>
+    contracts.filter(c => {
+      if (c.status !== "lost") return false
+      const t = toTime(c.stageEnteredAt)
+      return t !== null && t >= start && t < end
+    })
+
+  const leadsLast = createdIn(last30, t0 + 1).length
+  const leadsPrior = createdIn(prior60, last30).length
+  const leadDelta = leadsLast - leadsPrior
+
+  const wonLast = wonResolvedIn(last30, t0 + 1)
+  const lostLast = lostResolvedIn(last30, t0 + 1)
+  const wonPrior = wonResolvedIn(prior60, last30)
+  const lostPrior = lostResolvedIn(prior60, last30)
+
+  const winRate = (won: number, lost: number) => (won + lost) > 0 ? Math.round((won / (won + lost)) * 100) : null
+  const wrLast = winRate(wonLast.length, lostLast.length)
+  const wrPrior = winRate(wonPrior.length, lostPrior.length)
+
+  const avgSize = (deals: InsightContract[]) =>
+    deals.length ? deals.reduce((s, c) => s + (c.monthly || 0), 0) / deals.length : null
+  const sizeLast = avgSize(wonLast)
+  const sizePrior = avgSize(wonPrior)
+
+  const hasPipelineActivity = leadsLast + leadsPrior + wonLast.length + lostLast.length > 0
+  if (hasPipelineActivity) {
+    const parts: string[] = []
+
+    // Lead flow
+    let lead = `You added ${leadsLast} ${leadsLast === 1 ? "lead" : "leads"} in the last 30 days`
+    if (leadsLast > 0 || leadsPrior > 0) {
+      lead += leadDelta > 0 ? ` — ${leadDelta} more than the prior 30`
+        : leadDelta < 0 ? ` — ${Math.abs(leadDelta)} fewer than the prior 30`
+        : ` — same as the prior 30`
+    }
+    parts.push(lead + ".")
+
+    // Win rate (resolved deals only)
+    if (wrLast !== null) {
+      let s = `Of deals that resolved, ${wrLast}% closed`
+      if (wrPrior !== null) s += `, vs ${wrPrior}% the prior 30`
+      parts.push(s + ".")
+    }
+
+    // Average deal size (won deals)
+    if (sizeLast !== null) {
+      let s = `Won deals averaged ${fmtCurrency(sizeLast)}/mo`
+      if (sizePrior !== null && sizePrior > 0) {
+        s += ` (${signedPct(Math.round((sizeLast - sizePrior) / sizePrior * 100))})`
+      }
+      parts.push(s + ".")
+    }
+
     cards.push({
       tone: "leverage",
-      tag: "Pipeline",
-      title: "Your pipeline is filling",
-      body: `You've added ${currentLeads} ${currentLeads === 1 ? "lead" : "leads"} to the pipeline so far this month. Once a couple of months are complete, this will trend your lead flow and close rate.`,
+      tag: "Pipeline · last 30 days",
+      title: "Pipeline momentum",
+      body: parts.join(" "),
       metric: "leads",
       metricLabel: "leads",
     })
   }
 
-  // ── Cards 2 & 3: financials, completed months only ──
-  if (hasTrend) {
+  // ── Financials (completed calendar months only) ──
+  const currentMonth = now.toISOString().slice(0, 7)
+  const completed = metrics.filter(m => m.month < currentMonth).slice(-6)
+  const n = completed.length
+  if (n >= 2) {
     const np = completed.map(m => netProfit(m.revenue, m.totalExpenses))
     const nm = completed.map(m => netMargin(m.revenue, m.totalExpenses))
     const software = completed.map(m => m.software)
@@ -123,7 +165,7 @@ export function computeInsights(
       tone: profitUp ? "good" : "watch",
       tag: profitUp ? "Working well" : "Keep an eye on",
       title: profitUp ? "Net profit is trending up" : "Net profit is slipping",
-      body: `Over the last ${n} completed months, net profit moved ${signed(npP)}% and net margin ${nmPts >= 0 ? "improved" : "slipped"} ${Math.abs(nmPts)} points. ${profitUp ? "Protect what's driving it." : "Worth digging into what changed."}`,
+      body: `Over the last ${n} completed months, net profit moved ${signedPct(npP)} and net margin ${nmPts >= 0 ? "improved" : "slipped"} ${Math.abs(nmPts)} points. ${profitUp ? "Protect what's driving it." : "Worth digging into what changed."}`,
       metric: "netProfit",
       metricLabel: "net profit",
     })
@@ -132,7 +174,7 @@ export function computeInsights(
       tone: "watch",
       tag: "Keep an eye on",
       title: "Watch tooling creep",
-      body: `Software spend moved ${signed(softP)}% over the last ${n} completed months. Audit subscriptions each quarter so fixed costs don't quietly eat into margin.`,
+      body: `Software spend moved ${signedPct(softP)} over the last ${n} completed months. Audit subscriptions each quarter so fixed costs don't quietly eat into margin.`,
       metric: "software",
       metricLabel: "software spend",
     })
