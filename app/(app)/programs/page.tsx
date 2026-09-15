@@ -16,7 +16,7 @@ export default async function ProgramsPage() {
         _count: { select: { calls: true } },
       },
     }),
-    prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.client.findMany({ select: { id: true, name: true, status: true }, orderBy: { name: "asc" } }),
   ])
 
   return (
