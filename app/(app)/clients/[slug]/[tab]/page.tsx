@@ -61,9 +61,18 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
     prisma.personHoursMonth.findMany({ where: { person: { clientId: id } } }),
   ])
 
-  // This client's 1:1 calls plus every group call (group calls are shared).
+  // This client's 1:1 calls, plus group calls for any GROUP program they're in.
+  const groupProgramIds = (await prisma.programMembership.findMany({
+    where: { clientId: id, program: { isGroup: true } },
+    select: { programId: true },
+  })).map(m => m.programId)
   const calls = await prisma.call.findMany({
-    where: { OR: [{ clientId: id }, { isGroupCall: true }] },
+    where: {
+      OR: [
+        { clientId: id },
+        ...(groupProgramIds.length ? [{ isGroupCall: true, programId: { in: groupProgramIds } }] : []),
+      ],
+    },
     include: { questions: { orderBy: { order: "asc" } } },
     orderBy: { date: "desc" },
   })
@@ -84,9 +93,22 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
   // financials from completed months only.
   const insights = showInsights ? computeInsights(metrics, contracts, new Date()) : { enabled: true, cards: [] }
 
+  // Programs (cohorts) for the coach's group-call + assignment controls.
+  const isCoachViewer = session.user.role === "coach"
+  const [programs, clientMemberships] = await Promise.all([
+    isCoachViewer
+      ? prisma.program.findMany({ select: { id: true, name: true, isGroup: true }, orderBy: [{ isGroup: "desc" }, { name: "asc" }] })
+      : Promise.resolve([]),
+    isCoachViewer
+      ? prisma.programMembership.findMany({ where: { clientId: id }, select: { programId: true } })
+      : Promise.resolve([]),
+  ])
+
   return (
     <ClientPageClient
-      isCoach={session.user.role === "coach"}
+      isCoach={isCoachViewer}
+      programs={programs}
+      clientProgramIds={clientMemberships.map(m => m.programId)}
       showInsights={showInsights}
       insights={insights}
       clientId={id}
@@ -114,7 +136,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       checklistMonth={nowYM}
       initialChecklist={initialChecklist}
       goal={goal}
-      initialCalls={calls.map(c => ({ id: c.id, clientId: c.clientId, date: c.date, title: c.title, transcript: c.transcript ?? null, video: c.video ?? null, synopsis: c.synopsis ?? null, notes: c.notes ?? null, isGroupCall: c.isGroupCall, questions: c.questions.map(q => ({ id: q.id, q: q.q, a: q.a ?? null, order: q.order })) }))}
+      initialCalls={calls.map(c => ({ id: c.id, clientId: c.clientId, date: c.date, title: c.title, transcript: c.transcript ?? null, video: c.video ?? null, synopsis: c.synopsis ?? null, notes: c.notes ?? null, isGroupCall: c.isGroupCall, programId: c.programId ?? null, questions: c.questions.map(q => ({ id: q.id, q: q.q, a: q.a ?? null, order: q.order })) }))}
       products={products.map(p => ({ id: p.id, name: p.name, description: p.description ?? null, type: p.type as "retainer" | "ongoing" | "oneoff", monthly: p.monthly }))}
       initialRoadmap={roadmapItems.map(r => ({ key: r.key, status: r.status as "none" | "red" | "yellow" | "green" }))}
     />

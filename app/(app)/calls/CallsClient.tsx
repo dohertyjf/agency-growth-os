@@ -12,13 +12,16 @@ interface Call {
   synopsis: string | null
   notes: string | null
   isGroupCall: boolean
+  programId: string | null
   questions: Question[]
 }
 interface Client { id: string; name: string }
+interface Program { id: string; name: string }
 
 interface Props {
   calls: Call[]
   clients: Client[]
+  programs?: Program[]
   isCoach: boolean
   defaultClientId?: string
   embedded?: boolean
@@ -57,13 +60,13 @@ function GroupBadge() {
   )
 }
 
-export default function CallsClient({ calls: initialCalls, clients, isCoach, defaultClientId, embedded }: Props) {
+export default function CallsClient({ calls: initialCalls, clients, programs = [], isCoach, defaultClientId, embedded }: Props) {
   const isMobile = useIsMobile()
   const byDateDesc = (a: Call, b: Call) => (b.date || "").localeCompare(a.date || "")
   const [calls, setCalls] = useState<Call[]>([...initialCalls].sort(byDateDesc))
   const [selected, setSelected] = useState<Call | null>([...initialCalls].sort(byDateDesc)[0] ?? null)
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ clientId: defaultClientId ?? clients[0]?.id ?? "", date: new Date().toISOString().slice(0, 10), title: "", isGroupCall: false })
+  const [form, setForm] = useState({ clientId: defaultClientId ?? clients[0]?.id ?? "", date: new Date().toISOString().slice(0, 10), title: "", isGroupCall: false, programId: "" })
   const [saving, setSaving] = useState(false)
   const [editingNote, setEditingNote] = useState<{ callId: string; field: "synopsis" | "notes"; value: string } | null>(null)
   const [addingQ, setAddingQ] = useState(false)
@@ -80,7 +83,7 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
     const res = await fetch(`/api/clients/${form.clientId}/calls`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: form.date, title: form.title, isGroupCall: form.isGroupCall }),
+      body: JSON.stringify({ date: form.date, title: form.title, isGroupCall: form.isGroupCall, programId: form.isGroupCall ? (form.programId || null) : null }),
     })
     const data = await res.json()
     if (res.ok && data.id) {
@@ -88,7 +91,7 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
       setCalls(prev => [newCall, ...prev])
       setSelected(newCall)
       setAdding(false)
-      setForm(f => ({ ...f, title: "", isGroupCall: false }))
+      setForm(f => ({ ...f, title: "", isGroupCall: false, programId: "" }))
     }
     setSaving(false)
   }
@@ -178,8 +181,21 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
         <span>{selected.date}</span>
         {isCoach && (
           <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-            <input type="checkbox" checked={selected.isGroupCall} onChange={e => patchCall(selected.id, { isGroupCall: e.target.checked })} style={{ accentColor: "#E9532A" }} />
-            Group call (all clients can view)
+            <input type="checkbox" checked={selected.isGroupCall} onChange={e => patchCall(selected.id, { isGroupCall: e.target.checked, ...(e.target.checked ? {} : { programId: null }) })} style={{ accentColor: "#E9532A" }} />
+            Group call
+          </label>
+        )}
+        {isCoach && selected.isGroupCall && (
+          <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span>Program:</span>
+            <select
+              value={selected.programId ?? ""}
+              onChange={e => patchCall(selected.id, { programId: e.target.value || null })}
+              style={{ padding: "3px 6px", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 12 }}
+            >
+              <option value="">Unassigned — hidden</option>
+              {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </label>
         )}
       </div>
@@ -364,6 +380,15 @@ export default function CallsClient({ calls: initialCalls, clients, isCoach, def
             <input type="checkbox" checked={form.isGroupCall} onChange={e => setForm(f => ({ ...f, isGroupCall: e.target.checked }))} style={{ accentColor: "#E9532A" }} />
             Group call
           </label>
+          {form.isGroupCall && (
+            <div>
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Program</label>
+              <select value={form.programId} onChange={e => setForm(f => ({ ...f, programId: e.target.value }))} style={{ padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 13 }}>
+                <option value="">Unassigned — hidden from clients</option>
+                {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
           <button type="submit" disabled={saving} style={{ padding: "7px 16px", background: "#E9532A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Save</button>
         </form>
       )}

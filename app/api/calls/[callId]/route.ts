@@ -10,6 +10,7 @@ const schema = z.object({
   synopsis: z.string().optional(),
   notes: z.string().optional(),
   isGroupCall: z.boolean().optional(),
+  programId: z.string().nullable().optional(),
 })
 
 // Call recaps/notes/transcripts are coaching artifacts — clients may view them

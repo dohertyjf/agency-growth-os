@@ -11,6 +11,7 @@ import ProductsPanel from "./ProductsPanel"
 import ProgressPanel from "./ProgressPanel"
 import GoalsPanel from "./GoalsPanel"
 import ClientLoginPanel from "./ClientLoginPanel"
+import ProgramAssignPanel from "./ProgramAssignPanel"
 import PeoplePanel from "./PeoplePanel"
 import PipelinePanel from "./PipelinePanel"
 import CapacitySold from "./CapacitySold"
@@ -156,6 +157,7 @@ interface Call {
   synopsis: string | null
   notes: string | null
   isGroupCall: boolean
+  programId: string | null
   questions: CallQuestion[]
 }
 
@@ -196,6 +198,9 @@ interface Props {
   // Insights is a flagged tab, shown only for allowlisted profiles.
   showInsights: boolean
   insights: { enabled: boolean; cards: InsightCard[] }
+  // Cohort/program controls (coach only).
+  programs: { id: string; name: string; isGroup: boolean }[]
+  clientProgramIds: string[]
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -217,7 +222,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -489,6 +494,7 @@ export default function ClientPageClient({
         <CallsClient
           calls={initialCalls}
           clients={[{ id: clientId, name: clientName }]}
+          programs={programs.filter(p => p.isGroup)}
           isCoach={isCoach}
           defaultClientId={clientId}
           embedded
@@ -513,6 +519,7 @@ export default function ClientPageClient({
             clientId={clientId}
             initialGoal={goal}
           />
+          {isCoach && <ProgramAssignPanel clientId={clientId} programs={programs} initialProgramIds={clientProgramIds} />}
           {isCoach && <ClientLoginPanel clientId={clientId} clientName={clientName} />}
         </>
       )}

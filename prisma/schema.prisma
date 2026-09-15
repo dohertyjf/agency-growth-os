@@ -53,6 +53,7 @@ model Client {
   startDate     String?
   endDate       String?
   projectionState String?       // JSON: saved Growth Projection input state
+  memberships   ProgramMembership[] // programs/cohorts this client belongs to
   users         User[]
   goal          Goal?
   metrics       MonthlyMetric[]
@@ -283,9 +284,31 @@ model Call {
   video       String?
   synopsis    String?
   notes       String?
-  isGroupCall Boolean    @default(false) // group call → visible to every client
+  isGroupCall Boolean    @default(false) // group call → visible to its program's clients
+  programId   String?    // group calls: which program/cohort this call is for
+  program     Program?   @relation(fields: [programId], references: [id], onDelete: SetNull)
   questions   Question[]
   createdAt   DateTime   @default(now())
+}
+
+model Program {
+  id          String              @id @default(cuid())
+  name        String
+  isGroup     Boolean             @default(false) // group program → members see its group-call recaps
+  memberships ProgramMembership[]
+  calls       Call[]
+  createdAt   DateTime            @default(now())
+}
+
+model ProgramMembership {
+  clientId  String
+  programId String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([clientId, programId])
+  @@index([programId])
 }
 
 model Question {

@@ -32,6 +32,7 @@ const schema = z.object({
   synopsis: z.string().optional(),
   notes: z.string().optional(),
   isGroupCall: z.boolean().optional(),
+  programId: z.string().nullable().optional(),
 })
 
 export async function POST(
