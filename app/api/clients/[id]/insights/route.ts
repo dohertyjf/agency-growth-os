@@ -17,20 +17,19 @@ export async function GET(
   const { id } = await params
   if (!authorize(session, id)) return Response.json({ error: "Forbidden" }, { status: 403 })
 
-  const url = new URL(req.url)
-  const range = parseInt(url.searchParams.get("range") ?? "6", 10)
-
   const client = await prisma.client.findUnique({ where: { id } })
   if (!client) return Response.json({ error: "Not found" }, { status: 404 })
 
-  const metrics = await prisma.monthlyMetric.findMany({
-    where: { clientId: id },
-    orderBy: { month: "desc" },
-    take: range,
-  })
-  metrics.reverse()
+  const [metrics, contracts] = await Promise.all([
+    prisma.monthlyMetric.findMany({ where: { clientId: id }, orderBy: { month: "asc" } }),
+    prisma.contract.findMany({
+      where: { clientId: id },
+      select: { createdAt: true, signedDate: true, stageEnteredAt: true, status: true },
+    }),
+  ])
+  const currentMonth = new Date().toISOString().slice(0, 7)
 
-  return Response.json(computeInsights(metrics))
+  return Response.json(computeInsights(metrics, contracts, currentMonth))
 }
 
 const schema = z.object({ enabled: z.boolean() })

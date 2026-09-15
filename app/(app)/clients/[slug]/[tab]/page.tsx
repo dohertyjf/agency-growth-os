@@ -80,8 +80,9 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
   const checklistRow = await prisma.monthlyChecklist.findUnique({ where: { clientId_month: { clientId: id, month: nowYM } } })
   const initialChecklist = checklistRow ? { dismissed: checklistRow.dismissed, checkedKeys: JSON.parse(checklistRow.checkedKeys) as string[] } : null
 
-  // Insights (flagged tab): rules-based analysis over the last 6 months.
-  const insights = showInsights ? computeInsights(metrics.slice(-6)) : { enabled: true, cards: [] }
+  // Insights (flagged tab): leads/close-rate live from the Pipeline (contracts),
+  // financials from completed months only.
+  const insights = showInsights ? computeInsights(metrics, contracts, nowYM) : { enabled: true, cards: [] }
 
   return (
     <ClientPageClient

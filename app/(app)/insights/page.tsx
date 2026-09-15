@@ -17,14 +17,17 @@ export default async function InsightsPage() {
 
   if (!clientId) redirect("/dashboard")
 
-  // Compute directly from the client's recent metrics — same logic the API uses.
-  const metrics = await prisma.monthlyMetric.findMany({
-    where: { clientId },
-    orderBy: { month: "desc" },
-    take: 6,
-  })
-  metrics.reverse()
-  const insights = computeInsights(metrics)
+  // Same logic the API and profile tab use: funnel live from the Pipeline,
+  // financials from completed months.
+  const [metrics, contracts] = await Promise.all([
+    prisma.monthlyMetric.findMany({ where: { clientId }, orderBy: { month: "asc" } }),
+    prisma.contract.findMany({
+      where: { clientId },
+      select: { createdAt: true, signedDate: true, stageEnteredAt: true, status: true },
+    }),
+  ])
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const insights = computeInsights(metrics, contracts, currentMonth)
 
   return <InsightsClient clientId={clientId} insights={insights} />
 }
