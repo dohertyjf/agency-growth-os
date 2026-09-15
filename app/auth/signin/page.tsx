@@ -1,26 +1,46 @@
 "use client"
 import { signIn } from "next-auth/react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+
+const DEACTIVATED_MSG = "This account has been deactivated. Please contact your coach for access."
 
 export default function SignInPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
+  // An existing session bounced by the app layout arrives with ?deactivated=1.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("deactivated") === "1") {
+      setError(DEACTIVATED_MSG)
+    }
+  }, [])
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError("")
     const fd = new FormData(e.currentTarget)
+    const email = fd.get("email") as string
     const res = await signIn("credentials", {
-      email: fd.get("email") as string,
+      email,
       password: fd.get("password") as string,
       redirect: false,
     })
-    setLoading(false)
     if (res?.error) {
-      setError("Invalid email or password")
+      // Distinguish a deactivated login from bad credentials for a clearer message.
+      let deactivated = false
+      try {
+        const r = await fetch("/api/auth/account-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        })
+        if (r.ok) deactivated = (await r.json()).deactivated
+      } catch { /* fall back to the generic message */ }
+      setError(deactivated ? DEACTIVATED_MSG : "Invalid email or password")
+      setLoading(false)
     } else {
       router.push("/dashboard")
       router.refresh()
