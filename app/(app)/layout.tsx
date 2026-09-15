@@ -1,10 +1,17 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
+import { prisma } from "@/lib/prisma"
 import AppNav from "@/components/AppNav"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
   if (!session) redirect("/auth/signin")
+
+  // Lock out a client whose login was deactivated, even on an existing session.
+  if (session.user.role === "client") {
+    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { active: true } })
+    if (user?.active === false) redirect("/auth/signin?deactivated=1")
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#FBFAF7" }}>

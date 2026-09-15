@@ -29,7 +29,7 @@ export async function GET(
 
   const user = await prisma.user.findFirst({
     where: { clientId: id, role: "client" },
-    select: { email: true, passwordHash: true },
+    select: { email: true, passwordHash: true, active: true },
   })
 
   const pendingInvite = user
@@ -41,9 +41,30 @@ export async function GET(
 
   return Response.json({
     clientEmail: client.email,
-    user: user ? { email: user.email, hasPassword: !!user.passwordHash } : null,
+    user: user ? { email: user.email, hasPassword: !!user.passwordHash, active: user.active } : null,
     invitePending: !!pendingInvite,
   })
+}
+
+// Enable/disable this client's login without touching their profile or data.
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session || session.user.role !== "coach") {
+    return Response.json({ error: "Forbidden" }, { status: 403 })
+  }
+  const { id } = await params
+  const body = await req.json().catch(() => null)
+  const active = body?.active
+  if (typeof active !== "boolean") return Response.json({ error: "active must be a boolean" }, { status: 422 })
+
+  const user = await prisma.user.findFirst({ where: { clientId: id, role: "client" } })
+  if (!user) return Response.json({ error: "This client has no login." }, { status: 404 })
+
+  await prisma.user.update({ where: { id: user.id }, data: { active } })
+  return Response.json({ active })
 }
 
 // Create (or link) the client's login user and mint a fresh invite link.

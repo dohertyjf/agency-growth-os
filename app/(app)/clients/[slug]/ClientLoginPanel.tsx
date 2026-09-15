@@ -3,7 +3,7 @@ import { useEffect, useState } from "react"
 
 interface Status {
   clientEmail: string
-  user: { email: string; hasPassword: boolean } | null
+  user: { email: string; hasPassword: boolean; active: boolean } | null
   invitePending: boolean
 }
 
@@ -63,6 +63,16 @@ export default function ClientLoginPanel({ clientId, clientName }: { clientId: s
     }
   }
 
+  async function setActive(active: boolean) {
+    if (active === false && !confirm(`Deactivate ${firstName}'s login? They won't be able to sign in, but their profile and data are kept. You can reactivate anytime.`)) return
+    const res = await fetch(`/api/clients/${clientId}/invite`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active }),
+    })
+    if (res.ok) await loadStatus()
+  }
+
   async function copy() {
     if (!link) return
     try {
@@ -74,6 +84,7 @@ export default function ClientLoginPanel({ clientId, clientName }: { clientId: s
     }
   }
 
+  const deactivated = status?.user?.active === false
   const hasLogin = status?.user?.hasPassword
   const invited = status?.user && !status.user.hasPassword
 
@@ -93,7 +104,11 @@ export default function ClientLoginPanel({ clientId, clientName }: { clientId: s
       ) : (
         <>
           <div style={{ fontSize: 13, marginBottom: 16 }}>
-            {hasLogin ? (
+            {deactivated ? (
+              <span style={{ color: "#B91C1C", fontWeight: 600 }}>
+                ⊘ {firstName}&apos;s login is deactivated ({status?.user?.email}) — they can&apos;t sign in. Profile and data are kept.
+              </span>
+            ) : hasLogin ? (
               <span style={{ color: "#166534", fontWeight: 600 }}>
                 ✓ {firstName} has an active login ({status?.user?.email}).
               </span>
@@ -128,15 +143,26 @@ export default function ClientLoginPanel({ clientId, clientName }: { clientId: s
             </div>
           )}
 
-          <button onClick={generate} disabled={generating} style={{ ...btnStyle, opacity: generating ? 0.7 : 1, cursor: generating ? "default" : "pointer" }}>
-            {generating
-              ? "Generating…"
-              : hasLogin
-                ? "Generate new link (password reset)"
-                : invited
-                  ? "Generate a fresh link"
-                  : "Generate invite link"}
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {deactivated ? (
+              <button onClick={() => setActive(true)} style={btnStyle}>Reactivate login</button>
+            ) : (
+              <button onClick={generate} disabled={generating} style={{ ...btnStyle, opacity: generating ? 0.7 : 1, cursor: generating ? "default" : "pointer" }}>
+                {generating
+                  ? "Generating…"
+                  : hasLogin
+                    ? "Generate new link (password reset)"
+                    : invited
+                      ? "Generate a fresh link"
+                      : "Generate invite link"}
+              </button>
+            )}
+            {status?.user && !deactivated && (
+              <button onClick={() => setActive(false)} style={{ padding: "10px 16px", background: "#fff", color: "#B91C1C", border: "1px solid #F5C4B4", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Deactivate login
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>

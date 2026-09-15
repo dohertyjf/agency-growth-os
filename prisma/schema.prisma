@@ -38,6 +38,7 @@ model User {
   name         String?
   role         Role     @default(client)
   passwordHash String?
+  active       Boolean  @default(true) // false = login disabled (former client), profile kept
   clientId     String?
   client       Client?  @relation(fields: [clientId], references: [id])
   createdAt    DateTime @default(now())
