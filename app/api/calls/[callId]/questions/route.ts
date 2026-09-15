@@ -9,7 +9,10 @@ export async function POST(
   { params }: { params: Promise<{ callId: string }> }
 ) {
   const session = await auth()
-  if (!session) return Response.json({ error: "Forbidden" }, { status: 403 })
+  // Call questions are part of the coach's recap — coach-only to edit.
+  if (!session || session.user.role !== "coach") {
+    return Response.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   const { callId } = await params
   const call = await prisma.call.findUnique({
@@ -17,10 +20,6 @@ export async function POST(
     include: { questions: true },
   })
   if (!call) return Response.json({ error: "Not found" }, { status: 404 })
-
-  if (session.user.role !== "coach" && session.user.clientId !== call.clientId) {
-    return Response.json({ error: "Forbidden" }, { status: 403 })
-  }
 
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)

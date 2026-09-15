@@ -12,23 +12,19 @@ const schema = z.object({
   isGroupCall: z.boolean().optional(),
 })
 
-async function authorizeCall(session: import("next-auth").Session | null, callId: string) {
-  if (!session) return null
-  const call = await prisma.call.findUnique({ where: { id: callId } })
-  if (!call) return null
-  if (session.user.role === "coach") return call
-  if (session.user.clientId === call.clientId) return call
-  return null
-}
-
+// Call recaps/notes/transcripts are coaching artifacts — clients may view them
+// (via read routes) but only the coach may edit them.
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ callId: string }> }
 ) {
   const session = await auth()
+  if (!session || session.user.role !== "coach") {
+    return Response.json({ error: "Forbidden" }, { status: 403 })
+  }
   const { callId } = await params
-  const call = await authorizeCall(session, callId)
-  if (!call) return Response.json({ error: "Forbidden or not found" }, { status: 403 })
+  const call = await prisma.call.findUnique({ where: { id: callId } })
+  if (!call) return Response.json({ error: "Not found" }, { status: 404 })
 
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)

@@ -9,13 +9,17 @@ type Tab = typeof VALID_TABS[number]
 export default async function ClientTabPage({ params }: { params: Promise<{ slug: string; tab: string }> }) {
   const session = await auth()
   if (!session) redirect("/auth/signin")
-  if (session.user.role !== "coach") redirect("/dashboard")
 
   const { slug, tab } = await params
   if (!VALID_TABS.includes(tab as Tab)) notFound()
 
   const client = await prisma.client.findFirst({ where: { slug } })
   if (!client) notFound()
+
+  // A client may only view their OWN profile; a coach may view any.
+  if (session.user.role !== "coach" && session.user.clientId !== client.id) {
+    redirect("/dashboard")
+  }
 
   const id = client.id
 
@@ -74,6 +78,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   return (
     <ClientPageClient
+      isCoach={session.user.role === "coach"}
       clientId={id}
       projectionState={client.projectionState}
       clientSlug={slug}

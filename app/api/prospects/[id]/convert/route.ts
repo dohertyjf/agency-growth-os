@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { ymAdd } from "@/lib/calc"
 import { SignJWT } from "jose"
+import { hashToken } from "@/lib/inviteToken"
 
 const schema = z.object({
   annualRevenue: z.number().min(0),
@@ -95,7 +96,7 @@ export async function POST(
       await tx.inviteToken.create({
         data: {
           email: s.email,
-          token,
+          token: hashToken(token),
           expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         },
       })

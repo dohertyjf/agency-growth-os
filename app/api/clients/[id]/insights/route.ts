@@ -1,6 +1,6 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { netProfit, netMargin, momDelta } from "@/lib/calc"
+import { computeInsights } from "@/lib/insights"
 import { z } from "zod"
 
 function authorize(session: import("next-auth").Session | null, clientId: string) {
@@ -30,56 +30,7 @@ export async function GET(
   })
   metrics.reverse()
 
-  if (metrics.length < 2) {
-    return Response.json({ enabled: true, cards: [] })
-  }
-
-  const pct = (arr: number[]) => {
-    const f = arr[0], l = arr[arr.length - 1]
-    return f === 0 ? 0 : Math.round((l - f) / Math.abs(f) * 100)
-  }
-
-  const leads = metrics.map(m => m.leads)
-  const closeRate = metrics.map(m => m.closeRate)
-  const np = metrics.map(m => netProfit(m.revenue, m.totalExpenses))
-  const software = metrics.map(m => m.software)
-  const nm = metrics.map(m => netMargin(m.revenue, m.totalExpenses))
-
-  const leadsP = pct(leads)
-  const closeP = pct(closeRate)
-  const npP = pct(np)
-  const softP = pct(software)
-  const nmPts = Math.round(nm[nm.length - 1] - nm[0])
-  const lastLeads = leads[leads.length - 1]
-
-  const cards = [
-    {
-      tone: "leverage",
-      tag: "Highest leverage",
-      title: "Tighten sales conversion before buying more traffic",
-      body: `Leads grew ${leadsP}% but close rate moved ${closeP}% over the period. At ${lastLeads} leads/mo, lifting close rate just 3 points is worth more revenue than another lead-gen push — and costs nothing.`,
-      metric: "closeRate",
-      metricLabel: "close rate",
-    },
-    {
-      tone: "good",
-      tag: "Working well",
-      title: "Net profit is compounding",
-      body: `Net profit is up ${npP}% and net margin improved ${nmPts} points. The pricing and delegation moves from recent calls are landing — protect what changed.`,
-      metric: "netProfit",
-      metricLabel: "net profit",
-    },
-    {
-      tone: "watch",
-      tag: "Keep an eye on",
-      title: "Watch tooling creep",
-      body: `Software spend rose ${softP}% over the period. Audit subscriptions each quarter so fixed costs don't quietly eat into the margin gains.`,
-      metric: "software",
-      metricLabel: "software spend",
-    },
-  ]
-
-  return Response.json({ enabled: true, cards })
+  return Response.json(computeInsights(metrics))
 }
 
 const schema = z.object({ enabled: z.boolean() })

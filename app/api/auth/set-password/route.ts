@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { jwtVerify } from "jose"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
+import { hashToken } from "@/lib/inviteToken"
 
 const schema = z.object({
   token: z.string(),
@@ -27,7 +28,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid or expired token" }, { status: 400 })
   }
 
-  const invite = await prisma.inviteToken.findUnique({ where: { token } })
+  // Look up by the token's hash — the DB never holds the raw token.
+  const tokenHash = hashToken(token)
+  const invite = await prisma.inviteToken.findUnique({ where: { token: tokenHash } })
   if (!invite || invite.used || invite.expiresAt < new Date()) {
     return Response.json({ error: "Token expired or already used" }, { status: 400 })
   }
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
   const hash = await bcrypt.hash(password, 12)
   await prisma.$transaction([
     prisma.user.update({ where: { email }, data: { passwordHash: hash } }),
-    prisma.inviteToken.update({ where: { token }, data: { used: true } }),
+    prisma.inviteToken.update({ where: { token: tokenHash }, data: { used: true } }),
   ])
 
   return Response.json({ ok: true })

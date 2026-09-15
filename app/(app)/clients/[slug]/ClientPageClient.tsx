@@ -10,6 +10,7 @@ import AccountsPanel from "./AccountsPanel"
 import ProductsPanel from "./ProductsPanel"
 import ProgressPanel from "./ProgressPanel"
 import GoalsPanel from "./GoalsPanel"
+import ClientLoginPanel from "./ClientLoginPanel"
 import PeoplePanel from "./PeoplePanel"
 import PipelinePanel from "./PipelinePanel"
 import CapacitySold from "./CapacitySold"
@@ -187,6 +188,9 @@ interface Props {
   initialSalaryMonths: PersonSalaryMonth[]
   initialHoursMonths: PersonHoursMonth[]
   initialWeekly: WeeklyRow[]
+  // Coach vs. client viewer. Gates coach-only controls (e.g. the invite panel)
+  // so they never render when a client views their own profile.
+  isCoach: boolean
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -207,7 +211,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -277,9 +281,11 @@ export default function ClientPageClient({
   return (
     <CurrencyProvider currency={currency}>
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <Link href="/clients" style={{ fontSize: 13, color: "#9C9590", textDecoration: "none" }}>← Clients</Link>
-      </div>
+      {isCoach && (
+        <div style={{ marginBottom: 20 }}>
+          <Link href="/clients" style={{ fontSize: 13, color: "#9C9590", textDecoration: "none" }}>← Clients</Link>
+        </div>
+      )}
 
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 32, fontWeight: 600, color: "#1A1916", margin: 0, lineHeight: 1.1 }}>{clientName}</h1>
@@ -468,18 +474,19 @@ export default function ClientPageClient({
         </div>
       )}
 
+      {/* isCoach flows through so a client sees calls read-only (no note editing) */}
       {currentTab === "calls" && (
         <CallsClient
           calls={initialCalls}
           clients={[{ id: clientId, name: clientName }]}
-          isCoach={true}
+          isCoach={isCoach}
           defaultClientId={clientId}
           embedded
         />
       )}
 
       {currentTab === "progress" && (
-        <ProgressPanel clientId={clientId} initialItems={initialRoadmap} />
+        <ProgressPanel clientId={clientId} initialItems={initialRoadmap} isCoach={isCoach} />
       )}
 
       {currentTab === "services" && (
@@ -491,10 +498,13 @@ export default function ClientPageClient({
       )}
 
       {currentTab === "goals" && (
-        <GoalsPanel
-          clientId={clientId}
-          initialGoal={goal}
-        />
+        <>
+          <GoalsPanel
+            clientId={clientId}
+            initialGoal={goal}
+          />
+          {isCoach && <ClientLoginPanel clientId={clientId} clientName={clientName} />}
+        </>
       )}
 
       {currentTab === "team" && (

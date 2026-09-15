@@ -12,14 +12,18 @@ export default async function DashboardPage() {
   const clientId = session.user.clientId
   if (!clientId) redirect("/auth/signin")
 
-  const [client, metrics, goal, contracts] = await Promise.all([
-    prisma.client.findUnique({ where: { id: clientId } }),
+  // Clients get the full tabbed profile view (scoped to their own client by the
+  // [slug]/[tab] route's owner check). Fall through to the simple dashboard only
+  // for a client whose profile has no slug yet.
+  const client = await prisma.client.findUnique({ where: { id: clientId } })
+  if (!client) redirect("/auth/signin")
+  if (client.slug) redirect(`/clients/${client.slug}/dashboard`)
+
+  const [metrics, goal, contracts] = await Promise.all([
     prisma.monthlyMetric.findMany({ where: { clientId }, orderBy: { month: "asc" } }),
     prisma.goal.findUnique({ where: { clientId } }),
     prisma.contract.findMany({ where: { clientId } }),
   ])
-
-  if (!client) redirect("/auth/signin")
 
   return (
     <Dashboard

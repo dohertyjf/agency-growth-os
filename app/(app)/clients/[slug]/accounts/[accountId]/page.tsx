@@ -7,11 +7,16 @@ import AccountDetailClient from "./AccountDetailClient"
 export default async function AccountDetailPage({ params }: { params: Promise<{ slug: string; accountId: string }> }) {
   const session = await auth()
   if (!session) redirect("/auth/signin")
-  if (session.user.role !== "coach") redirect("/dashboard")
 
   const { slug, accountId } = await params
   const client = await prisma.client.findFirst({ where: { slug } })
   if (!client) notFound()
+
+  // A client may only view their OWN profile; a coach may view any.
+  if (session.user.role !== "coach" && session.user.clientId !== client.id) {
+    redirect("/dashboard")
+  }
+
   const id = client.id
 
   const account = await prisma.account.findFirst({ where: { id: accountId, clientId: id } })

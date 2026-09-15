@@ -3,6 +3,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
+import AccountMenu from "./AccountMenu"
 
 interface Props {
   role: "coach" | "client"
@@ -15,21 +16,15 @@ export default function AppNav({ role, userName }: Props) {
 
   const links = [
     { href: "/dashboard", label: "Dashboard" },
-    ...(role === "client" ? [{ href: "/tracker", label: "Tracker" }] : []),
     ...(role === "coach" ? [{ href: "/clients", label: "Clients" }] : []),
     { href: "/calls", label: "Calls" },
     ...(role === "coach" ? [{ href: "/prospects", label: "Prospects" }] : []),
     ...(role === "coach" ? [{ href: "/leads", label: "Leads" }] : []),
     ...(role === "coach" ? [{ href: "/tools", label: "Tools" }] : []),
-    { href: "/insights", label: "Insights" },
+    // Insights is a work in progress — not shipped to clients yet. The page is
+    // still reachable at /insights directly for development. Re-add here to launch.
+    // { href: "/insights", label: "Insights" },
   ]
-
-  const initials = (userName ?? "?")
-    .split(" ")
-    .map((p: string) => p[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
 
   function isActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard"
@@ -109,16 +104,8 @@ export default function AppNav({ role, userName }: Props) {
               )}
             </button>
 
-            {/* Avatar / sign out */}
-            <button
-              onClick={() => signOut({ callbackUrl: "/auth/signin" })}
-              title="Sign out"
-              style={{ display: "flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 8, flexShrink: 0 }}
-            >
-              <div style={{ width: 30, height: 30, background: "#1A1916", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 700 }}>
-                {initials}
-              </div>
-            </button>
+            {/* Account menu: change password + sign out */}
+            <AccountMenu userName={userName} />
           </div>
         </div>
 

@@ -11,6 +11,8 @@ interface RoadmapItem {
 interface Props {
   clientId: string
   initialItems: RoadmapItem[]
+  // Progress is the coach's assessment — clients see it but can't change it.
+  isCoach: boolean
 }
 
 const ROADMAP: Array<{
@@ -58,7 +60,8 @@ const STATUS_CONFIG: Record<Exclude<Status, "none">, { bg: string; ring: string;
   green:  { bg: "#16A34A", ring: "#16A34A", label: "G", text: "#fff" },
 }
 
-function StatusPicker({ itemKey, status, onChange }: { itemKey: string; status: Status; onChange: (key: string, s: Status) => void }) {
+function StatusPicker({ itemKey, status, onChange }: { itemKey: string; status: Status; onChange?: (key: string, s: Status) => void }) {
+  const readOnly = !onChange
   return (
     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
       {(["red", "yellow", "green"] as const).map(s => {
@@ -67,7 +70,8 @@ function StatusPicker({ itemKey, status, onChange }: { itemKey: string; status: 
         return (
           <button
             key={s}
-            onClick={() => onChange(itemKey, active ? "none" : s)}
+            disabled={readOnly}
+            onClick={() => onChange?.(itemKey, active ? "none" : s)}
             title={s.charAt(0).toUpperCase() + s.slice(1)}
             style={{
               width: 26,
@@ -78,12 +82,12 @@ function StatusPicker({ itemKey, status, onChange }: { itemKey: string; status: 
               color: active ? cfg.text : "#D1D5DB",
               fontSize: 10,
               fontWeight: 700,
-              cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               transition: "all 0.12s",
               padding: 0,
+              cursor: readOnly ? "default" : "pointer",
             }}
           >
             {cfg.label}
@@ -94,7 +98,7 @@ function StatusPicker({ itemKey, status, onChange }: { itemKey: string; status: 
   )
 }
 
-export default function ProgressPanel({ clientId, initialItems }: Props) {
+export default function ProgressPanel({ clientId, initialItems, isCoach }: Props) {
   const [statuses, setStatuses] = useState<Record<string, Status>>(() => {
     const map: Record<string, Status> = {}
     for (const item of initialItems) map[item.key] = item.status
@@ -102,6 +106,7 @@ export default function ProgressPanel({ clientId, initialItems }: Props) {
   })
 
   async function handleChange(key: string, status: Status) {
+    if (!isCoach) return
     setStatuses(prev => ({ ...prev, [key]: status }))
     await fetch(`/api/clients/${clientId}/roadmap`, {
       method: "POST",
@@ -137,13 +142,13 @@ export default function ProgressPanel({ clientId, initialItems }: Props) {
                 <div style={{ padding: "12px 20px 4px", display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#9C9590", minWidth: 20, textAlign: "right" }}>{step.number}.</span>
                   <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1916", flex: 1 }}>{step.label}</span>
-                  {step.trackable && <StatusPicker itemKey={step.key} status={getStatus(step.key)} onChange={handleChange} />}
+                  {step.trackable && <StatusPicker itemKey={step.key} status={getStatus(step.key)} onChange={isCoach ? handleChange : undefined} />}
                 </div>
                 {step.children.map((child, ci) => (
                   <div key={child.key} style={{ padding: "6px 20px 6px 52px", display: "flex", alignItems: "center", gap: 12, background: ci % 2 === 0 ? "#FDFCFA" : "#fff" }}>
                     <span style={{ fontSize: 11, color: "#C4BFBA", minWidth: 14 }}>{child.letter}.</span>
                     <span style={{ fontSize: 13, color: "#4B4744", flex: 1 }}>{child.label}</span>
-                    <StatusPicker itemKey={child.key} status={getStatus(child.key)} onChange={handleChange} />
+                    <StatusPicker itemKey={child.key} status={getStatus(child.key)} onChange={isCoach ? handleChange : undefined} />
                   </div>
                 ))}
                 <div style={{ height: 8 }} />
@@ -152,7 +157,7 @@ export default function ProgressPanel({ clientId, initialItems }: Props) {
               <div style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#9C9590", minWidth: 20, textAlign: "right" }}>{step.number}.</span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1916", flex: 1 }}>{step.label}</span>
-                <StatusPicker itemKey={step.key} status={getStatus(step.key)} onChange={handleChange} />
+                <StatusPicker itemKey={step.key} status={getStatus(step.key)} onChange={isCoach ? handleChange : undefined} />
               </div>
             )}
           </div>
