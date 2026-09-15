@@ -164,8 +164,6 @@ export default function ProjectDetailClient(props: Props) {
   const coverage = `${lifetime.loggedMonths ?? 0} of ${lifetime.elapsedMonths ?? 0} months logged`
   const partial = (lifetime.loggedMonths ?? 0) < (lifetime.elapsedMonths ?? 0)
 
-  const thisMonth = pnlByMonth.get(now) ?? projectMonthPnl(contract, now, inputs, now)
-  const inWindowNow = window_.start <= now && now <= window_.end
 
   // ── Team rows: the owner, then assigned members. Vendors that were assigned
   // earlier still show, but new vendors belong in Costs.
@@ -276,11 +274,14 @@ export default function ProjectDetailClient(props: Props) {
   const anyReimbursed = costItems.some(i => i.reimbursed)
 
   const feeLabel = contract.type === "oneoff" ? `${fmt(contract.monthly)} total` : `${fmt(contract.monthly)}/mo`
+  // Tiles are project-to-date (Final once finished) — the per-month story is the
+  // table below.
+  const scope = isFinished ? "Final" : "To date"
   const tiles = [
-    { label: inWindowNow ? "Margin this month" : "Margin (last month delivered)", value: fmt(thisMonth.margin), sub: `${fmtPct(thisMonth.marginPct)} of ${fmt(thisMonth.revenue)} · ${ymLabel(inWindowNow ? now : defaultEnd)}`, color: marginColor(thisMonth.marginPct) },
-    { label: isFinished ? "Final margin" : "Project to date", value: fmt(lifetime.margin), sub: `${fmtPct(lifetime.marginPct)} of ${fmt(lifetime.revenue)} · ${coverage}`, color: marginColor(lifetime.marginPct) },
-    { label: "Revenue / hr", value: thisMonth.perHr != null ? fmt(thisMonth.perHr) : "—", sub: thisMonth.hours > 0 ? `${fmtHrs(thisMonth.hours)} logged` : "no hours logged", color: props.minHourlyRate && thisMonth.perHr != null && thisMonth.perHr < props.minHourlyRate ? "#B23A1B" : "#1A1916" },
-    { label: "Team cost / hr", value: thisMonth.costPerHr != null ? fmt(thisMonth.costPerHr) : "—", sub: thisMonth.teamCost > 0 ? `${fmt(thisMonth.teamCost)} team cost` : "assign hours below", color: "#1A1916" },
+    { label: `${scope} margin`, value: fmt(lifetime.margin), sub: `${fmtPct(lifetime.marginPct)} of ${fmt(lifetime.revenue)} · ${coverage}`, color: marginColor(lifetime.marginPct) },
+    { label: `${scope} revenue`, value: fmt(lifetime.revenue), sub: `${fmt(lifetime.teamCost)} team · ${fmt(lifetime.directCost)} costs`, color: "#1A1916" },
+    { label: "Revenue / hr", value: lifetime.perHr != null ? fmt(lifetime.perHr) : "—", sub: lifetime.hours > 0 ? `${fmtHrs(lifetime.hours)} logged ${scope.toLowerCase()}` : "no hours logged", color: props.minHourlyRate && lifetime.perHr != null && lifetime.perHr < props.minHourlyRate ? "#B23A1B" : "#1A1916" },
+    { label: "Team cost / hr", value: lifetime.costPerHr != null ? fmt(lifetime.costPerHr) : "—", sub: lifetime.teamCost > 0 ? `blended across ${fmtHrs(lifetime.hours)}` : "assign hours below", color: "#1A1916" },
   ]
 
   return (
