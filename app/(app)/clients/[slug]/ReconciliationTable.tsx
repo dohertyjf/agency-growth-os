@@ -235,11 +235,17 @@ export default function ReconciliationTable({ contracts, accounts, products = []
           onAccountCreated={onAccountCreated}
         />
       )}
+      <style>{`
+        .recon-cell { position: relative; }
+        .recon-cell .recon-record { display: none; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; border: none; cursor: pointer; font-family: inherit; }
+        .recon-cell:hover .recon-record { display: inline-block; }
+        .recon-cell:hover .recon-forecast { visibility: hidden; }
+      `}</style>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Monthly Reconciliation</div>
           <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
-            Muted = forecast · click any cell to set the amount · teal = cash received · tagged rows are Qualified / Opportunity (excluded from signed totals)
+            <em>Italic</em> = forecast, not recorded — hover and hit <strong>Record</strong> to keep it, or click the number to enter a different amount · bold = recorded · teal = cash received · tagged rows are Qualified / Opportunity (excluded from signed totals)
           </div>
         </div>
         <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2 }}>
@@ -335,17 +341,28 @@ export default function ReconciliationTable({ contracts, accounts, products = []
                           />
                         ) : (
                           <div
+                            className="recon-cell"
                             onClick={() => setEditing({ contractId: contract.id, month })}
+                            title={am ? "Recorded — click to change" : `Forecast (${fmtCurrency(contract.monthly)}) — not recorded. Record it, or click to enter the billed amount.`}
                             style={{
                               padding: "7px 10px", fontSize: 12, textAlign: "right",
                               cursor: "pointer", fontVariantNumeric: "tabular-nums",
                               color: am ? "#1A1916" : "#C4BFB8",
-                              fontWeight: am ? 500 : 400,
+                              fontWeight: am ? 600 : 400,
+                              fontStyle: am ? "normal" : "italic",
                               background: isSaving ? "#FFFBE8" : month === now ? "#FFFBF7" : "transparent",
                               minWidth: 80,
                             }}
                           >
-                            {fmtCurrency(am ? am.actual : contract.monthly)}
+                            {am
+                              ? fmtCurrency(am.actual)
+                              : <>
+                                  <span className="recon-forecast">{fmtCurrency(contract.monthly)}</span>
+                                  <button className="recon-record" style={{ background: "#1A1916", color: "#fff" }}
+                                    onClick={e => { e.stopPropagation(); handleSave(contract.id, month, String(contract.monthly)) }}>
+                                    Record {fmtCurrency(contract.monthly)}
+                                  </button>
+                                </>}
                           </div>
                         )}
                       </td>
@@ -384,12 +401,15 @@ export default function ReconciliationTable({ contracts, accounts, products = []
                           />
                         ) : (
                           <div
+                            className="recon-cell"
                             onClick={() => setEditingPayment({ contractId: contract.id, month })}
+                            title={pm ? "Recorded payment — click to change" : forecastsInMonth(contract, month) ? "Expected — no payment recorded. Record it, or click to enter what was received." : "Click to record a payment"}
                             style={{
                               padding: "5px 10px", fontSize: 11, textAlign: "right",
                               cursor: "pointer", fontVariantNumeric: "tabular-nums",
                               color: pm ? "#0F766E" : forecastsInMonth(contract, month) ? "#99D6CE" : "#A7D8D2",
                               fontWeight: pm ? 600 : 400,
+                              fontStyle: pm ? "normal" : "italic",
                               background: isSaving ? "#CCFBF1" : "transparent",
                               minWidth: 80,
                             }}
@@ -397,7 +417,13 @@ export default function ReconciliationTable({ contracts, accounts, products = []
                             {pm
                               ? fmtCurrency(pm.amount)
                               : forecastsInMonth(contract, month)
-                                ? fmtCurrency(getActual(contract.id, month)?.actual ?? contract.monthly)
+                                ? (() => { const expected = getActual(contract.id, month)?.actual ?? contract.monthly; return <>
+                                    <span className="recon-forecast">{fmtCurrency(expected)}</span>
+                                    <button className="recon-record" style={{ background: "#0F766E", color: "#fff" }}
+                                      onClick={e => { e.stopPropagation(); handlePaymentSave(contract.id, month, String(expected)) }}>
+                                      Record {fmtCurrency(expected)}
+                                    </button>
+                                  </> })()
                                 : "—"}
                           </div>
                         )}

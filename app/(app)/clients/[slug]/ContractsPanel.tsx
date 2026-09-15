@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import Link from "next/link"
 import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, BOOKED_AHEAD_MONTHS, type ContractRow } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import PaymentScheduleModal from "./PaymentScheduleModal"
@@ -46,6 +47,7 @@ interface Product {
 
 interface Props {
   clientId: string
+  clientSlug?: string // when set, project names link to their detail page
   initialContracts: Contract[]
   accounts?: Account[]
   products?: Product[]
@@ -567,7 +569,7 @@ const contractsResponsiveStyle = `
   }
 `
 
-export default function ContractsPanel({ clientId, initialContracts, accounts: accountsProp, products, people = [], pulses = [], onPulseChange, minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp, view = "list" }: Props) {
+export default function ContractsPanel({ clientId, clientSlug, initialContracts, accounts: accountsProp, products, people = [], pulses = [], onPulseChange, minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp, view = "list" }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
@@ -837,6 +839,7 @@ export default function ContractsPanel({ clientId, initialContracts, accounts: a
           {/* Active */}
           {byStatus.active.length > 0 && (
             <ContractSection
+              clientSlug={clientSlug}
               products={products}
               title="Active"
               contracts={byStatus.active}
@@ -855,6 +858,7 @@ onSchedule={setSchedulingContract}
           {/* Pipeline */}
           {byStatus.potential.length > 0 && (
             <ContractSection
+              clientSlug={clientSlug}
               products={products}
               title="Pipeline"
               contracts={byStatus.potential}
@@ -882,6 +886,7 @@ onSchedule={setSchedulingContract}
               </button>
               {showPast && (
                 <ContractSection
+              clientSlug={clientSlug}
               products={products}
                   title=""
                   contracts={byStatus.finished}
@@ -907,8 +912,9 @@ onSchedule={setSchedulingContract}
   )
 }
 
-function ContractSection({ title, contracts, accounts, products, people, pulses, onPulseChange, onOwnerChange, onEdit, onDelete, onDuplicate, onSchedule, dimmed }: {
+function ContractSection({ title, contracts, accounts, products, people, pulses, onPulseChange, onOwnerChange, onEdit, onDelete, onDuplicate, onSchedule, dimmed, clientSlug }: {
   title: string
+  clientSlug?: string
   contracts: Contract[]
   accounts: Account[]
   people: Person[]
@@ -944,13 +950,17 @@ function ContractSection({ title, contracts, accounts, products, people, pulses,
             <div style={{ flex: "1 1 160px", minWidth: 0 }}>
               {(() => { const pn = c.productId ? products?.find(p => p.id === c.productId)?.name : null; return (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</span>
+                  {clientSlug
+                    ? <Link href={`/clients/${clientSlug}/projects/${c.id}`} style={{ fontSize: 13, fontWeight: 500, color: "#1A1916", textDecoration: "none", borderBottom: "1px dotted #C0BAB2" }}>{c.name}</Link>
+                    : <span style={{ fontSize: 13, fontWeight: 500, color: "#1A1916" }}>{c.name}</span>}
                   {pn && <span style={{ fontSize: 9, fontWeight: 700, color: "#4B5563", background: "#F0EBE3", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.03em" }}>{pn}</span>}
                 </div>
               ) })()}
               <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
                 {accountName
-                  ? <span style={{ color: "#6B6760", fontWeight: 500 }}>{accountName} · </span>
+                  ? clientSlug
+                    ? <><Link href={`/clients/${clientSlug}/accounts/${c.accountId}`} title="Open account" style={{ color: "#6B6760", fontWeight: 500, textDecoration: "none", borderBottom: "1px dotted #C0BAB2" }}>{accountName}</Link> · </>
+                    : <span style={{ color: "#6B6760", fontWeight: 500 }}>{accountName} · </span>
                   : <span style={{ color: "#C2410C", fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>Unassigned · </span>
                 }
                 {isOneoff

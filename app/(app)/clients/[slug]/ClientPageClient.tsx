@@ -4,6 +4,8 @@ import Link from "next/link"
 import Dashboard from "@/components/Dashboard"
 import ContractsPanel from "./ContractsPanel"
 import ReconciliationTable from "./ReconciliationTable"
+import ProfitByProject from "./ProfitByProject"
+import type { MemberHoursRow, CostItemRow, CostMonthRow } from "@/lib/profit"
 import CashflowProjection from "./CashflowProjection"
 import YieldByMonth from "./YieldByMonth"
 import AccountsPanel from "./AccountsPanel"
@@ -182,6 +184,9 @@ interface Props {
   initialAccountMonths: AccountMonth[]
   initialPayments: Payment[]
   initialContractHours: ContractHours[]
+  initialMemberHours: MemberHoursRow[]
+  initialCostItems: CostItemRow[]
+  initialCostMonths: CostMonthRow[]
   initialDeliveryMonths: ContractHours[]
   initialPulses: Pulse[]
   goal: Goal | null
@@ -222,7 +227,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialCostItems, initialCostMonths, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -233,7 +238,7 @@ export default function ClientPageClient({
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
   const [reconView, setReconView] = useState<"reconcile" | "projection" | "yield" | "capacity">("reconcile")
-  const [projectView, setProjectView] = useState<"list" | "timeline" | "yield">("list")
+  const [projectView, setProjectView] = useState<"list" | "timeline" | "yield" | "profit">("list")
   const [pulses, setPulses] = useState<Pulse[]>(initialPulses)
   const handlePulseChange = (pulse: Pulse) => setPulses(prev => [...prev.filter(p => !(p.contractId === pulse.contractId && p.month === pulse.month)), pulse])
 
@@ -420,16 +425,32 @@ export default function ClientPageClient({
       {currentTab === "projects" && (
         <div>
           <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 16 }}>
-            {([["list", "List"], ["timeline", "Timeline"], ["yield", "Hourly yield"]] as const).map(([v, label]) => (
+            {([["list", "List"], ["timeline", "Timeline"], ["yield", "Hourly yield"], ["profit", "Profit"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setProjectView(v)}
                 style={{ padding: "4px 14px", fontSize: 12, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: projectView === v ? "#fff" : "transparent", color: projectView === v ? "#1A1916" : "#9C9590", boxShadow: projectView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
                 {label}
               </button>
             ))}
           </div>
+          {projectView === "profit" ? (
+            <ProfitByProject
+              clientSlug={clientSlug}
+              contracts={contracts}
+              accounts={accounts}
+              minHourlyRate={goal?.minHourlyRate ?? null}
+              inputs={{
+                people: people.map(p => ({ id: p.id, name: p.name, isExternal: p.isExternal, annualSalary: p.annualSalary, billableHours: p.billableHours })),
+                salaryMonths, capacityMonths: hoursMonths,
+                memberHours: initialMemberHours, contractHours: initialContractHours,
+                costItems: initialCostItems, costMonths: initialCostMonths,
+                accountMonths: initialAccountMonths, payments,
+              }}
+            />
+          ) : (
           <ContractsPanel
             view={projectView}
           clientId={clientId}
+          clientSlug={clientSlug}
           initialContracts={initialContracts}
           accounts={accounts}
           products={clientProducts}
@@ -440,6 +461,7 @@ export default function ClientPageClient({
           onContractsChange={updated => setContracts(updated)}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
         />
+          )}
         </div>
       )}
 
@@ -477,6 +499,8 @@ export default function ClientPageClient({
               initialHours={initialContractHours}
               deliveryMonths={initialDeliveryMonths}
               minHourlyRate={goal?.minHourlyRate ?? null}
+              memberHours={initialMemberHours}
+              clientSlug={clientSlug}
             />
           ) : (
             <CapacitySold

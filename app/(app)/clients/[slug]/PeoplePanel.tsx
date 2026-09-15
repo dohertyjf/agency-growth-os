@@ -428,8 +428,8 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    {["Name", "Title", "Core Roles", "Annual Salary", "Billable hrs/mo", ""].map(h => (
-                      <th key={h} style={{ textAlign: h === "Annual Salary" || h === "Billable hrs/mo" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
+                    {["Name", "Title", "Core Roles", "Annual Salary", "Billable hrs/mo", "Cost/hr", ""].map(h => (
+                      <th key={h} title={h === "Cost/hr" ? "Monthly salary ÷ billable hours — what an hour of this person costs on a project" : undefined} style={{ textAlign: h === "Annual Salary" || h === "Billable hrs/mo" || h === "Cost/hr" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -459,6 +459,9 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                         </td>
                         <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.annualSalary ? fmt$(p.annualSalary) : <span style={{ color: "#C0BAB2" }}>—</span>}</td>
                         <td style={{ padding: "10px 8px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{p.billableHours} hrs</td>
+                        <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                          {p.annualSalary > 0 && p.billableHours > 0 ? fmt$(p.annualSalary / 12 / p.billableHours) : <span style={{ color: "#C0BAB2" }}>—</span>}
+                        </td>
                         <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
                           <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
                           <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>

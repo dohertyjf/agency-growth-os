@@ -1,5 +1,6 @@
 "use client"
 import { Fragment, useState } from "react"
+import Link from "next/link"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import { ymLabel } from "@/lib/calc"
 
@@ -50,15 +51,26 @@ function activeInMonth(c: Contract, ym: string) {
   return c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym)
 }
 
-export default function YieldByMonth({ contracts, accounts, accountMonths, initialHours, deliveryMonths, minHourlyRate }: {
+export default function YieldByMonth({ contracts, accounts, accountMonths, initialHours, deliveryMonths, minHourlyRate, memberHours = [], clientSlug }: {
   contracts: Contract[]
   accounts: Account[]
   accountMonths: AccountMonth[]
   initialHours: HoursRow[]
   deliveryMonths: HoursRow[]
   minHourlyRate: number | null
+  // Per-person hours from the project pages. Once a project-month has these, the
+  // total here is derived from them and can only be changed there.
+  memberHours?: { contractId: string; month: string; hours: number }[]
+  clientSlug?: string
 }) {
   const fmt$ = useFmtCurrency()
+  const fromTeam = (contractId: string, m: string) => memberHours.some(h => h.contractId === contractId && h.month === m && h.hours > 0)
+  const teamLink = (contractId: string, hours: number | null) => (
+    <Link href={clientSlug ? `/clients/${clientSlug}/projects/${contractId}` : "#"} title="Logged per person on the project page — edit it there"
+      style={{ display: "inline-block", border: "1px solid #ECE7DE", background: "#FBFAF7", borderRadius: 6, padding: "4px 9px", fontSize: 13, color: "#1A1916", textDecoration: "none", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+      {hours != null ? `${hours}h` : "—"} <span style={{ fontSize: 10, color: "#9C9590" }}>team ↗</span>
+    </Link>
+  )
   const [hours, setHours] = useState(() => {
     const m = new Map<string, number>()
     initialHours.forEach(h => m.set(`${h.contractId}:${h.month}`, h.hours))
@@ -256,7 +268,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
                   <td style={{ padding: "8px 10px", fontSize: 13, color: "#9C9590", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{sold != null ? `${Math.round(sold * 10) / 10}h` : "—"}</td>
                   <td style={{ padding: "4px 10px", textAlign: "right" }}>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
-                      {editing === c.id ? (
+                      {fromTeam(c.id, month) ? teamLink(c.id, actual) : editing === c.id ? (
                         <input
                           autoFocus type="number" min={0} step={0.5} defaultValue={actual ?? ""}
                           onBlur={e => { setEditing(null); saveHours(c.id, month, e.target.value) }}
@@ -353,7 +365,7 @@ export default function YieldByMonth({ contracts, accounts, accountMonths, initi
                             {perMonth.map(pm => (
                               <div key={pm.month}>
                                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9C9590", marginBottom: 3 }}>{ymLabel(pm.month)}</div>
-                                {editingCell === `${c.id}:${pm.month}` ? (
+                                {fromTeam(c.id, pm.month) ? teamLink(c.id, pm.hours) : editingCell === `${c.id}:${pm.month}` ? (
                                   <input
                                     autoFocus type="number" min={0} step={0.5} defaultValue={pm.hours ?? ""}
                                     onBlur={e => { setEditingCell(null); saveHours(c.id, pm.month, e.target.value) }}

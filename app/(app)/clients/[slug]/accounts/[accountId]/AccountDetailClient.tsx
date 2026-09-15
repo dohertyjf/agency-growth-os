@@ -4,13 +4,15 @@ import Link from "next/link"
 import { fmtCurrency, ymAdd, ymLabel, ymDiff } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import ProjectPulse, { pulseColor, type Pulse } from "../../ProjectPulse"
+import { projectMonthPnl, projectLifetimePnl, sumPnl, isLogged, type ProfitInputs, type MonthPnl } from "@/lib/profit"
 
 interface Account { id: string; name: string; contactName: string | null; contactEmail: string | null; ownerId: string | null }
-interface Person { id: string; name: string; role: string | null; isExternal: boolean }
+interface Person { id: string; name: string; role: string | null; isExternal: boolean; annualSalary: number; billableHours: number }
 interface Product { id: string; name: string; type: "retainer" | "ongoing" | "oneoff"; monthly: number }
 interface Contract {
   id: string; name: string; monthly: number; hoursPerMonth: number
   start: string; contractedThrough: string | null; status: string; type: string; ownerId: string | null; productId?: string | null
+  deliveryStart?: string | null; deliveryEnd?: string | null
 }
 interface HoursRow { contractId: string; month: string; hours: number }
 interface PaymentRow { contractId: string; month: string; amount: number }
@@ -32,6 +34,7 @@ interface Props {
   payments: PaymentRow[]
   members: Member[]
   notes: Note[]
+  profit: Pick<ProfitInputs, "memberHours" | "costItems" | "costMonths" | "accountMonths" | "salaryMonths" | "capacityMonths">
 }
 
 const now = new Date().toISOString().slice(0, 7)
@@ -71,6 +74,22 @@ export default function AccountDetailClient(props: Props) {
   const paymentIn = (m: string) => props.payments.filter(p => p.month === m).reduce((s, p) => s + p.amount, 0)
   const hoursIn = (m: string) => props.hours.filter(h => h.month === m).reduce((s, h) => s + h.hours, 0)
   const budgetIn = (m: string) => contracts.filter(c => activeInMonth(c, m) && c.type !== "oneoff").reduce((s, c) => s + c.hoursPerMonth, 0)
+  // Profit roll-up across the account's projects (see lib/profit.ts).
+  const profitInputs: ProfitInputs = { ...props.profit, people, contractHours: props.hours, payments: props.payments }
+  const pnlIn = (m: string) => sumPnl(contracts.map(c => projectMonthPnl(c, m, profitInputs, now)), m)
+  // Account to date: each project's logged months, summed (see projectLifetimePnl).
+  const lifetimes = contracts.map(c => projectLifetimePnl(c, profitInputs, now))
+  const toDate: MonthPnl = {
+    ...sumPnl(lifetimes, "lifetime"),
+    loggedMonths: lifetimes.reduce((s, l) => s + (l.loggedMonths ?? 0), 0),
+    elapsedMonths: lifetimes.reduce((s, l) => s + (l.elapsedMonths ?? 0), 0),
+  }
+  const toDatePartial = (toDate.loggedMonths ?? 0) < (toDate.elapsedMonths ?? 0)
+  const fmtHrs = (h: number) => `${Math.round(h * 10) / 10}h`
+  const fmtPct = (p: number | null) => (p == null ? "—" : `${Math.round(p)}%`)
+  const marginColor = (p: number | null) => (p == null ? "#9C9590" : p < 0 ? "#B23A1B" : p < 30 ? "#B45309" : "#15803D")
+  const cell: React.CSSProperties = { padding: "9px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }
+  const dash = <span style={{ color: "#C0BAB2" }}>—</span>
   const rollupPulse = (m: string): Pulse | undefined => {
     const scored = contracts.filter(c => activeInMonth(c, m)).map(c => pulseFor(c.id, m)).filter((p): p is Pulse => !!p)
     return scored.sort((a, b) => a.score - b.score)[0]
@@ -311,15 +330,22 @@ export default function AccountDetailClient(props: Props) {
                 {months.map(m => (
                   <th key={m} style={{ textAlign: "right", padding: "6px 10px", fontSize: 11, fontWeight: 700, color: m === now ? "#1A1916" : "#9C9590", whiteSpace: "nowrap" }}>{ymLabel(m)}</th>
                 ))}
+                <th title={`${toDate.loggedMonths} of ${toDate.elapsedMonths} project-months logged`} style={{ textAlign: "right", padding: "6px 10px", fontSize: 11, fontWeight: 700, color: "#1A1916", whiteSpace: "nowrap", borderLeft: "2px solid #ECE7DE" }}>To date{toDatePartial && <span style={{ color: "#B45309" }}>*</span>}</th>
               </tr>
             </thead>
             <tbody>
               <tr style={{ borderTop: "1px solid #F5F1EC" }}>
-                <td style={{ padding: "9px 10px", fontWeight: 600, color: "#6B6760" }}>Payments</td>
+                <td style={{ padding: "9px 10px", fontWeight: 600, color: "#6B6760" }} title="Cash received (Reconciliation → payment row)">Payments</td>
                 {months.map(m => {
                   const v = paymentIn(m)
                   return <td key={m} style={{ padding: "9px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: v ? "#1A1916" : "#C0BAB2" }}>{v ? fmt(v) : "—"}</td>
                 })}
+                <td style={{ ...cell, borderLeft: "2px solid #ECE7DE", fontWeight: 700 }}>{ltv ? fmt(ltv) : dash}</td>
+              </tr>
+              <tr style={{ borderTop: "1px solid #F5F1EC" }}>
+                <td style={{ padding: "9px 10px", fontWeight: 600, color: "#6B6760" }} title="What margin is computed from: the reconciled billed amount for the month, else the project fee">Revenue</td>
+                {months.map(m => { const v = pnlIn(m).revenue; return <td key={m} style={{ ...cell, color: v ? "#1A1916" : "#C0BAB2" }}>{v ? fmt(v) : "—"}</td> })}
+                <td style={{ ...cell, borderLeft: "2px solid #ECE7DE", fontWeight: 700 }}>{toDate.revenue ? fmt(toDate.revenue) : dash}</td>
               </tr>
               <tr style={{ borderTop: "1px solid #F5F1EC" }}>
                 <td style={{ padding: "9px 10px", fontWeight: 600, color: "#6B6760" }}>Pulse</td>
@@ -331,6 +357,7 @@ export default function AccountDetailClient(props: Props) {
                     <span style={{ background: col.bg, color: col.fg, borderRadius: 20, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>{p.score}/5</span>
                   </td>
                 })}
+                <td style={{ borderLeft: "2px solid #ECE7DE" }} />
               </tr>
               <tr style={{ borderTop: "1px solid #F5F1EC" }}>
                 <td style={{ padding: "9px 10px", fontWeight: 600, color: "#6B6760" }}>Hours</td>
@@ -343,11 +370,47 @@ export default function AccountDetailClient(props: Props) {
                     {a ? `${Math.round(a)}` : "0"}{b > 0 && <span style={{ color: "#9C9590", fontWeight: 400 }}> / {Math.round(b)}h</span>}
                   </td>
                 })}
+                <td style={{ ...cell, borderLeft: "2px solid #ECE7DE", fontWeight: 700 }}>{toDate.hours ? fmtHrs(toDate.hours) : dash}</td>
+              </tr>
+              <tr style={{ borderTop: "1px solid #F5F1EC" }}>
+                <td style={{ padding: "9px 10px", fontWeight: 600, color: "#6B6760" }}>Team cost</td>
+                {months.map(m => { const v = pnlIn(m).teamCost; return <td key={m} style={{ ...cell, color: v ? "#1A1916" : "#C0BAB2" }}>{v ? fmt(v) : "—"}</td> })}
+                <td style={{ ...cell, borderLeft: "2px solid #ECE7DE", fontWeight: 700 }}>{toDate.teamCost ? fmt(toDate.teamCost) : dash}</td>
+              </tr>
+              <tr style={{ borderTop: "1px solid #F5F1EC" }}>
+                <td style={{ padding: "9px 10px", fontWeight: 600, color: "#6B6760" }}>Costs</td>
+                {months.map(m => { const v = pnlIn(m).directCost; return <td key={m} style={{ ...cell, color: v ? "#1A1916" : "#C0BAB2" }}>{v ? fmt(v) : "—"}</td> })}
+                <td style={{ ...cell, borderLeft: "2px solid #ECE7DE", fontWeight: 700 }}>{toDate.directCost ? fmt(toDate.directCost) : dash}</td>
+              </tr>
+              <tr style={{ borderTop: "2px solid #ECE7DE", background: "#FBFAF7" }}>
+                <td style={{ padding: "9px 10px", fontWeight: 700, color: "#1A1916" }}>Margin</td>
+                {months.map(m => {
+                  const p = pnlIn(m)
+                  const has = p.revenue > 0 || p.teamCost > 0 || p.directCost > 0
+                  return <td key={m} style={{ ...cell, fontWeight: 700, color: has ? marginColor(p.marginPct) : "#C0BAB2" }}>{has ? fmt(p.margin) : "—"}</td>
+                })}
+                <td style={{ ...cell, borderLeft: "2px solid #ECE7DE", fontWeight: 700, color: marginColor(toDate.marginPct) }}>{toDate.revenue || toDate.teamCost || toDate.directCost ? fmt(toDate.margin) : dash}</td>
+              </tr>
+              <tr style={{ background: "#FBFAF7" }}>
+                <td style={{ padding: "9px 10px", fontWeight: 700, color: "#1A1916" }}>Margin %</td>
+                {months.map(m => { const p = pnlIn(m); return <td key={m} style={{ ...cell, fontWeight: 700, color: p.marginPct == null ? "#C0BAB2" : marginColor(p.marginPct) }}>{fmtPct(p.marginPct)}</td> })}
+                <td style={{ ...cell, borderLeft: "2px solid #ECE7DE", fontWeight: 700, color: marginColor(toDate.marginPct) }}>{fmtPct(toDate.marginPct)}</td>
+              </tr>
+              <tr style={{ borderTop: "1px solid #F5F1EC" }}>
+                <td style={{ padding: "9px 10px", fontWeight: 600, color: "#6B6760" }}>Revenue / hr</td>
+                {months.map(m => { const p = pnlIn(m); const under = hasMin && p.perHr != null && p.perHr < (minHourlyRate as number); return <td key={m} style={{ ...cell, color: p.perHr == null ? "#C0BAB2" : under ? "#B23A1B" : "#1A1916" }}>{p.perHr != null ? fmt(p.perHr) : "—"}</td> })}
+                <td style={{ ...cell, borderLeft: "2px solid #ECE7DE", fontWeight: 700 }}>{toDate.perHr != null ? fmt(toDate.perHr) : dash}</td>
+              </tr>
+              <tr style={{ borderTop: "1px solid #F5F1EC" }}>
+                <td style={{ padding: "9px 10px", fontWeight: 600, color: "#6B6760" }}>Team cost / hr</td>
+                {months.map(m => { const p = pnlIn(m); return <td key={m} style={{ ...cell, color: p.costPerHr == null ? "#C0BAB2" : "#1A1916" }}>{p.costPerHr != null ? fmt(p.costPerHr) : "—"}</td> })}
+                <td style={{ ...cell, borderLeft: "2px solid #ECE7DE", fontWeight: 700 }}>{toDate.costPerHr != null ? fmt(toDate.costPerHr) : dash}</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <div style={{ fontSize: 11, color: "#9C9590", marginTop: 10 }}>Account-level totals across all projects. Hours show actual vs budget — <span style={{ color: "#C2410C" }}>▲ over</span>. Log hours in Reconciliation.</div>
+        <div style={{ fontSize: 11, color: "#9C9590", marginTop: 10 }}>Account-level totals across all projects. Payments are cash received; Revenue is what margin is computed from (reconciled billed amount, else the fee). Hours show actual vs budget — <span style={{ color: "#C2410C" }}>▲ over</span>. Margin = revenue − team cost − costs; log hours and costs on each project&apos;s page.
+          {toDatePartial && <> <span style={{ color: "#B45309" }}>* To date counts only the {toDate.loggedMonths} of {toDate.elapsedMonths} project-months with hours or costs logged.</span></>}</div>
       </div>
 
       {/* Projects */}
@@ -400,7 +463,7 @@ export default function AccountDetailClient(props: Props) {
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#9C9590", textTransform: "uppercase", letterSpacing: "0.05em", margin: "8px 0 4px" }}>{heading as string}</div>
                   {items.map(c => (
                     <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 0", borderBottom: "1px solid #F5F1EC" }}>
-                      <span style={{ fontWeight: 500, color: "#1A1916" }}>{c.name}</span>
+                      <Link href={`/clients/${clientSlug}/projects/${c.id}`} style={{ fontWeight: 500, color: "#1A1916", textDecoration: "none", borderBottom: "1px dotted #C0BAB2" }}>{c.name}</Link>
                       {c.productId && props.products.find(p => p.id === c.productId) && (
                         <span style={{ fontSize: 9, fontWeight: 700, color: "#4B5563", background: "#F0EBE3", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.03em" }}>{props.products.find(p => p.id === c.productId)!.name}</span>
                       )}
@@ -439,6 +502,7 @@ export default function AccountDetailClient(props: Props) {
                   {internal.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <span style={{ flex: 1 }} />
+                <Link href={`/clients/${clientSlug}/projects/${c.id}`} style={{ fontSize: 11, color: "#9C9590", textDecoration: "none" }}>Log hours →</Link>
                 <button onClick={() => { setAddMemberFor(x => x === c.id ? null : c.id); setMemberForm({ personId: "", role: "" }) }}
                   style={{ background: "none", border: "1px solid #E9532A", borderRadius: 4, fontSize: 11, color: "#E9532A", cursor: "pointer", padding: "2px 8px", fontWeight: 600 }}>+ Person / Vendor</button>
               </div>

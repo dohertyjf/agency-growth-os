@@ -172,6 +172,8 @@ model Contract {
   deliveryMonths    ContractDeliveryMonth[]
   pulses            ContractPulse[]
   members           ProjectMember[]
+  memberHours       ProjectMemberHoursMonth[]
+  costItems         ProjectCostItem[]
   notesLog          ContractNote[]
 }
 
@@ -205,6 +207,7 @@ model Person {
   salaryMonths     PersonSalaryMonth[]
   hoursMonths      PersonHoursMonth[]
   projectMembers   ProjectMember[]
+  projectHours     ProjectMemberHoursMonth[]
 }
 
 model PersonSalaryMonth {
@@ -408,6 +411,44 @@ model ProjectMember {
   createdAt  DateTime @default(now())
 
   @@unique([contractId, personId])
+}
+
+// Hours one person spent on one project in a month — the team-cost input for
+// per-project profit. The project total (ContractHoursMonth) is kept in sync
+// as the sum of these whenever any exist.
+model ProjectMemberHoursMonth {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  personId   String
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  month      String   // YYYY-MM
+  hours      Float
+
+  @@unique([contractId, personId, month])
+}
+
+// A recurring direct-cost line on a project ("Blog Posts", "Directory Listings",
+// a vendor), with an amount per month. Vendors live here, not in the team grid.
+model ProjectCostItem {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  name       String
+  category   String   @default("other") // content | ads | software | vendor | other
+  reimbursed Boolean  @default(false)    // client pays it back → shown, excluded from margin
+  createdAt  DateTime @default(now())
+  months     ProjectCostMonth[]
+}
+
+model ProjectCostMonth {
+  id         String          @id @default(cuid())
+  costItemId String
+  costItem   ProjectCostItem @relation(fields: [costItemId], references: [id], onDelete: Cascade)
+  month      String          // YYYY-MM
+  amount     Float
+
+  @@unique([costItemId, month])
 }
 
 // Timestamped relationship notes on an account.
