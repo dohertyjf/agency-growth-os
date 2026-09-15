@@ -29,7 +29,7 @@ const COLUMNS: { key: Field; label: string; money?: boolean }[] = [
   { key: "proposalsSent", label: "Proposals Sent" },
   { key: "newClients", label: "New Clients" },
   { key: "marketingSpend", label: "Marketing Spend", money: true },
-  { key: "revenue", label: "Revenue in Bank", money: true },
+  { key: "revenue", label: "Revenue Collected", money: true },
 ]
 
 const EMPTY: Record<Field, number> = {
@@ -174,7 +174,7 @@ function ImportModal({ clientId, year, onClose, onImport }: {
         </label>
 
         <textarea autoFocus value={text} onChange={e => setText(e.target.value)}
-          placeholder={"Week\tLeads\tSales Calls Schedule\tSales Calls Had\tDeep Dive Strategy Calls\tNew Clients\tRevenue in bank\nJan 11-17\t3\t1\t1\t2\t1\t$7,275.00"}
+          placeholder={"Week\tLeads\tSales Calls Schedule\tSales Calls Had\tDeep Dive Strategy Calls\tNew Clients\tRevenue Collected\nJan 11-17\t3\t1\t1\t2\t1\t$7,275.00"}
           style={{ width: "100%", height: 130, padding: "10px 12px", border: "1px solid #ECE7DE", borderRadius: 8, fontSize: 12, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box", outline: "none", color: "#1A1916" }} />
 
         {rows.length > 0 && (
@@ -436,7 +436,8 @@ export default function WeeklyTracker({ clientId, initialRows, readOnly = false 
                               <td key={c.key} style={numCell}>
                                 <input
                                   key={`${key}:${r[c.key]}`}
-                                  defaultValue={r[c.key] ? String(r[c.key]) : ""}
+                                  defaultValue={r[c.key] ? (c.money ? fmt$(r[c.key]) : String(r[c.key])) : ""}
+                                  onFocus={e => { e.target.value = r[c.key] ? String(r[c.key]) : ""; e.target.select() }}
                                   onBlur={e => save(w, c.key, e.target.value)}
                                   onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
                                   readOnly={readOnly}

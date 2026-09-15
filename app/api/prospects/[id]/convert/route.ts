@@ -2,6 +2,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { ymAdd } from "@/lib/calc"
+import { toSlug } from "@/lib/slug"
 import { SignJWT } from "jose"
 import { hashToken } from "@/lib/inviteToken"
 
@@ -37,9 +38,18 @@ export async function POST(
 
   // Create client + goal in a transaction
   const client = await prisma.$transaction(async (tx) => {
+    // A unique slug — without it the client's portal can't route to their profile.
+    const base = toSlug(s.name || s.email) || "client"
+    let slug = base
+    let suffix = 2
+    while (await tx.client.findFirst({ where: { slug } })) {
+      slug = `${base}-${suffix++}`
+    }
+
     const c = await tx.client.create({
       data: {
         name: s.name || s.email,
+        slug,
         agency: s.agency ?? null,
         email: s.email,
         status: "active",
