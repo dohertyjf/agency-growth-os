@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
+import { computeInsights, insightsEnabledForSlug } from "@/lib/insights"
 import ClientPageClient from "../ClientPageClient"
 
 const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "services", "goals", "team", "calls", "projection", "weekly"] as const
@@ -11,7 +12,10 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
   if (!session) redirect("/auth/signin")
 
   const { slug, tab } = await params
-  if (!VALID_TABS.includes(tab as Tab)) notFound()
+  // "insights" is a flagged tab, valid only for allowlisted profiles.
+  const showInsights = insightsEnabledForSlug(slug)
+  const isValidTab = VALID_TABS.includes(tab as Tab) || (tab === "insights" && showInsights)
+  if (!isValidTab) notFound()
 
   const client = await prisma.client.findFirst({ where: { slug } })
   if (!client) notFound()
@@ -76,9 +80,14 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
   const checklistRow = await prisma.monthlyChecklist.findUnique({ where: { clientId_month: { clientId: id, month: nowYM } } })
   const initialChecklist = checklistRow ? { dismissed: checklistRow.dismissed, checkedKeys: JSON.parse(checklistRow.checkedKeys) as string[] } : null
 
+  // Insights (flagged tab): rules-based analysis over the last 6 months.
+  const insights = showInsights ? computeInsights(metrics.slice(-6)) : { enabled: true, cards: [] }
+
   return (
     <ClientPageClient
       isCoach={session.user.role === "coach"}
+      showInsights={showInsights}
+      insights={insights}
       clientId={id}
       projectionState={client.projectionState}
       clientSlug={slug}

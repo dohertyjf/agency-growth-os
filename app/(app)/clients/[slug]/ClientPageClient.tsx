@@ -17,6 +17,8 @@ import CapacitySold from "./CapacitySold"
 import MonthlyChecklist from "./MonthlyChecklist"
 import WeeklyTracker, { type WeeklyRow } from "@/components/WeeklyTracker"
 import CallsClient from "../../calls/CallsClient"
+import InsightsClient from "../../insights/InsightsClient"
+import type { InsightCard } from "@/lib/insights"
 import { CurrencyProvider } from "@/lib/CurrencyContext"
 import { ymDiff } from "@/lib/calc"
 
@@ -157,7 +159,7 @@ interface Call {
   questions: CallQuestion[]
 }
 
-type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "services" | "goals" | "team" | "calls" | "projection" | "weekly"
+type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "services" | "goals" | "team" | "calls" | "projection" | "weekly" | "insights"
 
 interface Props {
   clientId: string
@@ -191,10 +193,14 @@ interface Props {
   // Coach vs. client viewer. Gates coach-only controls (e.g. the invite panel)
   // so they never render when a client views their own profile.
   isCoach: boolean
+  // Insights is a flagged tab, shown only for allowlisted profiles.
+  showInsights: boolean
+  insights: { enabled: boolean; cards: InsightCard[] }
 }
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "dashboard", label: "Overview" },
+  { key: "insights", label: "Insights" },
   { key: "weekly", label: "Tracker" },
   { key: "projection", label: "Projection" },
   { key: "accounts", label: "Accounts" },
@@ -211,7 +217,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -302,7 +308,7 @@ export default function ClientPageClient({
       />
 
       <div className="tab-strip" style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE", overflowX: "auto", scrollbarWidth: "none" }}>
-        {TABS.map(t => (
+        {TABS.filter(t => t.key !== "insights" || showInsights).map(t => (
           <Link
             key={t.key}
             href={`/clients/${clientSlug}/${t.key}`}
@@ -345,6 +351,10 @@ export default function ClientPageClient({
           totalHoursWorked={totalHoursWorked}
           payrollByMonth={payrollByMonth}
         />
+      )}
+
+      {currentTab === "insights" && showInsights && (
+        <InsightsClient clientId={clientId} insights={insights} />
       )}
 
       {currentTab === "weekly" && (

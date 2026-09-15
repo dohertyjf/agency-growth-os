@@ -1,5 +1,17 @@
 import { netProfit, netMargin } from "@/lib/calc"
 
+// Phased rollout flag (server-side only). Comma-separated client slugs allowed
+// to see Insights, e.g. INSIGHTS_CLIENT_SLUGS="john-doherty,acme". Unset = none.
+// Lets us dogfood on one profile in production before opening it to clients.
+export function insightsEnabledForSlug(slug: string | null | undefined): boolean {
+  if (!slug) return false
+  const allow = (process.env.INSIGHTS_CLIENT_SLUGS ?? "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean)
+  return allow.includes(slug)
+}
+
 export interface InsightCard {
   tone: "leverage" | "good" | "watch"
   tag: string
