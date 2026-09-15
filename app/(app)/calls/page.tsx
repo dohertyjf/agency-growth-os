@@ -28,8 +28,8 @@ export default async function CallsPage() {
 
   const [clients, programs] = await Promise.all([
     isCoach ? prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : Promise.resolve([]),
-    isCoach ? prisma.program.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : Promise.resolve([]),
+    isCoach ? prisma.program.findMany({ select: { id: true, name: true, isGroup: true }, orderBy: { name: "asc" } }) : Promise.resolve([]),
   ])
 
-  return <CallsClient calls={calls} clients={clients} programs={programs} isCoach={isCoach} defaultClientId={clientId} />
+  return <CallsClient calls={calls} clients={clients} programs={programs.filter(p => p.isGroup)} isCoach={isCoach} defaultClientId={clientId} />
 }

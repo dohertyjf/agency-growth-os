@@ -317,8 +317,18 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
     </div>
   )
 
+  function whoFor(call: Call): string | null {
+    if (call.isGroupCall) {
+      const prog = programs.find(p => p.id === call.programId)
+      return prog ? `Group · ${prog.name}` : "Group · unassigned"
+    }
+    if (embedded) return null // client's own page — the client is obvious
+    return clients.find(c => c.id === call.clientId)?.name ?? null
+  }
+
   function CallRow({ call }: { call: Call }) {
     const isSel = selected?.id === call.id
+    const who = whoFor(call)
     return (
       <div
         onClick={() => setSelected(call)}
@@ -332,7 +342,7 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
           <span style={{ flex: 1 }}>{call.title}</span>
           {call.isGroupCall && <GroupBadge />}
         </div>
-        <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>{call.date}</div>
+        <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>{call.date}{who ? ` · ${who}` : ""}</div>
       </div>
     )
   }
