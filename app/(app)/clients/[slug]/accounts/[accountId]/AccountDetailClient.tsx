@@ -4,6 +4,7 @@ import Link from "next/link"
 import { fmtCurrency, ymAdd, ymLabel, ymDiff } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import ProjectPulse, { pulseColor, type Pulse } from "../../ProjectPulse"
+import ConfirmDialog from "../../ConfirmDialog"
 import { projectMonthPnl, projectLifetimePnl, sumPnl, isLogged, type ProfitInputs, type MonthPnl } from "@/lib/profit"
 
 interface Account { id: string; name: string; contactName: string | null; contactEmail: string | null; ownerId: string | null }
@@ -155,6 +156,18 @@ export default function AccountDetailClient(props: Props) {
     })
     setContracts(prev => prev.filter(c => c.id !== contractId)) // it left this account
     setReassigning(null)
+  }
+
+  // ── Delete project ─────────────────────────────────────
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  async function confirmDelete() {
+    if (!deletingId) return
+    const id = deletingId
+    setDeletingId(null)
+    setContracts(prev => prev.filter(c => c.id !== id))
+    setPulses(prev => prev.filter(p => p.contractId !== id))
+    setMembers(prev => prev.filter(m => m.contractId !== id))
+    await fetch(`/api/contracts/${id}`, { method: "DELETE" })
   }
 
   // ── Add project ────────────────────────────────────────
@@ -414,6 +427,12 @@ export default function AccountDetailClient(props: Props) {
       </div>
 
       {/* Projects */}
+      <ConfirmDialog
+        open={!!deletingId}
+        title={`Delete "${contracts.find(c => c.id === deletingId)?.name ?? "this project"}"?`}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
       <div style={card}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <h2 style={{ ...sectionTitle, margin: 0 }}>Projects</h2>
@@ -475,6 +494,7 @@ export default function AccountDetailClient(props: Props) {
                       {c.status === "active" && <ProjectPulse contractId={c.id} current={pulseFor(c.id, now)} prev={pulseFor(c.id, prevMonth)} onSaved={onPulseSaved} />}
                       {reassigning === c.id ? reassignSelect(c.id)
                         : <button onClick={() => setReassigning(c.id)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#9C9590", cursor: "pointer", padding: "2px 8px" }}>Reassign</button>}
+                      <button onClick={() => setDeletingId(c.id)} title="Delete project" style={{ background: "none", border: "none", color: "#9C9590", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
                     </div>
                   ))}
                 </div>

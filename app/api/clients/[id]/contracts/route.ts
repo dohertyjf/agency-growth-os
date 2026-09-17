@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
+import { budgetedHours } from "@/lib/calc"
 
 function authorize(session: import("next-auth").Session | null, clientId: string) {
   if (!session) return false
@@ -61,8 +62,17 @@ export async function POST(
     return Response.json({ error: "A finished retainer needs an end month" }, { status: 422 })
   }
 
+  // Hours left blank → budget them from the fee at the client's Minimum Hourly Yield.
+  // Most add forms don't ask for hours, so this is what makes a new project show up
+  // on the yield and capacity views straight away.
+  let hoursPerMonth = data.hoursPerMonth
+  if (!(hoursPerMonth > 0)) {
+    const goal = await prisma.goal.findUnique({ where: { clientId: id }, select: { minHourlyRate: true } })
+    hoursPerMonth = budgetedHours(data.monthly, goal?.minHourlyRate)
+  }
+
   const contract = await prisma.contract.create({
-    data: { clientId: id, ...data, contractedThrough },
+    data: { clientId: id, ...data, hoursPerMonth, contractedThrough },
   })
   return Response.json(contract, { status: 201 })
 }

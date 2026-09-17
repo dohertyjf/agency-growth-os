@@ -1,7 +1,7 @@
 "use client"
 import { useState } from "react"
 import Link from "next/link"
-import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, BOOKED_AHEAD_MONTHS, type ContractRow } from "@/lib/calc"
+import { fmtCurrency, ymLabel, ymAdd, bookedAhead, currentMRR, budgetedHours, BOOKED_AHEAD_MONTHS, type ContractRow } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import PaymentScheduleModal from "./PaymentScheduleModal"
 import ConfirmDialog from "./ConfirmDialog"
@@ -581,6 +581,11 @@ export default function ContractsPanel({ clientId, clientSlug, initialContracts,
   const [schedulingContract, setSchedulingContract] = useState<Contract | null>(null)
   const [duplicatingContract, setDuplicatingContract] = useState<Contract | null>(null)
   const [form, setForm] = useState({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential" as ContractStatus, type: "retainer" as ContractTypeField, accountId: null as string | null, ownerId: null as string | null, productId: null as string | null })
+  // Hours follow the fee (at the Minimum Hourly Yield) until the user types their own.
+  const [hoursTouched, setHoursTouched] = useState(false)
+  function setMonthly(monthly: string) {
+    setForm(f => ({ ...f, monthly, hoursPerMonth: hoursTouched ? f.hoursPerMonth : (parseFloat(monthly) > 0 ? fmtHours(budgetedHours(parseFloat(monthly), minHourlyRate)) : "") }))
+  }
   const [saving, setSaving] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -627,6 +632,7 @@ export default function ContractsPanel({ clientId, clientSlug, initialContracts,
     if (res.ok) {
       updateContracts([...contracts, data.contract ?? data])
       setForm({ name: "", monthly: "", hoursPerMonth: "", start: now, contractedThrough: "", status: "potential", type: "retainer", accountId: null, ownerId: null, productId: null })
+      setHoursTouched(false)
       setAdding(false)
     }
     setSaving(false)
@@ -739,11 +745,11 @@ export default function ContractsPanel({ clientId, clientSlug, initialContracts,
             </div>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>{form.type === "oneoff" ? "Amount ($)" : "Monthly ($)"}</label>
-              <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" value={form.monthly} onChange={e => setForm(f => ({ ...f, monthly: e.target.value }))} required placeholder="5000" />
+              <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" value={form.monthly} onChange={e => setMonthly(e.target.value)} required placeholder="5000" />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Hrs / mo</label>
-              <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" value={form.hoursPerMonth} onChange={e => setForm(f => ({ ...f, hoursPerMonth: e.target.value }))} min={0} step={0.5} placeholder="0" />
+              <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>{form.type === "oneoff" ? "Hrs" : "Hrs / mo"}</label>
+              <input style={{ ...inputStyle, background: "#FBFAF7" }} type="number" value={form.hoursPerMonth} onChange={e => { setHoursTouched(true); setForm(f => ({ ...f, hoursPerMonth: e.target.value })) }} min={0} step={0.5} placeholder="0" title={`Defaults to the fee ÷ ${minHourlyRate && minHourlyRate > 0 ? fmtCurrency(minHourlyRate) : "$150"}/hr`} />
             </div>
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Status</label>

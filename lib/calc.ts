@@ -130,6 +130,19 @@ export function currentMRR(contracts: ContractRow[], now: string) {
   return bookedActive(contracts, now)
 }
 
+// ── Budgeted hours ─────────────────────────────────────────────────────────────
+// A new project's hours default to what its fee affords at the agency's Minimum
+// Hourly Yield (Settings). With none set, $150/hr is the working assumption.
+// Retainers: hours per month from the monthly fee; one-offs: total hours from the
+// whole fee. Rounded to the half hour, matching how hours are entered elsewhere.
+export const DEFAULT_HOURLY_YIELD = 150
+
+export function budgetedHours(amount: number, minHourlyRate: number | null | undefined) {
+  const rate = minHourlyRate && minHourlyRate > 0 ? minHourlyRate : DEFAULT_HOURLY_YIELD
+  if (!(amount > 0)) return 0
+  return Math.round((amount / rate) * 2) / 2
+}
+
 // ── 9.3b Churn — trailing window over the monthly metrics ─────────────────────
 // Churned clients come from the hand-entered monthly metrics (the one record that
 // reliably reaches back before the projects were loaded). The denominator is the
