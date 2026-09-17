@@ -12,6 +12,8 @@ declare module "next-auth" {
       name?: string | null
       role: "coach" | "client"
       clientId?: string | null
+      // Set while the coach is using the app as a client ("switch user").
+      impersonator?: { id: string; name: string | null } | null
     }
   }
   interface User {
@@ -20,8 +22,62 @@ declare module "next-auth" {
   }
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    // Switch user: the coach can use the app as one of their clients and back.
+    // Triggered by `unstable_update({ switchToUserId })` from /api/auth/impersonate.
+    // The same trigger is reachable from the browser via POST /api/auth/session,
+    // so every switch is verified here against the DB, never trusted from the payload.
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.id = user.id
+        token.role = (user as { role?: string }).role
+        token.clientId = (user as { clientId?: string | null }).clientId
+      }
+      const switchTo = trigger === "update" ? (session as { switchToUserId?: string } | null)?.switchToUserId : undefined
+      if (!switchTo) return token
+
+      if (token.impersonatorId) {
+        // Already switched: the only allowed move is back to the coach.
+        if (switchTo !== token.impersonatorId) return token
+        const coach = await prisma.user.findUnique({ where: { id: switchTo } })
+        if (!coach || coach.role !== "coach") return token
+        token.id = coach.id
+        token.role = coach.role
+        token.clientId = coach.clientId
+        token.name = coach.name
+        token.email = coach.email
+        delete token.impersonatorId
+        delete token.impersonatorName
+        return token
+      }
+
+      if (token.role !== "coach") return token
+      const target = await prisma.user.findUnique({ where: { id: switchTo }, include: { client: { select: { name: true } } } })
+      if (!target || target.role !== "client" || target.active === false) return token
+      token.impersonatorId = token.id
+      token.impersonatorName = token.name
+      token.id = target.id
+      token.role = target.role
+      token.clientId = target.clientId
+      token.name = target.name ?? target.client?.name ?? target.email
+      token.email = target.email
+      return token
+    },
+    session({ session, token }) {
+      if (token && session.user) {
+        session.user.id = token.id as string
+        session.user.role = token.role as "coach" | "client"
+        session.user.clientId = token.clientId as string | null
+        session.user.impersonator = token.impersonatorId
+          ? { id: token.impersonatorId as string, name: (token.impersonatorName as string | null) ?? null }
+          : null
+      }
+      return session
+    },
+  },
   providers: [
     Credentials({
       credentials: {

@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 interface Status {
   clientEmail: string
@@ -22,6 +23,8 @@ const inputStyle: React.CSSProperties = {
 
 export default function ClientLoginPanel({ clientId, clientName }: { clientId: string; clientName: string }) {
   const firstName = clientName.trim().split(/\s+/)[0] || "your client"
+  const router = useRouter()
+  const [switching, setSwitching] = useState(false)
   const [status, setStatus] = useState<Status | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -71,6 +74,25 @@ export default function ClientLoginPanel({ clientId, clientName }: { clientId: s
       body: JSON.stringify({ active }),
     })
     if (res.ok) await loadStatus()
+  }
+
+  // Switch user: use the app as this client, with a "switch back" bar up top.
+  async function useAs() {
+    setSwitching(true)
+    setError(null)
+    const res = await fetch("/api/auth/impersonate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId }),
+    })
+    if (res.ok) {
+      router.push("/dashboard")
+      router.refresh()
+    } else {
+      const data = await res.json().catch(() => ({}))
+      setError(data.error || "Could not switch user")
+      setSwitching(false)
+    }
   }
 
   async function copy() {
@@ -155,6 +177,11 @@ export default function ClientLoginPanel({ clientId, clientName }: { clientId: s
                     : invited
                       ? "Generate a fresh link"
                       : "Generate invite link"}
+              </button>
+            )}
+            {status?.user && !deactivated && (
+              <button onClick={useAs} disabled={switching} style={{ padding: "10px 16px", background: "#fff", color: "#1A1916", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: switching ? "default" : "pointer", fontFamily: "inherit", opacity: switching ? 0.7 : 1 }}>
+                {switching ? "Switching…" : `Use August as ${firstName}`}
               </button>
             )}
             {status?.user && !deactivated && (
