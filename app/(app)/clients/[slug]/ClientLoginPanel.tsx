@@ -1,6 +1,5 @@
 "use client"
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 
 interface Status {
   clientEmail: string
@@ -23,7 +22,6 @@ const inputStyle: React.CSSProperties = {
 
 export default function ClientLoginPanel({ clientId, clientName }: { clientId: string; clientName: string }) {
   const firstName = clientName.trim().split(/\s+/)[0] || "your client"
-  const router = useRouter()
   const [switching, setSwitching] = useState(false)
   const [status, setStatus] = useState<Status | null>(null)
   const [loading, setLoading] = useState(true)
@@ -86,8 +84,9 @@ export default function ClientLoginPanel({ clientId, clientName }: { clientId: s
       body: JSON.stringify({ clientId }),
     })
     if (res.ok) {
-      router.push("/dashboard")
-      router.refresh()
+      // Full navigation, not router.push: the router cache may hold a prefetched
+      // /dashboard from the coach session (a redirect to /clients).
+      window.location.assign("/dashboard")
     } else {
       const data = await res.json().catch(() => ({}))
       setError(data.error || "Could not switch user")

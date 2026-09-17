@@ -1,18 +1,16 @@
 "use client"
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 
 // Shown across the top while the coach is using the app as a client.
 export default function ImpersonationBar({ asName, coachName }: { asName: string; coachName: string | null }) {
-  const router = useRouter()
   const [busy, setBusy] = useState(false)
 
   async function switchBack() {
     setBusy(true)
     const res = await fetch("/api/auth/impersonate", { method: "DELETE" })
     if (res.ok) {
-      router.push("/clients")
-      router.refresh()
+      // Full navigation so nothing prefetched under the client session is reused.
+      window.location.assign("/clients")
     } else {
       setBusy(false)
     }
