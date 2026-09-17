@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div style={{ minHeight: "100vh", background: "#FBFAF7" }}>
       {session.user.impersonator && (
-        <ImpersonationBar asName={session.user.name ?? session.user.email} coachName={session.user.impersonator.name} />
+        <ImpersonationBar asName={session.user.name ?? session.user.email} coachId={session.user.impersonator.id} coachName={session.user.impersonator.name} />
       )}
       <AppNav role={session.user.role} userName={session.user.name} />
       <main style={{ maxWidth: 1280, margin: "0 auto", padding: "32px 24px" }}>

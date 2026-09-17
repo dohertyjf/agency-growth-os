@@ -1,14 +1,15 @@
 "use client"
 import { useState } from "react"
+import { switchSessionTo } from "@/lib/switchUser"
 
 // Shown across the top while the coach is using the app as a client.
-export default function ImpersonationBar({ asName, coachName }: { asName: string; coachName: string | null }) {
+export default function ImpersonationBar({ asName, coachId, coachName }: { asName: string; coachId: string; coachName: string | null }) {
   const [busy, setBusy] = useState(false)
 
   async function switchBack() {
     setBusy(true)
-    const res = await fetch("/api/auth/impersonate", { method: "DELETE" })
-    if (res.ok) {
+    const user = await switchSessionTo(coachId)
+    if (user?.id === coachId) {
       // Full navigation so nothing prefetched under the client session is reused.
       window.location.assign("/clients")
     } else {

@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import { switchSessionTo } from "@/lib/switchUser"
 
 interface Status {
   clientEmail: string
@@ -83,13 +84,19 @@ export default function ClientLoginPanel({ clientId, clientName }: { clientId: s
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId }),
     })
-    if (res.ok) {
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setError(data.error || "Could not switch user")
+      setSwitching(false)
+      return
+    }
+    const user = await switchSessionTo(data.userId)
+    if (user?.id === data.userId) {
       // Full navigation, not router.push: the router cache may hold a prefetched
       // /dashboard from the coach session (a redirect to /clients).
       window.location.assign("/dashboard")
     } else {
-      const data = await res.json().catch(() => ({}))
-      setError(data.error || "Could not switch user")
+      setError("Could not switch user")
       setSwitching(false)
     }
   }

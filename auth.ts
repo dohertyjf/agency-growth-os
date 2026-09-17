@@ -22,14 +22,14 @@ declare module "next-auth" {
   }
 }
 
-export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   callbacks: {
     ...authConfig.callbacks,
     // Switch user: the coach can use the app as one of their clients and back.
-    // Triggered by `unstable_update({ switchToUserId })` from /api/auth/impersonate.
-    // The same trigger is reachable from the browser via POST /api/auth/session,
-    // so every switch is verified here against the DB, never trusted from the payload.
+    // Triggered from the browser via POST /api/auth/session with
+    // `data: { switchToUserId }` (see lib/switchUser.ts), so every switch is
+    // verified here against the DB and never trusted from the payload.
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id
