@@ -89,7 +89,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       authorize: async (credentials) => {
-        const email = (credentials?.email ?? "") as string
+        // Emails are stored lowercase; phones autocapitalise and users add
+        // stray spaces, and the lookup below is an exact match.
+        const email = ((credentials?.email ?? "") as string).trim().toLowerCase()
         const password = (credentials?.password ?? "") as string
         if (!email || !password) return null
 

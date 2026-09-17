@@ -22,7 +22,7 @@ export default function SignInPage() {
     setLoading(true)
     setError("")
     const fd = new FormData(e.currentTarget)
-    const email = fd.get("email") as string
+    const email = (fd.get("email") as string).trim().toLowerCase()
     const res = await signIn("credentials", {
       email,
       password: fd.get("password") as string,
@@ -71,6 +71,9 @@ export default function SignInPage() {
                 type="email"
                 required
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 style={{ width: "100%", padding: "10px 12px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 14, background: "#FBFAF7", color: "#1A1916", boxSizing: "border-box" }}
               />
             </div>
