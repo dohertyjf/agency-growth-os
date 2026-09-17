@@ -6,7 +6,6 @@ import LeadGoalCalculator from "@/components/LeadGoalCalculator"
 export default async function LeadGoalLivePage() {
   const session = await auth()
   if (!session) redirect("/auth/signin")
-  if (session.user.role !== "coach") redirect("/dashboard")
 
   return (
     <div>

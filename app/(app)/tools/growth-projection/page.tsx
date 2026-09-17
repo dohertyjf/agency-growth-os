@@ -6,7 +6,6 @@ import CapacityLiveTool from "@/components/CapacityLiveTool"
 export default async function GrowthProjectionLivePage() {
   const session = await auth()
   if (!session) redirect("/auth/signin")
-  if (session.user.role !== "coach") redirect("/dashboard")
 
   return (
     <div>

@@ -20,7 +20,7 @@ export default function AppNav({ role, userName }: Props) {
     { href: "/calls", label: "Calls" },
     ...(role === "coach" ? [{ href: "/prospects", label: "Prospects" }] : []),
     ...(role === "coach" ? [{ href: "/leads", label: "Leads" }] : []),
-    ...(role === "coach" ? [{ href: "/tools", label: "Tools" }] : []),
+    { href: "/tools", label: "Tools" },
     ...(role === "coach" ? [{ href: "/programs", label: "Programs" }] : []),
     // Insights is a work in progress — not shipped to clients yet. The page is
     // still reachable at /insights directly for development. Re-add here to launch.

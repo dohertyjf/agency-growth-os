@@ -484,3 +484,14 @@ model MonthlyChecklist {
 
   @@unique([clientId, month])
 }
+
+// One row per generation attempt on an AI tool (e.g. "content-five").
+// Used for per-user rate limiting — a circuit breaker for runaway clients.
+model ToolRun {
+  id        String   @id @default(cuid())
+  userId    String
+  tool      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, tool, createdAt])
+}
