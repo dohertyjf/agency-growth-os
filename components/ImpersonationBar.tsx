@@ -13,7 +13,9 @@ export default function ImpersonationBar({ asName, coachId, coachName }: { asNam
       // Full navigation so nothing prefetched under the client session is reused.
       window.location.assign("/clients")
     } else {
-      setBusy(false)
+      // The switch was refused — most likely the session was ended because the
+      // coach login no longer exists. Reload so the layout sends us to sign-in.
+      window.location.reload()
     }
   }
 

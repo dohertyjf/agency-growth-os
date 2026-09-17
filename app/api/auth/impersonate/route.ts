@@ -22,6 +22,13 @@ export async function POST(req: Request) {
   const clientId = typeof body?.clientId === "string" ? body.clientId : null
   if (!clientId) return Response.json({ error: "clientId required" }, { status: 400 })
 
+  // Refuse to switch if the coach's own login row is gone (a stale session
+  // from a deleted user) — there would be nothing to switch back to.
+  const self = await prisma.user.findUnique({ where: { id: session.user.id } })
+  if (!self || self.role !== "coach") {
+    return Response.json({ error: "Your login session is out of date. Sign out and back in, then try again." }, { status: 409 })
+  }
+
   const target = await prisma.user.findFirst({ where: { clientId, role: "client" } })
   if (!target) return Response.json({ error: "This client has no login yet." }, { status: 404 })
 

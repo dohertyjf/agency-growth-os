@@ -43,7 +43,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Already switched: the only allowed move is back to the coach.
         if (switchTo !== token.impersonatorId) return token
         const coach = await prisma.user.findUnique({ where: { id: switchTo } })
-        if (!coach || coach.role !== "coach") return token
+        // Coach row gone (stale session from a deleted login): end the session
+        // rather than leave the coach stuck as the client. They sign in again.
+        if (!coach || coach.role !== "coach") return null
         token.id = coach.id
         token.role = coach.role
         token.clientId = coach.clientId
