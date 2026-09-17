@@ -397,6 +397,12 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
   return (
     <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       <style>{`
+        .account-name-link { border-bottom: 1px dotted #C0BAB2; transition: color 0.12s, border-color 0.12s; }
+        .account-name-link:hover { color: #E9532A !important; border-bottom: 1px solid #E9532A; }
+        .account-name-link:hover .account-name-chevron { color: #E9532A !important; }
+        .account-view-link:hover { background: #FBEAE4 !important; }
+        .account-project-link { border-bottom: 1px dotted #C0BAB2; transition: color 0.12s, border-color 0.12s; }
+        .account-project-link:hover { color: #E9532A !important; border-bottom: 1px solid #E9532A; }
         @media (max-width: 640px) {
           .account-form-grid { grid-template-columns: 1fr !important; }
           .account-project-grid { grid-template-columns: 1fr 1fr !important; }
@@ -418,7 +424,7 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916" }}>Client Accounts</div>
-          <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>{accounts.length} account{accounts.length !== 1 ? "s" : ""} · assign projects to group them</div>
+          <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>{accounts.length} account{accounts.length !== 1 ? "s" : ""} · each account holds its projects — open one for its months, team and notes</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setBulkOpen(true)}
@@ -516,9 +522,10 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
                 ) : (
                 <div className="account-header-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: risk ? "#FBEAE4" : "#FBFAF7" }}>
                   <div style={{ flex: 1 }}>
-                    <Link href={`/clients/${clientSlug}/accounts/${account.id}`} style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", textDecoration: "none" }}>
-                      {account.name}{risk && <span title="Churn risk" style={{ marginLeft: 6, color: "#C2410C", fontSize: 12 }}>⚠</span>} <span style={{ color: "#C0BAB2", fontWeight: 400 }}>›</span>
+                    <Link href={`/clients/${clientSlug}/accounts/${account.id}`} className="account-name-link" title="Open this account" style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", textDecoration: "none" }}>
+                      {account.name} <span className="account-name-chevron" style={{ color: "#C0BAB2", fontWeight: 400 }}>›</span>
                     </Link>
+                    {risk && <span title="Churn risk" style={{ marginLeft: 6, color: "#C2410C", fontSize: 12 }}>⚠</span>}
                     {(account.contactName || account.contactEmail) && (
                       <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>
                         {account.contactName}
@@ -542,6 +549,10 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
                   <div style={{ fontSize: 11, color: "#9C9590" }}>
                     {accountContracts.length} project{accountContracts.length !== 1 ? "s" : ""}
                   </div>
+                  <Link href={`/clients/${clientSlug}/accounts/${account.id}`} className="account-view-link"
+                    style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#6B6760", textDecoration: "none", padding: "2px 8px", whiteSpace: "nowrap" }}>
+                    View account →
+                  </Link>
                   <button onClick={() => { setAddingProjectForAccount(a => a === account.id ? null : account.id); setProjectForm(defaultProjectForm) }}
                     style={{ background: "none", border: "1px solid #E9532A", borderRadius: 4, fontSize: 11, color: "#E9532A", cursor: "pointer", padding: "2px 8px", fontWeight: 600 }}>
                     + Project
@@ -629,11 +640,20 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
                     </div>
                   </form>
                 )}
-                {!isEditing && accountContracts.length > 0 && (
-                  <div style={{ padding: "6px 14px 10px" }}>
+                {!isEditing && (
+                  <div style={{ padding: "8px 14px 10px 14px" }}>
+                    {/* Nested under the account: a label and a left rail make the hierarchy visible. */}
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#9C9590", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>
+                      Projects · {accountContracts.length}
+                    </div>
+                    {accountContracts.length === 0 && (
+                      <div style={{ fontSize: 12, color: "#9C9590", padding: "6px 0 6px 12px", borderLeft: "2px solid #ECE7DE", fontStyle: "italic" }}>
+                        No projects yet — use <strong style={{ fontStyle: "normal", color: "#6B6760" }}>+ Project</strong> to add one.
+                      </div>
+                    )}
                     {accountContracts.map(c => (
-                      <div key={c.id} style={{ fontSize: 12, color: "#6B6760", padding: "4px 0", borderBottom: "1px solid #F5F1EC", display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontWeight: 500, color: "#1A1916" }}>{c.name}</span>
+                      <div key={c.id} style={{ fontSize: 12, color: "#6B6760", padding: "5px 0 5px 12px", borderLeft: "2px solid #ECE7DE", borderBottom: "1px solid #F5F1EC", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <Link href={`/clients/${clientSlug}/projects/${c.id}`} className="account-project-link" title="Open this project" style={{ fontWeight: 500, color: "#1A1916", textDecoration: "none" }}>{c.name}</Link>
                         <span style={{ color: "#9C9590" }}>
                           {c.type === "oneoff"
                             ? ymLabel(c.start)
@@ -649,6 +669,10 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
                         {c.status === "active" && (
                           <ProjectPulse contractId={c.id} current={pulseFor(c.id, now)} prev={pulseFor(c.id, prevMonth)} onSaved={p => onPulseChange?.(p)} />
                         )}
+                        <Link href={`/clients/${clientSlug}/projects/${c.id}`} className="account-view-link"
+                          style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 4, fontSize: 11, color: "#6B6760", textDecoration: "none", padding: "2px 8px", whiteSpace: "nowrap" }}>
+                          View project →
+                        </Link>
                         {assigningContract === c.id
                           ? assignSelect(c.id, c.accountId ?? null)
                           : <button onClick={() => setAssigningContract(c.id)}
