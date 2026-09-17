@@ -30,6 +30,10 @@ export default auth((req) => {
   return NextResponse.next()
 })
 
+// /api/auth is excluded on purpose: the auth wrapper re-sets the session
+// cookie on every request it handles. On Netlify that refreshed (stale) cookie
+// is appended after the auth route's own Set-Cookie, so a session update such
+// as switch-user was silently overridden by the old session.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/auth).*)"],
 }
