@@ -571,7 +571,7 @@ export function ymLabel(ym: string): string {
   return `${months[m - 1]} '${String(y).slice(2)}`
 }
 
-const CURRENCY_LOCALE: Record<string, string> = { USD: "en-US", GBP: "en-GB", EUR: "de-DE" }
+const CURRENCY_LOCALE: Record<string, string> = { USD: "en-US", GBP: "en-GB", EUR: "de-DE", CAD: "en-CA" }
 
 export function fmtCurrency(v: number, currency = "USD"): string {
   const locale = CURRENCY_LOCALE[currency] ?? "en-US"

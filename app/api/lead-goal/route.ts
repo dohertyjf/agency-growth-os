@@ -34,7 +34,7 @@ const schema = z.object({
   email: z.string().trim().email(),
   name: z.string().optional(),
   agency: z.string().optional(),
-  currency: z.enum(["USD", "GBP", "EUR"]).default("USD"),
+  currency: z.enum(["USD", "GBP", "EUR", "CAD"]).default("USD"),
   inputs: inputsSchema,
   honeypot: z.string().max(0).optional(),
 })

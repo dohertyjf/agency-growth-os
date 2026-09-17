@@ -27,7 +27,7 @@ const schema = z.object({
   netProfitPct: z.number().min(0).max(100),
   closeRatePct: z.number().min(0).max(100),
   peoplePct: z.number().min(0).max(100).default(30),
-  currency: z.enum(["USD", "GBP", "EUR"]).default("USD"),
+  currency: z.enum(["USD", "GBP", "EUR", "CAD"]).default("USD"),
   minHourlyRate: z.number().min(0).nullable().optional(),
 })
 

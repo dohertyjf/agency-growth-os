@@ -583,7 +583,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   const growthProjection = (
     <CapacityLiveTool
       compact
-      currency={currency === "GBP" || currency === "EUR" ? currency : "USD"}
+      currency={currency === "GBP" || currency === "EUR" || currency === "CAD" ? currency : "USD"}
       title="Growth Projection"
       subtitle="Seeded from this client's last 6 months — adjust any input to model a scenario"
       initialValues={savedSeed ?? projectionSeed}

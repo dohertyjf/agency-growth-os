@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import { leadsGoal } from "@/lib/calc"
 import LeadGoalResults from "@/components/LeadGoalResults"
 
-type Currency = "USD" | "GBP" | "EUR"
+type Currency = "USD" | "GBP" | "EUR" | "CAD"
 function currSym(c: Currency) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
 
 const accent = "#E9532A"
@@ -201,7 +201,7 @@ export default function LeadGoalCalculator({ embed = false, prefill, live = fals
           </div>
           <select value={currency} onChange={e => setCurrency(e.target.value as Currency)}
             style={{ ...inputStyle, width: "auto", padding: "8px 12px", cursor: "pointer" }} aria-label="Currency">
-            <option value="USD">$ USD</option><option value="GBP">£ GBP</option><option value="EUR">€ EUR</option>
+            <option value="USD">$ USD</option><option value="GBP">£ GBP</option><option value="EUR">€ EUR</option><option value="CAD">$ CAD</option>
           </select>
         </div>
 

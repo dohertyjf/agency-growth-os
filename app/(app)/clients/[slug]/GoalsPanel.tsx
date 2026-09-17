@@ -263,6 +263,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
               <option value="USD">USD — US Dollar ($)</option>
               <option value="GBP">GBP — British Pound (£)</option>
               <option value="EUR">EUR — Euro (€)</option>
+              <option value="CAD">CAD — Canada Dollar ($)</option>
             </select>
           </div>
         </div>

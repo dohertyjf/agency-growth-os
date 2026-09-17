@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useRef, useState } from "react"
 
-type Currency = "USD" | "GBP" | "EUR"
+type Currency = "USD" | "GBP" | "EUR" | "CAD"
 function currSym(c: Currency) { return c === "GBP" ? "£" : c === "EUR" ? "€" : "$" }
 
 const accent = "#E9532A"
@@ -143,6 +143,7 @@ export default function CapacityCalculator({ embed = false, schedulingUrl = "" }
               <option value="USD">$ USD</option>
               <option value="GBP">£ GBP</option>
               <option value="EUR">€ EUR</option>
+              <option value="CAD">$ CAD</option>
             </select>
           </div>
         </div>
