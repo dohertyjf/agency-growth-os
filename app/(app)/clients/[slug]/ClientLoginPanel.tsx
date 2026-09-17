@@ -179,7 +179,7 @@ export default function ClientLoginPanel({ clientId, clientName }: { clientId: s
                       : "Generate invite link"}
               </button>
             )}
-            {status?.user && !deactivated && (
+            {status?.user && (
               <button onClick={useAs} disabled={switching} style={{ padding: "10px 16px", background: "#fff", color: "#1A1916", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: switching ? "default" : "pointer", fontFamily: "inherit", opacity: switching ? 0.7 : 1 }}>
                 {switching ? "Switching…" : `Use August as ${firstName}`}
               </button>

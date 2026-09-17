@@ -9,7 +9,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/auth/signin")
 
   // Lock out a client whose login was deactivated, even on an existing session.
-  if (session.user.role === "client") {
+  if (session.user.role === "client" && !session.user.impersonator) {
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { active: true } })
     if (user?.active === false) redirect("/auth/signin?deactivated=1")
   }

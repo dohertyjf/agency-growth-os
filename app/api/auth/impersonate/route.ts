@@ -17,7 +17,6 @@ export async function POST(req: Request) {
 
   const target = await prisma.user.findFirst({ where: { clientId, role: "client" } })
   if (!target) return Response.json({ error: "This client has no login yet." }, { status: 404 })
-  if (target.active === false) return Response.json({ error: "This client's login is deactivated." }, { status: 409 })
 
   const updated = await unstable_update({ switchToUserId: target.id } as never)
   if (updated?.user?.id !== target.id) return Response.json({ error: "Could not switch user." }, { status: 500 })

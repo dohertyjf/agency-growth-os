@@ -56,7 +56,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
 
       if (token.role !== "coach") return token
       const target = await prisma.user.findUnique({ where: { id: switchTo }, include: { client: { select: { name: true } } } })
-      if (!target || target.role !== "client" || target.active === false) return token
+      // Deactivated logins are allowed here on purpose: the coach may want to see
+      // what a churned client sees. The layout skips the deactivated bounce while switched.
+      if (!target || target.role !== "client") return token
       token.impersonatorId = token.id
       token.impersonatorName = token.name
       token.id = target.id
