@@ -24,16 +24,15 @@ interface Props {
   format: "currency" | "percent" | "number"
   label: string
   series2?: ChartPoint[]
-  series2Label?: string
   series3?: ChartPoint[]
-  series3Label?: string
   series4?: ChartPoint[]
-  series4Label?: string
+  series5?: ChartPoint[]
   flowBars?: FlowBars
   goalValue?: number
 }
 
 const OPP_COLOR = "#8B5CF6"
+const VERBAL_COLOR = "#D97706"
 
 function fmt(v: number, format: "currency" | "percent" | "number", sym = "$"): string {
   if (format === "currency") {
@@ -49,11 +48,11 @@ const PAD = { top: 20, right: 24, bottom: 36, left: 60 }
 const VW = 880
 const VH = 240
 
-export default function MetricChart({ points, format, label, series2, series2Label, series3, series3Label, series4, series4Label, flowBars, goalValue }: Props) {
+export default function MetricChart({ points, format, label, series2, series3, series4, series5, flowBars, goalValue }: Props) {
   const [hover, setHover] = useState<number | null>(null)
   const sym = currSym(useCurrency())
 
-  if (!points.length && !series2?.length) {
+  if (!points.length && !series2?.length && !series4?.length && !series5?.length) {
     return (
       <div>
         <div style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 4 }}>
@@ -70,7 +69,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
   const plotH = VH - PAD.top - PAD.bottom
 
   const barVals = flowBars ? [...flowBars.newRevenue, ...flowBars.churnedRevenue] : []
-  const allVals = [...points, ...(series2 ?? []), ...(series3 ?? []), ...(series4 ?? [])].map(p => p.value).concat(barVals)
+  const allVals = [...points, ...(series2 ?? []), ...(series3 ?? []), ...(series4 ?? []), ...(series5 ?? [])].map(p => p.value).concat(barVals)
   const dataMin = Math.min(...allVals)
   const dataMax = Math.max(...allVals)
 
@@ -89,7 +88,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
   const yRange = yMax - yMin
   const crossesZero = yMin < 0 && yMax > 0
 
-  const refPoints = points.length ? points : (series2 ?? [])
+  const refPoints = points.length ? points : (series5 ?? series2 ?? series4 ?? [])
 
   const toX = (i: number) =>
     refPoints.length === 1
@@ -120,12 +119,10 @@ export default function MetricChart({ points, format, label, series2, series2Lab
   const s2 = series2?.length ? buildPaths(series2) : null
   const s3 = series3?.length ? buildPaths(series3) : null
   const s4 = series4?.length ? buildPaths(series4) : null
+  const s5 = series5?.length ? buildPaths(series5) : null
 
   const colW = refPoints.length > 1 ? plotW / refPoints.length : plotW
-  const hasBothSeries = !!(points.length && series2?.length)
-  const hasSeries3 = !!(series3?.length)
-  const hasSeries4 = !!(series4?.length)
-  const hasProjected = s1.hasProj || (s2?.hasProj ?? false) || (s3?.hasProj ?? false) || (s4?.hasProj ?? false)
+  const hasBothSeries = !!(points.length && (series2?.length || series5?.length))
 
   return (
     <div style={{ position: "relative" }}>
@@ -225,6 +222,17 @@ export default function MetricChart({ points, format, label, series2, series2Lab
             </>
           )}
 
+          {/* Series 5 (with verbal) — the nearest-to-signed tier, drawn just behind contracted */}
+          {s5 && (
+            <>
+              {s5.histPath && <path d={s5.histPath} fill="none" stroke={VERBAL_COLOR} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" opacity={0.6} />}
+              {s5.projPath && <path d={s5.projPath} fill="none" stroke={VERBAL_COLOR} strokeWidth={1.5} strokeDasharray="6,4" strokeLinejoin="round" strokeLinecap="round" opacity={0.35} />}
+              {series5!.map((p, i) => (
+                <circle key={i} cx={toX(i)} cy={toY(p.value)} r={2.5} fill={p.projected ? "#fff" : VERBAL_COLOR} stroke={VERBAL_COLOR} strokeWidth={1.5} opacity={0.6} />
+              ))}
+            </>
+          )}
+
           {/* Series 3 (cash collected) — drawn behind series 1 */}
           {s3 && (
             <>
@@ -267,9 +275,10 @@ export default function MetricChart({ points, format, label, series2, series2Lab
             const p2 = series2?.[hover]
             const p3 = series3?.[hover]
             const p4 = series4?.[hover]
+            const p5 = series5?.[hover]
             const newRev = flowBars?.newRevenue[hover] ?? 0
             const churnRev = flowBars?.churnedRevenue[hover] ?? 0
-            const anchor = p1 ?? p2
+            const anchor = p1 ?? p5 ?? p2 ?? p4
             if (!anchor) return null
             const tx = toX(hover)
             const ty = toY(anchor.value)
@@ -277,6 +286,7 @@ export default function MetricChart({ points, format, label, series2, series2Lab
 
             const rows: { label: string; value: number; color: string }[] = []
             if (p1) rows.push({ label: hasBothSeries ? "Contracted" : p3 ? "MRR" : "", value: p1.value, color: "#FF8B6A" })
+            if (p5) rows.push({ label: "Verbal", value: p5.value, color: "#FCD34D" })
             if (p2) rows.push({ label: "Qualified", value: p2.value, color: "#93C5FD" })
             if (p4) rows.push({ label: "Opportunity", value: p4.value, color: "#C4B5FD" })
             if (p3) rows.push({ label: "Cash", value: p3.value, color: "#2DD4BF" })
@@ -311,64 +321,6 @@ export default function MetricChart({ points, format, label, series2, series2Lab
         </svg>
       </div>
 
-      {/* Legend */}
-      {(hasBothSeries || hasProjected || flowBars || hasSeries3 || hasSeries4 || (goalValue != null && goalValue > 0)) && (
-        <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#9C9590", marginTop: 6, flexWrap: "wrap" }}>
-          {hasBothSeries ? (
-            <>
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#E9532A" strokeWidth={2} /></svg>
-                Contracted
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#2563EB" strokeWidth={2} opacity={0.5} /></svg>
-                {series2Label ?? "With Qualified"}
-              </span>
-            </>
-          ) : hasProjected ? (
-            <>
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#E9532A" strokeWidth={2} /></svg>
-                Actual
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#E9532A" strokeWidth={2} strokeDasharray="4,3" opacity={0.6} /></svg>
-                Projected
-              </span>
-            </>
-          ) : null}
-          {hasSeries4 && (
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke={OPP_COLOR} strokeWidth={2} opacity={0.5} /></svg>
-              {series4Label ?? "With Opportunity"}
-            </span>
-          )}
-          {hasSeries3 && (
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#0D9488" strokeWidth={2} /></svg>
-              {series3Label ?? "Cash Collected"}
-            </span>
-          )}
-          {goalValue != null && goalValue > 0 && (
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <svg width={20} height={4}><line x1={0} y1={2} x2={20} y2={2} stroke="#16A34A" strokeWidth={1.5} strokeDasharray="6,4" opacity={0.7} /></svg>
-              Revenue Goal
-            </span>
-          )}
-          {flowBars && (
-            <>
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <svg width={12} height={10}><rect x={0} y={0} width={12} height={10} fill="#22C55E" opacity={0.75} rx={1} /></svg>
-                New revenue
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <svg width={12} height={10}><rect x={0} y={0} width={12} height={10} fill="#EF4444" opacity={0.75} rx={1} /></svg>
-                Churned revenue
-              </span>
-            </>
-          )}
-        </div>
-      )}
     </div>
   )
 }

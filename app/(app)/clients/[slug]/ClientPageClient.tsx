@@ -23,7 +23,7 @@ import CallsClient from "../../calls/CallsClient"
 import InsightsClient from "../../insights/InsightsClient"
 import type { InsightCard } from "@/lib/insights"
 import { CurrencyProvider } from "@/lib/CurrencyContext"
-import { ymDiff } from "@/lib/calc"
+import { ymDiff, trailingChurn, activeAccountsIn, avgStayMonths, type AccountContractRow, type ContractRow } from "@/lib/calc"
 
 interface Metric {
   id: string
@@ -247,6 +247,19 @@ export default function ClientPageClient({
 
   // Per-month payroll: for each metric month, sum each active person's salary override
   // or fall back to annualSalary / 12, respecting start/end dates.
+  // Same avg-stay figure the Dashboard's LTV card uses, so an ongoing deal on the
+  // pipeline is valued with the number shown there.
+  const avgStay = useMemo(() => {
+    const nowYM = new Date().toISOString().slice(0, 7)
+    const rows: AccountContractRow[] = contracts.map(c => ({
+      id: c.id, accountId: c.accountId, monthly: c.monthly, start: c.start, contractedThrough: c.contractedThrough,
+      status: c.status as ContractRow["status"], type: (c.type ?? "retainer") as ContractRow["type"],
+    }))
+    const through = metrics.filter(m => m.month <= nowYM).sort((a, b) => b.month.localeCompare(a.month))[0]?.month ?? nowYM
+    const churn = trailingChurn(metrics, ym => activeAccountsIn(rows, ym), through)
+    return avgStayMonths(churn, rows, nowYM)
+  }, [contracts, metrics])
+
   const payrollByMonth = useMemo(() => {
     const overrides = new Map<string, number>()
     salaryMonths.forEach(sm => overrides.set(`${sm.personId}:${sm.month}`, sm.monthlySalary))
@@ -413,6 +426,9 @@ export default function ClientPageClient({
         <PipelinePanel
           clientId={clientId}
           contracts={contracts}
+          payments={payments}
+          onPaymentsChange={setPayments}
+          avgStayMonths={avgStay}
           accounts={accounts}
           people={people.map(p => ({ id: p.id, name: p.name, isExternal: p.isExternal }))}
           onContractsChange={setContracts}

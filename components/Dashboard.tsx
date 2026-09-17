@@ -10,7 +10,7 @@ import CapacityLiveTool from "./CapacityLiveTool"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
   projectMetric, ymAdd, ymLabel, bookedAhead, BOOKED_AHEAD_MONTHS,
-  mrrGoal, goalProgress, trailingChurn, activeAccountsIn, churnedStayMonths,
+  mrrGoal, goalProgress, trailingChurn, activeAccountsIn, churnedStayMonths, avgStayMonths,
   type ContractRow, type ProjectionInput, type ProjectableMetric, type CapacityInputs, type AccountContractRow,
 } from "@/lib/calc"
 
@@ -38,6 +38,7 @@ interface Contract {
   contractedThrough: string | null
   status: string
   type?: string
+  verbal?: boolean
   accountId?: string | null
   deliveryStart?: string | null
   deliveryEnd?: string | null
@@ -151,6 +152,10 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   const [tableRange, setTableRange] = useState<3 | 6 | 12 | "all">("all")
   const [showMRRFlow, setShowMRRFlow] = useState(false)
   const [showCashCollected, setShowCashCollected] = useState(false)
+  // Pipeline tier lines shown on the Contract MRR chart. A toggle only hides its
+  // line — each line always means "contracted + everything at least this far along",
+  // so hiding Verbal folds those deals back into the Qualified line above it.
+  const [tiers, setTiers] = useState({ contracted: true, verbal: true, qualified: true, opportunity: true })
   const [payments, setPayments] = useState<Payment[]>(paymentsProp ?? [])
   const [newMonth, setNewMonth] = useState("")
   const [addingMonthSaving, setAddingMonthSaving] = useState(false)
@@ -258,21 +263,27 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     type: (c.type ?? "retainer") as "retainer" | "oneoff",
   }))
 
-  // Contracted revenue by month: retainers = MRR (monthly across their term);
-  // one-offs = their scheduled payments that month (falls back to the full total in
-  // the start month only when no payment plan is set). Keeps a lump one-off from
-  // inflating a single month's Contracted figure.
+  // Contracted revenue by month. A payment schedule wins when one is set — a
+  // retainer's term is delivery months and may bill on fewer of them. Without one:
+  // retainers = MRR across their term; one-offs = the full total in the start month.
+  // Keeps a lump one-off from inflating a single month's Contracted figure.
   const paysByContract = new Map<string, { month: string; amount: number }[]>()
   payments.forEach(p => { const a = paysByContract.get(p.contractId); if (a) a.push(p); else paysByContract.set(p.contractId, [p]) })
-  const ACTIVE_STATUSES = ["active", "finished"]
-  function bookedSched(ym: string, statuses: string[]): number {
+  type Tier = "contracted" | "verbal" | "qualified" | "opportunity"
+  const tierOf = (c: Contract): Tier =>
+    c.status === "active" || c.status === "finished" ? "contracted"
+    : c.status === "potential" ? (c.verbal ? "verbal" : "qualified")
+    : "opportunity"
+  function bookedSched(ym: string, include: Tier[]): number {
     let total = 0
     for (const c of contracts) {
-      if (!statuses.includes(c.status)) continue
-      if ((c.type ?? "retainer") === "oneoff") {
-        const pays = paysByContract.get(c.id) ?? []
-        if (pays.length) total += pays.reduce((sub, p) => p.month === ym ? sub + p.amount : sub, 0)
-        else if (c.start === ym) total += c.monthly
+      if (c.status === "lost" || !include.includes(tierOf(c))) continue
+      const pays = paysByContract.get(c.id) ?? []
+      if (pays.length) {
+        if (c.status === "finished" && ym > nowYM) continue
+        total += pays.reduce((sub, p) => p.month === ym ? sub + p.amount : sub, 0)
+      } else if ((c.type ?? "retainer") === "oneoff") {
+        if (c.start === ym) total += c.monthly
       } else if (c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym)) {
         if (c.status === "finished" && ym > nowYM) continue  // finished/churned: no future forecast
         total += c.monthly
@@ -280,7 +291,12 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     }
     return total
   }
-  const contractedFor = (ym: string) => bookedSched(ym, ACTIVE_STATUSES)
+  const contractedFor = (ym: string) => bookedSched(ym, ["contracted"])
+  // Tiers a line counts: contracted plus every tier at least as far along as `through`.
+  const tiersThrough = (through: Tier): Tier[] => {
+    const order: Tier[] = ["contracted", "verbal", "qualified", "opportunity"]
+    return order.slice(0, order.indexOf(through) + 1)
+  }
 
   const nowYM = new Date().toISOString().slice(0, 7)
   const currentYM = latest?.month ?? nowYM
@@ -297,7 +313,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   const contractMRRSparkline = useMemo(() => {
     return Array.from({ length: range }, (_, i) => contractedFor(ymAdd(cardMonth, i - range + 1)))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, range, cardMonth])
+  }, [contracts, payments, range, cardMonth])
 
   // Build chart points for selected metric
   const chartPoints: ChartPoint[] = useMemo(() => {
@@ -368,32 +384,22 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metrics, selectedCard, contracts])
 
-  // Second series: contracted + potential (only when contractMRR card selected)
-  const chartPoints2: ChartPoint[] | undefined = useMemo(() => {
-    if (selectedCard !== "contractMRR") return undefined
+  // Pipeline tier lines on the Contract MRR chart: history over the range, then
+  // six months projected. Each is contracted + every tier at least as far along.
+  const tierLine = (through: Tier): ChartPoint[] | undefined => {
+    if (selectedCard !== "contractMRR" || !tiers[through as keyof typeof tiers]) return undefined
+    const include = tiersThrough(through)
     const pts: ChartPoint[] = []
-    for (let i = range - 1; i >= 0; i--) {
-      const ym = ymAdd(nowYM, -i)
-      pts.push({ label: ymLabel(ym), value: contractedFor(ym) + bookedSched(ym, ["potential"]) })
-    }
-    for (let j = 1; j <= 6; j++) {
-      const ym = ymAdd(nowYM, j)
-      pts.push({ label: ymLabel(ym), value: contractedFor(ym) + bookedSched(ym, ["potential"]), projected: true })
-    }
+    for (let i = range - 1; i >= 0; i--) { const ym = ymAdd(nowYM, -i); pts.push({ label: ymLabel(ym), value: bookedSched(ym, include) }) }
+    for (let j = 1; j <= 6; j++) { const ym = ymAdd(nowYM, j); pts.push({ label: ymLabel(ym), value: bookedSched(ym, include), projected: true }) }
     return pts
+  }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCard, contracts, range, nowYM])
-
-  // Third funnel line: contracted + qualified + opportunity (contractMRR card only)
-  const chartPoints4: ChartPoint[] | undefined = useMemo(() => {
-    if (selectedCard !== "contractMRR") return undefined
-    const withOpp = (ym: string) => contractedFor(ym) + bookedSched(ym, ["potential"]) + bookedSched(ym, ["opportunity"])
-    const pts: ChartPoint[] = []
-    for (let i = range - 1; i >= 0; i--) { const ym = ymAdd(nowYM, -i); pts.push({ label: ymLabel(ym), value: withOpp(ym) }) }
-    for (let j = 1; j <= 6; j++) { const ym = ymAdd(nowYM, j); pts.push({ label: ymLabel(ym), value: withOpp(ym), projected: true }) }
-    return pts
+  const chartPoints5 = useMemo(() => tierLine("verbal"), [selectedCard, contracts, payments, range, nowYM, tiers])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCard, contracts, range, nowYM])
+  const chartPoints2 = useMemo(() => tierLine("qualified"), [selectedCard, contracts, payments, range, nowYM, tiers])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const chartPoints4 = useMemo(() => tierLine("opportunity"), [selectedCard, contracts, payments, range, nowYM, tiers])
 
   // New vs churned MRR flow bars
   const flowBars: FlowBars | undefined = useMemo(() => {
@@ -504,17 +510,9 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
   const stays = useMemo(() => churnedStayMonths(accountRows), [accountRows])
   const shortStays = stays.filter(m => m <= 3).length
 
-  // Avg Client Lifetime Value: ACMV ÷ monthly churn (= ACMV × avg stay). Until there's
-  // churn data to divide by, fall back to the average retainer length so far.
-  function monthsBetween(a: string, b: string) {
-    const [ay, am] = a.split("-").map(Number)
-    const [by, bm] = b.split("-").map(Number)
-    return Math.max(1, (by - ay) * 12 + (bm - am) + 1)
-  }
-  const billableContracts = contracts.filter(c => c.type !== "oneoff")
-  const avgDurationMonths = churnStats.avgStay ?? (billableContracts.length
-    ? billableContracts.reduce((s, c) => s + monthsBetween(c.start, c.contractedThrough ?? nowYM), 0) / billableContracts.length
-    : 0)
+  // Avg Client Lifetime Value: ACMV × avg stay (churn-derived, else the average
+  // retainer length so far — the same number the pipeline values ongoing deals with).
+  const avgDurationMonths = avgStayMonths(churnStats, accountRows, nowYM)
   const acltv = acmv * avgDurationMonths
 
   const totalActiveHours = activeContracts.reduce((s, c) => s + (c.hoursPerMonth ?? 0), 0)
@@ -716,18 +714,34 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
       {/* Chart — full width, at top */}
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 24, marginBottom: 24 }}>
         <MetricChart
-          points={chartPoints}
+          points={selectedCard === "contractMRR" && !tiers.contracted ? [] : chartPoints}
           series2={chartPoints2}
-          series2Label="With Qualified"
           series3={cashCollectedPoints}
-          series3Label="Cash Collected"
           series4={chartPoints4}
-          series4Label="With Opportunity"
+          series5={chartPoints5}
           format={selectedCard === "contractMRR" ? "currency" : (CARDS.find(c => c.key === selectedCard)?.fmt ?? "currency")}
           label={selectedCard === "contractMRR" ? "Contracted MRR" : rawMetrics.length === 0 && contractRows.length > 0 ? "Contract MRR" : (CARDS.find(c => c.key === selectedCard)?.label ?? "")}
           flowBars={flowBars}
         />
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          {selectedCard === "contractMRR" && ([
+            { key: "contracted" as const, label: "Contracted", bg: "#FFF5F2", border: "#E9532A", fg: "#C2410C" },
+            { key: "verbal" as const, label: "Verbal", bg: "#FFFBEB", border: "#D97706", fg: "#B45309" },
+            { key: "qualified" as const, label: "Qualified", bg: "#EFF6FF", border: "#2563EB", fg: "#1D4ED8" },
+            { key: "opportunity" as const, label: "Opportunity", bg: "#F5F3FF", border: "#8B5CF6", fg: "#6D28D9" },
+          ]).map(t => (
+            <button key={t.key}
+              onClick={() => setTiers(prev => ({ ...prev, [t.key]: !prev[t.key] }))}
+              style={{
+                padding: "4px 12px", fontSize: 11, fontWeight: 600, borderRadius: 20, cursor: "pointer", border: "1px solid",
+                background: tiers[t.key] ? t.bg : "transparent",
+                borderColor: tiers[t.key] ? t.border : "#ECE7DE",
+                color: tiers[t.key] ? t.fg : "#9C9590",
+              }}
+            >
+              {tiers[t.key] ? `● ${t.label}` : `○ ${t.label}`}
+            </button>
+          ))}
           <button
             onClick={() => setShowCashCollected(v => !v)}
             style={{

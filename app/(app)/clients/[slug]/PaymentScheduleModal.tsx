@@ -18,6 +18,8 @@ interface Props {
   deliveryStart?: string | null  // one-off: work window, seeds hour rows
   deliveryEnd?: string | null
   onClose: () => void
+  /** The saved payment rows, so the caller can update its own copy without a reload. */
+  onSaved?: (payments: { month: string; amount: number }[]) => void
 }
 
 function ymAdd(ym: string, n: number): string {
@@ -36,7 +38,7 @@ const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n }
 const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi)
 const r1 = (n: number) => Math.round(n * 10) / 10
 
-export default function PaymentScheduleModal({ contractId, projectName, mode = "oneoff", total, hoursPerMonth = 0, startMonth, endMonth, deliveryStart, deliveryEnd, onClose }: Props) {
+export default function PaymentScheduleModal({ contractId, projectName, mode = "oneoff", total, hoursPerMonth = 0, startMonth, endMonth, deliveryStart, deliveryEnd, onClose, onSaved }: Props) {
   const isRetainer = mode === "retainer"
   const router = useRouter()
   const fmt$ = useFmtCurrency()
@@ -136,6 +138,7 @@ export default function PaymentScheduleModal({ contractId, projectName, mode = "
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ months: valid.map(r => ({ month: r.month, hours: num(r.hours) })) }),
       })
+      onSaved?.(payRows.map(r => ({ month: r.month, amount: num(r.amount) })))
       router.refresh()
       onClose()
     } finally { setSaving(false) }

@@ -164,6 +164,35 @@ export function trailingChurn(
   return { months: past.length, churned, activeMonths, rate, avgStay: rate ? 1 / rate : null }
 }
 
+// ── Average client stay & total contract value ────────────────────────────────
+// One number for "how long does a client stay", shared by the LTV card and the
+// pipeline: churn-derived when there's churn data, else the average retainer
+// length so far, else a flat default.
+export const DEFAULT_AVG_STAY_MONTHS = 7
+
+export function avgStayMonths(churnStats: ChurnStats, contracts: ContractRow[], nowYM: string): number {
+  if (churnStats.avgStay) return churnStats.avgStay
+  const retainers = contracts.filter(c => c.type !== "oneoff")
+  if (retainers.length === 0) return DEFAULT_AVG_STAY_MONTHS
+  return retainers.reduce((s, c) => s + Math.max(1, ymDiff(c.start, c.contractedThrough ?? nowYM) + 1), 0) / retainers.length
+}
+
+// Whole-deal value. A payment schedule, when one is set, is the answer — the term
+// dates are delivery months and a retainer can bill on fewer of them. Otherwise a
+// one-off's `monthly` is already its total; a dated retainer is monthly × its term
+// (inclusive of both end months); an ongoing retainer is monthly × the average
+// stay, flat — an estimate, not a contracted figure.
+export function contractValue(
+  c: { monthly: number; type?: string; start: string; contractedThrough: string | null },
+  avgStay: number,
+  payments: { amount: number }[] = [],
+): number {
+  if (payments.length) return payments.reduce((s, p) => s + p.amount, 0)
+  if (c.type === "oneoff") return c.monthly
+  if (c.contractedThrough) return c.monthly * Math.max(1, ymDiff(c.start, c.contractedThrough) + 1)
+  return c.monthly * avgStay
+}
+
 export interface AccountContractRow extends ContractRow {
   id: string
   accountId?: string | null

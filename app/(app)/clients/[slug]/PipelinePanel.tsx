@@ -1,8 +1,8 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import PaymentScheduleModal from "./PaymentScheduleModal"
 import ConfirmDialog from "./ConfirmDialog"
-import { ymLabel } from "@/lib/calc"
+import { ymLabel, contractValue } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 
 interface Contract {
@@ -31,6 +31,8 @@ interface Contract {
 interface Account { id: string; name: string }
 interface Person { id: string; name: string; isExternal: boolean }
 interface Product { id: string; name: string; type: string; monthly: number }
+interface Payment { contractId: string; month: string; amount: number }
+type PaymentsByContract = Map<string, Payment[]>
 
 interface Props {
   clientId: string
@@ -41,6 +43,11 @@ interface Props {
   onAccountCreated?: (account: Account) => void
   noteCounts?: Record<string, number>
   products?: Product[]
+  /** Months an average client stays — values ongoing retainers on the board. */
+  avgStayMonths: number
+  /** Payment schedules; a deal with one is valued by it rather than by its term. */
+  payments?: Payment[]
+  onPaymentsChange?: (payments: Payment[]) => void
 }
 
 function AccountPicker({ accounts, value, onChange, clientId, onAccountCreated }: {
@@ -372,9 +379,10 @@ interface DealCardProps {
   secondaryLabel?: string
   onSecondary?: (id: string) => void
   product?: string
+  dealValue: (c: Contract) => number
 }
 
-function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCount = 0, onNoteCountChange, secondaryLabel, onSecondary, product }: DealCardProps) {
+function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCount = 0, onNoteCountChange, secondaryLabel, onSecondary, product, dealValue }: DealCardProps) {
   const accountName = deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name : null
   const daysSinceCall = daysSince(deal.callDate)
 
@@ -403,8 +411,15 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, o
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexShrink: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>
-            {fmt$(deal.monthly)}{deal.type !== "oneoff" && <span style={{ fontSize: 11, fontWeight: 400, color: "#9C9590" }}>/mo</span>}
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>
+              {fmt$(deal.monthly)}{deal.type !== "oneoff" && <span style={{ fontSize: 11, fontWeight: 400, color: "#9C9590" }}>/mo</span>}
+            </div>
+            {deal.type !== "oneoff" && (
+              <div style={{ fontSize: 10, color: "#9C9590", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                {fmt$(dealValue(deal))} {deal.contractedThrough ? "total" : "est."}
+              </div>
+            )}
           </div>
           <button
             onClick={() => onEdit(deal)}
@@ -473,9 +488,10 @@ interface DealGroupProps {
   secondaryLabel?: string
   onSecondary?: (id: string) => void
   products?: Product[]
+  dealValue: (c: Contract) => number
 }
 
-function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCounts, onNoteCountChange, secondaryLabel, onSecondary, products }: DealGroupProps) {
+function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCounts, onNoteCountChange, secondaryLabel, onSecondary, products, dealValue }: DealGroupProps) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -488,6 +504,7 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
           <DealCard
             key={deal.id}
             deal={deal}
+            dealValue={dealValue}
             accounts={accounts}
             advanceLabel={advanceLabel}
             onAdvance={onAdvance}
@@ -543,8 +560,9 @@ function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage
   )
 }
 
-function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage }: {
+function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage, dealValue }: {
   col: typeof STAGE_COLS[number]
+  dealValue: (c: Contract) => number
   deals: Contract[]
   accounts: Account[]
   products: Product[]
@@ -564,7 +582,7 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
   }
   const shown = bounded ? deals.filter(isRecent) : deals
   const hidden = deals.length - shown.length
-  const sum = deals.reduce((t, c) => t + c.monthly, 0)
+  const sum = deals.reduce((t, c) => t + dealValue(c), 0)
   return (
     <div
       onDragOver={e => { e.preventDefault(); if (!over) setOver(true) }}
@@ -591,8 +609,9 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
   )
 }
 
-function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage }: {
+function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, onSetStage, dealValue }: {
   deals: Contract[]
+  dealValue: (c: Contract) => number
   accounts: Account[]
   products: Product[]
   noteCounts: Record<string, number>
@@ -604,7 +623,7 @@ function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, on
     <div>
       <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, alignItems: "stretch" }}>
         {STAGE_COLS.map(col => (
-          <BoardColumn key={col.stage} col={col} products={products}
+          <BoardColumn key={col.stage} col={col} products={products} dealValue={dealValue}
             deals={deals.filter(d => stageOf(d) === col.stage).sort((a, b) => {
               const key = (d: Contract) => col.stage === "opportunity" ? (d.createdAt ?? "") : (d.stageEnteredAt ?? d.createdAt ?? "")
               return key(b).localeCompare(key(a))
@@ -617,7 +636,13 @@ function PipelineBoard({ deals, accounts, products, noteCounts, fmt$, onEdit, on
   )
 }
 
-export default function PipelinePanel({ clientId, contracts, accounts: initialAccounts, people = [], onContractsChange, onAccountCreated, noteCounts = {}, products = [] }: Props) {
+export default function PipelinePanel({ clientId, contracts, accounts: initialAccounts, people = [], onContractsChange, onAccountCreated, noteCounts = {}, products = [], avgStayMonths, payments = [], onPaymentsChange }: Props) {
+  const paysByContract = useMemo<PaymentsByContract>(() => {
+    const m: PaymentsByContract = new Map()
+    for (const p of payments) { const a = m.get(p.contractId); if (a) a.push(p); else m.set(p.contractId, [p]) }
+    return m
+  }, [payments])
+  const dealValue = (c: Contract) => contractValue(c, avgStayMonths, paysByContract.get(c.id))
   const [liveCounts, setLiveCounts] = useState<Record<string, number>>(noteCounts)
   const handleNoteCountChange = (id: string, n: number) => setLiveCounts(prev => ({ ...prev, [id]: n }))
   const teamMembers = people.filter(p => !p.isExternal)
@@ -831,7 +856,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           </h2>
           <div style={{ fontSize: 13, color: "#9C9590", marginTop: 2 }}>
             {pipeline.length} open deal{pipeline.length !== 1 ? "s" : ""}
-            {pipeline.length > 0 && ` · ${fmt$(pipeline.reduce((s, c) => s + c.monthly, 0))}/mo potential`}
+            {pipeline.length > 0 && ` · ${fmt$(pipeline.reduce((s, c) => s + dealValue(c), 0))} potential`}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -851,7 +876,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       </div>
 
       {view === "board" ? (
-        <PipelineBoard
+        <PipelineBoard dealValue={dealValue}
           deals={contracts}
           accounts={localAccounts}
           products={products}
@@ -866,7 +891,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
       {/* Left: Open Pipeline */}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-        <DealGroup
+        <DealGroup dealValue={dealValue}
           products={products}
           title="Opportunity"
           subtitle="Initial contact made"
@@ -882,7 +907,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           fmt$={fmt$}
         />
 
-        <DealGroup
+        <DealGroup dealValue={dealValue}
           products={products}
           title="Qualified"
           subtitle="In negotiation"
@@ -901,7 +926,7 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           fmt$={fmt$}
         />
 
-        <DealGroup
+        <DealGroup dealValue={dealValue}
           products={products}
           title="Verbal"
           subtitle="Verbal yes — not signed or paid"
@@ -1188,6 +1213,12 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
                   </div>
                 )}
               </div>
+              {editForm.type === "retainer" && (
+                <button type="button" onClick={openScheduleForEdit}
+                  style={{ padding: "8px 12px", background: "#fff", border: "1px solid #E9532A", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "#E9532A", cursor: "pointer", alignSelf: "flex-start" }}>
+                  Payment plan &amp; hours →
+                </button>
+              )}
               {editForm.type === "oneoff" && (
                 <div style={{ border: "1px solid #ECE7DE", borderRadius: 8, padding: 12, background: "#FBFAF7", display: "flex", flexDirection: "column", gap: 10 }}>
                   <div style={{ ...labelStyle, marginBottom: 0 }}>Delivery window <span style={{ color: "#C0BAB2", fontWeight: 400 }}>(work span — cash is separate)</span></div>
@@ -1286,6 +1317,10 @@ export default function PipelinePanel({ clientId, contracts, accounts: initialAc
           deliveryStart={scheduleDeal.deliveryStart ?? null}
           deliveryEnd={scheduleDeal.deliveryEnd ?? null}
           onClose={() => setScheduleDeal(null)}
+          onSaved={rows => onPaymentsChange?.([
+            ...payments.filter(p => p.contractId !== scheduleDeal.id),
+            ...rows.map(r => ({ contractId: scheduleDeal.id, ...r })),
+          ])}
         />
       )}
     </div>
