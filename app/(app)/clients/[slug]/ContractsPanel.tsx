@@ -57,6 +57,8 @@ interface Props {
   minHourlyRate?: number | null
   onContractsChange?: (contracts: Contract[]) => void
   onAccountCreated?: (account: Account) => void
+  /** A saved payment plan, so the client page can refresh its own payment rows. */
+  onPaymentsSaved?: (contractId: string, rows: { month: string; amount: number }[]) => void
   // Owned by the client page so the switcher can sit above this card, matching the
   // Reconciliation tab's layout.
   view?: "list" | "timeline" | "yield"
@@ -379,7 +381,7 @@ function DuplicateModal({ contract, clientId, accounts, onClose, onSave, onAccou
   )
 }
 
-function EditModal({ contract, clientId, accounts, products, people = [], onClose, onSave, onAccountCreated }: { contract: Contract; clientId: string; accounts?: Account[]; products?: Product[]; people?: Person[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void }) {
+function EditModal({ contract, clientId, accounts, products, people = [], onClose, onSave, onAccountCreated, onSchedule }: { contract: Contract; clientId: string; accounts?: Account[]; products?: Product[]; people?: Person[]; onClose: () => void; onSave: (c: Contract) => void; onAccountCreated: (a: Account) => void; onSchedule: (c: Contract) => void }) {
   const uiType: ContractTypeField = !contract.contractedThrough && contract.type === "retainer" ? "ongoing" : (contract.type as ContractTypeField) ?? "retainer"
   const teamMembers = people.filter(p => !p.isExternal)
   const [form, setForm] = useState<EditForm>({
@@ -401,6 +403,21 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    if (await persist()) onClose()
+  }
+
+  // Opens the payment plan on the saved project, so the schedule's months follow
+  // the dates and amount on screen rather than the ones last written.
+  async function openSchedule() {
+    // The button sits outside the form's own validation, so check what the
+    // PATCH would otherwise blank out.
+    if (!form.name.trim() || !form.start) { setError("Name and start month are needed first"); return }
+    const updated = await persist()
+    if (updated) onSchedule(updated)
+  }
+
+  /** PATCHes the form and hands back the saved project, or null if it failed. */
+  async function persist(): Promise<Contract | null> {
     setSaving(true)
     setError(null)
     const isOngoing = form.type === "ongoing"
@@ -408,7 +425,7 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
     if (isOngoing && form.status === "finished" && !form.contractedThrough) {
       setSaving(false)
       setError("Enter the month this retainer ended")
-      return
+      return null
     }
     const payload = {
       ...form,
@@ -428,10 +445,11 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
       body: JSON.stringify(payload),
     })
     setSaving(false)
-    if (!res.ok) { setError("Failed to save"); return }
-    const updated = await res.json()
-    onSave({ ...updated, accountId: form.accountId, ownerId: form.ownerId, productId: form.productId })
-    onClose()
+    if (!res.ok) { setError("Failed to save"); return null }
+    const saved = await res.json()
+    const updated: Contract = { ...saved, accountId: form.accountId, ownerId: form.ownerId, productId: form.productId }
+    onSave(updated)
+    return updated
   }
 
   return (
@@ -540,6 +558,10 @@ function EditModal({ contract, clientId, accounts, products, people = [], onClos
               )}
             </div>
           )}
+          <button type="button" onClick={openSchedule} disabled={saving}
+            style={{ padding: "8px 12px", background: "#fff", border: "1px solid #E9532A", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "#E9532A", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1, alignSelf: "flex-start" }}>
+            Payment plan &amp; hours →
+          </button>
           {error && <div style={{ fontSize: 13, color: "#C2410C" }}>{error}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
             <button type="button" onClick={onClose}
@@ -569,7 +591,7 @@ const contractsResponsiveStyle = `
   }
 `
 
-export default function ContractsPanel({ clientId, clientSlug, initialContracts, accounts: accountsProp, products, people = [], pulses = [], onPulseChange, minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp, view = "list" }: Props) {
+export default function ContractsPanel({ clientId, clientSlug, initialContracts, accounts: accountsProp, products, people = [], pulses = [], onPulseChange, minHourlyRate: minHourlyRateProp, onContractsChange, onAccountCreated: onAccountCreatedProp, onPaymentsSaved, view = "list" }: Props) {
   const fmtCurrency = useFmtCurrency()
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accountsProp ?? [])
@@ -686,10 +708,10 @@ export default function ContractsPanel({ clientId, clientSlug, initialContracts,
         onCancel={() => setDeletingId(null)}
       />
       {editingContract && (
-        <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} products={products} people={people} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} />
+        <EditModal contract={editingContract} clientId={clientId} accounts={localAccounts} products={products} people={people} onClose={() => setEditingContract(null)} onSave={handleEdited} onAccountCreated={handleAccountCreated} onSchedule={setSchedulingContract} />
       )}
       {schedulingContract && (
-        <PaymentScheduleModal contractId={schedulingContract.id} projectName={schedulingContract.name} mode={schedulingContract.type === "oneoff" ? "oneoff" : "retainer"} total={schedulingContract.monthly} hoursPerMonth={schedulingContract.hoursPerMonth} startMonth={schedulingContract.start} endMonth={schedulingContract.contractedThrough} deliveryStart={schedulingContract.deliveryStart ?? null} deliveryEnd={schedulingContract.deliveryEnd ?? null} onClose={() => setSchedulingContract(null)} />
+        <PaymentScheduleModal contractId={schedulingContract.id} projectName={schedulingContract.name} mode={schedulingContract.type === "oneoff" ? "oneoff" : "retainer"} total={schedulingContract.monthly} hoursPerMonth={schedulingContract.hoursPerMonth} startMonth={schedulingContract.start} endMonth={schedulingContract.contractedThrough} deliveryStart={schedulingContract.deliveryStart ?? null} deliveryEnd={schedulingContract.deliveryEnd ?? null} onClose={() => setSchedulingContract(null)} onSaved={rows => onPaymentsSaved?.(schedulingContract.id, rows)} />
       )}
       {duplicatingContract && (
         <DuplicateModal contract={duplicatingContract} clientId={clientId} accounts={localAccounts} onClose={() => setDuplicatingContract(null)} onSave={handleDuplicated} onAccountCreated={handleAccountCreated} />

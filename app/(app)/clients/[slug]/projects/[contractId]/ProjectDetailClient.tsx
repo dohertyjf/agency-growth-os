@@ -1,6 +1,7 @@
 "use client"
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { ymLabel } from "@/lib/calc"
 import { useFmtCurrency } from "@/lib/CurrencyContext"
 import {
@@ -49,6 +50,16 @@ const btnGhost: React.CSSProperties = { padding: "7px 10px", background: "none",
 const btnOutline: React.CSSProperties = { background: "none", border: "1px solid #E9532A", borderRadius: 4, fontSize: 11, color: "#E9532A", cursor: "pointer", padding: "3px 10px", fontWeight: 600 }
 
 const STATUS_LABEL: Record<string, string> = { active: "Active", finished: "Finished", potential: "Qualified", opportunity: "Opportunity", lost: "Lost" }
+// Same palette as the Projects list, so a project reads the same in both places.
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  opportunity: { bg: "#EFF6FF", text: "#1D4ED8" },
+  potential: { bg: "#FFF7ED", text: "#92400E" },
+  active: { bg: "#DCFCE7", text: "#166534" },
+  lost: { bg: "#FEF2F2", text: "#991B1B" },
+  finished: { bg: "#F3F4F6", text: "#6B7280" },
+}
+// Pipeline order, matching the Projects list's Edit modal.
+const STATUS_ORDER = ["opportunity", "potential", "active", "lost", "finished"]
 const TYPE_LABEL: Record<string, string> = { retainer: "Retainer", ongoing: "Ongoing", oneoff: "One-off" }
 
 // Click-to-edit numeric cell. Blank / 0 clears the value.
@@ -97,20 +108,27 @@ function marginColor(p: number | null) { return p == null ? "#9C9590" : p < 0 ? 
 
 export default function ProjectDetailClient(props: Props) {
   const fmt = useFmtCurrency()
+  const router = useRouter()
   const { clientSlug, clientName, account, people, products } = props
-  // Service and owner are editable in the header; everything else routes back
-  // through the Projects list's Edit modal.
+  // Status, service and owner are editable in the header; everything else routes
+  // back through the Projects list's Edit modal.
   const [contract, setContract] = useState(props.contract)
-  type Patch = { productId?: string | null; ownerId?: string | null; start?: string; contractedThrough?: string | null; deliveryStart?: string | null; deliveryEnd?: string | null }
+  type Patch = { status?: string; productId?: string | null; ownerId?: string | null; start?: string; contractedThrough?: string | null; deliveryStart?: string | null; deliveryEnd?: string | null }
   const [savingField, setSavingField] = useState<keyof Patch | null>(null)
-  const [dateError, setDateError] = useState<string | null>(null)
+  // Which field the last failed save came from, so the reason shows where it happened.
+  const [saveError, setSaveError] = useState<{ field: keyof Patch; msg: string } | null>(null)
   async function patchContract(patch: Patch) {
     const key = Object.keys(patch)[0] as keyof Patch
     setSavingField(key)
-    setDateError(null)
+    setSaveError(null)
     const res = await fetch(`/api/contracts/${contract.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) })
-    if (res.ok) setContract(prev => ({ ...prev, ...patch }))
-    else setDateError((await res.json().catch(() => null))?.error ?? "Couldn't save")
+    if (res.ok) {
+      setContract(prev => ({ ...prev, ...patch }))
+      // Status files the project under a different section everywhere else, so
+      // let the server views re-read it rather than go stale behind this page.
+      if (key === "status") router.refresh()
+    }
+    else setSaveError({ field: key, msg: (await res.json().catch(() => null))?.error ?? "Couldn't save" })
     setSavingField(null)
   }
   // Delivery dates: retainers edit start / contracted-through; one-offs edit their
@@ -122,6 +140,9 @@ export default function ProjectDetailClient(props: Props) {
   const dateEndVal = isOneoff ? (contract.deliveryEnd || contract.contractedThrough || "") : (contract.contractedThrough ?? "")
   const isOngoing = !isOneoff && contract.contractedThrough === null
   const monthInput: React.CSSProperties = { ...input, width: 130, padding: "5px 8px", fontSize: 13 }
+  const dateError = saveError && (saveError.field === dateStartKey || saveError.field === dateEndKey) ? saveError.msg : null
+  const statusError = saveError?.field === "status" ? saveError.msg : null
+  const statusColors = STATUS_COLORS[contract.status] ?? STATUS_COLORS.finished
 
   const [members, setMembers] = useState<Member[]>(props.members)
   const [memberHours, setMemberHours] = useState(props.memberHours)
@@ -309,8 +330,15 @@ export default function ProjectDetailClient(props: Props) {
             <span style={{ color: "#C0BAB2" }}>·</span>
             <span>{TYPE_LABEL[contract.type] ?? contract.type}</span>
             <span style={{ color: "#C0BAB2" }}>·</span>
-            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: contract.status === "active" ? "#E8F5EE" : "#F5F1EC", color: contract.status === "active" ? "#15803D" : "#6B6760" }}>{STATUS_LABEL[contract.status] ?? contract.status}</span>
+            <span style={{ position: "relative", display: "inline-flex", alignItems: "center", opacity: savingField === "status" ? 0.6 : 1 }}>
+              <select value={contract.status} onChange={e => patchContract({ status: e.target.value })} title="Change status"
+                style={{ appearance: "none", WebkitAppearance: "none", fontFamily: "inherit", fontSize: 11, fontWeight: 700, padding: "3px 22px 3px 9px", borderRadius: 20, border: "none", background: statusColors.bg, color: statusColors.text, cursor: "pointer", outline: "none" }}>
+                {STATUS_ORDER.map(v => <option key={v} value={v}>{STATUS_LABEL[v]}</option>)}
+              </select>
+              <span aria-hidden style={{ position: "absolute", right: 8, fontSize: 9, color: statusColors.text, pointerEvents: "none" }}>▾</span>
+            </span>
           </div>
+          {statusError && <div style={{ fontSize: 11, color: "#B23A1B", marginTop: 6 }}>{statusError} — set it in the Delivery field.</div>}
         </div>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div>

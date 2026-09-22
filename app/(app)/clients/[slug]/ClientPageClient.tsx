@@ -476,6 +476,10 @@ export default function ClientPageClient({
           minHourlyRate={goal?.minHourlyRate ?? null}
           onContractsChange={updated => setContracts(updated)}
           onAccountCreated={account => setAccounts(prev => [...prev, account].sort((a, b) => a.name.localeCompare(b.name)))}
+          onPaymentsSaved={(contractId, rows) => setPayments(prev => [
+            ...prev.filter(p => p.contractId !== contractId),
+            ...rows.map(r => ({ contractId, ...r })),
+          ])}
         />
           )}
         </div>
