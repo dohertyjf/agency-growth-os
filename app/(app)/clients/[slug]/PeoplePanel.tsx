@@ -105,6 +105,10 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 11, color: "#9C9590", fontWeight: 600, display: "block", marginBottom: 4 }
 
+function EmploymentLine({ isFullTime }: { isFullTime: boolean }) {
+  return <div style={{ fontSize: 11, fontWeight: 600, color: isFullTime ? "#6B6760" : "#B45309", marginTop: 2 }}>{isFullTime ? "Full-time" : "Part-time"}</div>
+}
+
 function CoreRoleChip({ role }: { role: string }) {
   const colors = CORE_ROLE_COLORS[role as CoreRole] ?? { bg: "#F3F4F6", text: "#374151" }
   return (
@@ -398,6 +402,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                           <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1916" }}>{p.name}</span>
                           {hasDateInfo && <StatusBadge status={status} />}
                         </div>
+                        <EmploymentLine isFullTime={p.isFullTime} />
                         {p.role && <div style={{ fontSize: 12, color: "#6B6760", marginTop: 2 }}>{p.role}</div>}
                         {(p.startDate || p.endDate) && (
                           <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
@@ -444,6 +449,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                             <span style={{ fontSize: 13, color: "#1A1916", fontWeight: 600 }}>{p.name}</span>
                             {hasDateInfo && <StatusBadge status={status} />}
                           </div>
+                          <EmploymentLine isFullTime={p.isFullTime} />
                           {(p.startDate || p.endDate) && (
                             <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>
                               {p.startDate ? fmtDate(p.startDate) : "?"} – {p.endDate ? fmtDate(p.endDate) : "present"}
