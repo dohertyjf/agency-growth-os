@@ -1079,6 +1079,11 @@ function HoursCell({ value, onSave }: { value: number | null; onSave: (v: number
   )
 }
 
+function QualifiedTag() {
+  const { bg, text } = STATUS_COLORS.potential
+  return <span title="Qualified pipeline — projected, not signed" style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, fontStyle: "normal", color: text, background: bg, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.03em" }}>{STATUS_LABELS.potential}</span>
+}
+
 function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }: {
   contracts: Contract[]
   accounts: Account[]
@@ -1090,21 +1095,27 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }:
   const nameFor = (c: Contract) => c.accountId ? accounts.find(a => a.id === c.accountId)?.name ?? null : null
   const hasMin = minHourlyRate != null && minHourlyRate > 0
 
-  const retainers = contracts
-    .filter(c => c.status === "active" && c.type !== "oneoff")
-    .map(c => ({ c, accountName: nameFor(c), perHr: c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null }))
-    .sort((a, b) => (b.perHr ?? -1) - (a.perHr ?? -1))
+  // Signed (Active) work plus the Qualified pipeline, so the view shows where yield is
+  // heading, not only where it stands. Qualified rows sit below the active ones and are
+  // tagged; Opportunity stays out — too speculative to plan hours against.
+  const shown = (c: Contract) => c.status === "active" || c.status === "potential"
+  const toYieldRow = (c: Contract) => ({ c, accountName: nameFor(c), qualified: c.status === "potential", perHr: c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null })
+  type YieldRow = ReturnType<typeof toYieldRow>
+  const byYield = (a: YieldRow, b: YieldRow) => Number(a.qualified) - Number(b.qualified) || (b.perHr ?? -1) - (a.perHr ?? -1)
 
-  // Active only, same as the retainers above. Finished work belongs in the List tab's
-  // "Past" section, not in a table headed "no active projects to measure yet".
-  const oneoffs = contracts
-    .filter(c => c.type === "oneoff" && c.status === "active")
-    .map(c => ({ c, accountName: nameFor(c), perHr: c.hoursPerMonth > 0 ? c.monthly / c.hoursPerMonth : null }))
-    .sort((a, b) => (b.perHr ?? -1) - (a.perHr ?? -1))
+  const retainers = contracts.filter(c => shown(c) && c.type !== "oneoff").map(toYieldRow).sort(byYield)
 
-  const totalMonthly = retainers.reduce((s, r) => s + (r.perHr != null ? r.c.monthly : 0), 0)
-  const totalHours = retainers.reduce((s, r) => s + (r.perHr != null ? r.c.hoursPerMonth : 0), 0)
-  const blended = totalHours > 0 ? totalMonthly / totalHours : null
+  // Finished work belongs in the List tab's "Past" section, not here.
+  const oneoffs = contracts.filter(c => shown(c) && c.type === "oneoff").map(toYieldRow).sort(byYield)
+
+  // Blended = signed retainers only. Projected = the same plus Qualified, shown when it differs.
+  const blendOf = (rs: YieldRow[]) => {
+    const priced = rs.filter(r => r.perHr != null)
+    const hrs = priced.reduce((s, r) => s + r.c.hoursPerMonth, 0)
+    return hrs > 0 ? priced.reduce((s, r) => s + r.c.monthly, 0) / hrs : null
+  }
+  const blended = blendOf(retainers.filter(r => !r.qualified))
+  const projected = retainers.some(r => r.qualified && r.perHr != null) ? blendOf(retainers) : null
 
   function RatePerHr({ v }: { v: number | null }) {
     if (v == null) return <span style={{ color: "#C4BFB8", fontWeight: 700 }}>—</span>
@@ -1118,7 +1129,7 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }:
   }
 
   if (retainers.length === 0 && oneoffs.length === 0) {
-    return <div style={{ fontSize: 12, color: "#9C9590", padding: "8px 0" }}>No active projects to measure yet.</div>
+    return <div style={{ fontSize: 12, color: "#9C9590", padding: "8px 0" }}>No active or qualified projects to measure yet.</div>
   }
 
   const th: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#9C9590", padding: "6px 10px", borderBottom: "1px solid #ECE7DE", whiteSpace: "nowrap" }
@@ -1129,7 +1140,8 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }:
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 12, flexWrap: "wrap" }}>
         <div style={{ fontSize: 12, color: "#9C9590" }}>Click hrs to set your real numbers · {hasMin ? "▲ above / ▼ below your minimum" : "set a minimum $/hr in Settings to flag projects"}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          {blended != null && <div style={{ fontSize: 12, color: "#6B6760" }}>Blended <strong style={{ color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(blended)}/hr</strong></div>}
+          {blended != null && <div style={{ fontSize: 12, color: "#6B6760" }} title="Active retainers">Blended <strong style={{ color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(blended)}/hr</strong></div>}
+          {projected != null && <div style={{ fontSize: 12, color: "#6B6760" }} title="Active + Qualified retainers">Projected <strong style={{ color: "#92400E", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(projected)}/hr</strong></div>}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }} title="Set in Settings">
             <span style={{ fontSize: 11, color: "#9C9590", fontWeight: 600, whiteSpace: "nowrap" }}>Min $/hr</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: hasMin ? "#1A1916" : "#C4BFB8", fontVariantNumeric: "tabular-nums" }}>
@@ -1152,9 +1164,9 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }:
                 </tr>
               </thead>
               <tbody>
-                {retainers.map(({ c, accountName, perHr }) => (
-                  <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC" }}>
-                    <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}</td>
+                {retainers.map(({ c, accountName, qualified, perHr }) => (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC", fontStyle: qualified ? "italic" : undefined }}>
+                    <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}{qualified && <QualifiedTag />}</td>
                     <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(c.monthly)}</td>
                     <td style={{ padding: "4px 10px", textAlign: "right" }}>
@@ -1180,9 +1192,9 @@ function HourlyYieldTable({ contracts, accounts, minHourlyRate, onHoursChange }:
                 </tr>
               </thead>
               <tbody>
-                {oneoffs.map(({ c, accountName, perHr }) => (
-                  <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC" }}>
-                    <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}</td>
+                {oneoffs.map(({ c, accountName, qualified, perHr }) => (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #F5F1EC", fontStyle: qualified ? "italic" : undefined }}>
+                    <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", fontWeight: 500, whiteSpace: "nowrap" }}>{c.name}{qualified && <QualifiedTag />}</td>
                     <td style={{ padding: "8px 10px", fontSize: 12, color: accountName ? "#6B6760" : "#C2410C", whiteSpace: "nowrap" }}>{accountName ?? "Unassigned"}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13, color: "#1A1916", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(c.monthly)}</td>
                     <td style={{ padding: "4px 10px", textAlign: "right" }}>
