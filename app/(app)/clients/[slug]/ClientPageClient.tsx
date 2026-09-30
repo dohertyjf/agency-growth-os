@@ -17,6 +17,8 @@ import ProgramAssignPanel from "./ProgramAssignPanel"
 import PeoplePanel from "./PeoplePanel"
 import PipelinePanel from "./PipelinePanel"
 import CapacitySold from "./CapacitySold"
+import ProjectCapacity from "./ProjectCapacity"
+import type { DeliveryWeekRow } from "@/lib/capacityWeekly"
 import MonthlyChecklist from "./MonthlyChecklist"
 import WeeklyTracker, { type WeeklyRow } from "@/components/WeeklyTracker"
 import CallsClient from "../../calls/CallsClient"
@@ -188,6 +190,7 @@ interface Props {
   initialCostItems: CostItemRow[]
   initialCostMonths: CostMonthRow[]
   initialDeliveryMonths: ContractHours[]
+  initialDeliveryWeeks: DeliveryWeekRow[]
   initialPulses: Pulse[]
   goal: Goal | null
   initialCalls: Call[]
@@ -227,7 +230,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialCostItems, initialCostMonths, initialDeliveryMonths, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialCostItems, initialCostMonths, initialDeliveryMonths, initialDeliveryWeeks, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -238,8 +241,15 @@ export default function ClientPageClient({
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
   const [reconView, setReconView] = useState<"reconcile" | "projection" | "yield" | "capacity">("reconcile")
-  const [projectView, setProjectView] = useState<"list" | "timeline" | "yield" | "profit">("list")
+  const [projectView, setProjectView] = useState<"list" | "timeline" | "capacity" | "yield" | "profit">("list")
   const [pulses, setPulses] = useState<Pulse[]>(initialPulses)
+  // Hand-edited weekly hours live here so they survive switching Projects views.
+  const [deliveryWeeks, setDeliveryWeeks] = useState<DeliveryWeekRow[]>(initialDeliveryWeeks)
+  const handleDeliveryWeekChange = (contractId: string, week: string, hours: number | null) =>
+    setDeliveryWeeks(prev => [
+      ...prev.filter(d => !(d.contractId === contractId && d.week === week)),
+      ...(hours === null ? [] : [{ contractId, week, hours }]),
+    ])
   const handlePulseChange = (pulse: Pulse) => setPulses(prev => [...prev.filter(p => !(p.contractId === pulse.contractId && p.month === pulse.month)), pulse])
 
   const totalCapacityHours = people.reduce((s, p) => s + p.billableHours, 0)
@@ -441,14 +451,25 @@ export default function ClientPageClient({
       {currentTab === "projects" && (
         <div>
           <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 16 }}>
-            {([["list", "List"], ["timeline", "Timeline"], ["yield", "Hourly yield"], ["profit", "Profit"]] as const).map(([v, label]) => (
+            {([["list", "List"], ["timeline", "Timeline"], ["capacity", "Capacity"], ["yield", "Hourly yield"], ["profit", "Profit"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setProjectView(v)}
                 style={{ padding: "4px 14px", fontSize: 12, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: projectView === v ? "#fff" : "transparent", color: projectView === v ? "#1A1916" : "#9C9590", boxShadow: projectView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
                 {label}
               </button>
             ))}
           </div>
-          {projectView === "profit" ? (
+          {projectView === "capacity" ? (
+            <ProjectCapacity
+              contracts={contracts}
+              accounts={accounts}
+              deliveryMonths={initialDeliveryMonths}
+              deliveryWeeks={deliveryWeeks}
+              onDeliveryWeekChange={handleDeliveryWeekChange}
+              people={people}
+              capacityOverrides={hoursMonths}
+              clientSlug={clientSlug}
+            />
+          ) : projectView === "profit" ? (
             <ProfitByProject
               clientSlug={clientSlug}
               contracts={contracts}

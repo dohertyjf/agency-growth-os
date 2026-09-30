@@ -636,21 +636,14 @@ export interface CapacityContract {
 }
 export interface DeliveryRow { contractId: string; month: string; hours: number }
 
-// Planned delivery hours per month: committed (signed/active) and pipeline
-// (qualified/opportunity). Retainers spread hoursPerMonth over their term;
-// one-offs use their delivery-month rows, falling back to hoursPerMonth in the
-// delivery/payment month when none are set.
-export function capacityByMonth(
-  contracts: CapacityContract[],
-  deliveryMonths: DeliveryRow[],
-  months: string[],
-): { month: string; committed: number; pipeline: number }[] {
+/** `(contract, YYYY-MM) → planned delivery hours` — the one rule for how sold hours land on the calendar. */
+export function plannedHoursFn(deliveryMonths: DeliveryRow[]): (c: CapacityContract, m: string) => number {
   const byContract = new Map<string, Map<string, number>>()
   for (const d of deliveryMonths) {
     if (!byContract.has(d.contractId)) byContract.set(d.contractId, new Map())
     byContract.get(d.contractId)!.set(d.month, d.hours)
   }
-  const hoursFor = (c: CapacityContract, m: string): number => {
+  return (c, m) => {
     const hpm = c.hoursPerMonth ?? 0
     if (c.type === "oneoff") {
       const rows = byContract.get(c.id)
@@ -662,6 +655,18 @@ export function capacityByMonth(
     if (c.start <= m && (!end || m <= end)) return hpm
     return 0
   }
+}
+
+// Planned delivery hours per month: committed (signed/active) and pipeline
+// (qualified/opportunity). Retainers spread hoursPerMonth over their term;
+// one-offs use their delivery-month rows, falling back to hoursPerMonth in the
+// delivery/payment month when none are set.
+export function capacityByMonth(
+  contracts: CapacityContract[],
+  deliveryMonths: DeliveryRow[],
+  months: string[],
+): { month: string; committed: number; pipeline: number }[] {
+  const hoursFor = plannedHoursFn(deliveryMonths)
   return months.map(m => ({
     month: m,
     committed: contracts.filter(c => c.status === "active").reduce((s, c) => s + hoursFor(c, m), 0),

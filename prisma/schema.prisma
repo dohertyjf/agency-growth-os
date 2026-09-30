@@ -170,6 +170,7 @@ model Contract {
   payments          ContractPayment[]
   hoursMonths       ContractHoursMonth[]
   deliveryMonths    ContractDeliveryMonth[]
+  deliveryWeeks     ContractDeliveryWeek[]
   pulses            ContractPulse[]
   members           ProjectMember[]
   memberHours       ProjectMemberHoursMonth[]
@@ -353,6 +354,18 @@ model LeadGoalSubmission {
 }
 
 // Public "when does your agency cap out" calculator submissions (lead magnet).
+// Hand-set planned hours for one project in one week (Projects → Capacity).
+// Overrides the week's share of the monthly plan; no row = use the plan.
+model ContractDeliveryWeek {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  week       String   // YYYY-MM-DD, the Sunday starting the week
+  hours      Float
+
+  @@unique([contractId, week])
+}
+
 model CapacityLead {
   id             String   @id @default(cuid())
   email          String

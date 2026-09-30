@@ -84,6 +84,9 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
     prisma.projectCostItem.findMany({ where: { contract: { clientId: id } }, include: { months: true } }),
   ])
   const deliveryMonths = await prisma.contractDeliveryMonth.findMany({ where: { contract: { clientId: id } } })
+  // Tolerant of the table not existing yet, so a deploy that lands before the
+  // ContractDeliveryWeek DDL is applied still renders the page.
+  const deliveryWeeks = await prisma.contractDeliveryWeek.findMany({ where: { contract: { clientId: id } } }).catch(() => [])
   const contractPulses = await prisma.contractPulse.findMany({ where: { contract: { clientId: id } } })
   const noteCountRows = await prisma.contractNote.groupBy({ by: ["contractId"], where: { contract: { clientId: id } }, _count: { _all: true } })
   const noteCounts: Record<string, number> = {}
@@ -139,6 +142,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialCostItems={costItems.map(i => ({ id: i.id, contractId: i.contractId, name: i.name, category: i.category, reimbursed: i.reimbursed }))}
       initialCostMonths={costItems.flatMap(i => i.months.map(m => ({ costItemId: m.costItemId, month: m.month, amount: m.amount })))}
       initialDeliveryMonths={deliveryMonths.map(d => ({ contractId: d.contractId, month: d.month, hours: d.hours }))}
+      initialDeliveryWeeks={deliveryWeeks.map(d => ({ contractId: d.contractId, week: d.week, hours: d.hours }))}
       initialPulses={contractPulses.map(p => ({ contractId: p.contractId, month: p.month, score: p.score, note: p.note ?? null }))}
       initialNoteCounts={noteCounts}
       checklistMonth={nowYM}
