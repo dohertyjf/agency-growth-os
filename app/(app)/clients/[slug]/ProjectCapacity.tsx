@@ -1,17 +1,19 @@
 "use client"
 import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import type { DeliveryRow } from "@/lib/calc"
+import { ymLabel, type DeliveryRow } from "@/lib/calc"
 import { currentWeek } from "@/lib/weeks"
 import {
-  weeksFrom, projectHoursByWeek, teamCapacityByWeek, fteWeeklyHours, firstOver, stageOf,
+  weeksFrom, projectHoursByWeek, teamCapacityByWeek, fteWeeklyHours, firstOver, stageOf, forecastContract,
   type Stage, type CapacityPerson, type CapacityMonthOverride, type DeliveryWeekRow,
 } from "@/lib/capacityWeekly"
 
 interface Contract {
   id: string
   name: string
+  monthly: number
   hoursPerMonth: number
+  verbal?: boolean
   start: string
   contractedThrough: string | null
   status: string
@@ -29,7 +31,8 @@ const fmtH = (h: number) => h >= 9.95 ? String(Math.round(h)) : String(Math.roun
 
 const STAGE: Record<Stage, { label: string; color: string; text: string }> = {
   committed: { label: "Signed", color: "#E9532A", text: "#1A1916" },
-  qualified: { label: "Qualified", color: "#F5C4B4", text: "#92400E" },
+  verbal: { label: "Verbal", color: "#F2C07A", text: "#92400E" },
+  qualified: { label: "Qualified", color: "#F5C4B4", text: "#9A3412" },
   opportunity: { label: "Opportunity", color: "#B4C4F5", text: "#1D4ED8" },
 }
 const HORIZONS = [13, 26, 52] as const
@@ -37,7 +40,7 @@ const HORIZONS = [13, 26, 52] as const
 // Weekly load per project vs. team capacity, looking forward from this week.
 // Answers two questions: when does signed work fill the team, and when would
 // the pipeline (if it closes) push past capacity — i.e. when to hire.
-export default function ProjectCapacity({ contracts, accounts, deliveryMonths, deliveryWeeks, onDeliveryWeekChange, people, capacityOverrides, clientSlug }: {
+export default function ProjectCapacity({ contracts, accounts, deliveryMonths, deliveryWeeks, onDeliveryWeekChange, people, capacityOverrides, minHourlyRate, clientSlug }: {
   contracts: Contract[]
   accounts: Account[]
   deliveryMonths: DeliveryRow[]
@@ -45,6 +48,7 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
   onDeliveryWeekChange: (contractId: string, week: string, hours: number | null) => void
   people: CapacityPerson[]
   capacityOverrides: CapacityMonthOverride[]
+  minHourlyRate: number | null
   clientSlug?: string
 }) {
   const [horizon, setHorizon] = useState<(typeof HORIZONS)[number]>(26)
@@ -60,15 +64,21 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
 
   // Every live project gets a row — even one with no planned hours yet — so its
   // weeks can be filled in by hand. Ended projects only show if they still have hours here.
+  // Hours with no figure are estimated from the fee, and unsigned deals whose start
+  // has already passed are rolled forward to next month (see forecastContract).
   const rows = useMemo(() => contracts
-    .map(c => ({ c, stage: stageOf(c.status), ...projectHoursByWeek(c, deliveryMonths, deliveryWeeks, weeks) }))
+    .map(c => {
+      const f = forecastContract(c, deliveryMonths, weeks[0].slice(0, 7), minHourlyRate)
+      return { c: f.contract, estimated: f.estimated, slippedFrom: f.slippedFrom, stage: stageOf(c.status, c.verbal), ...projectHoursByWeek(f.contract, f.deliveryMonths, deliveryWeeks, weeks) }
+    })
     .filter((r): r is typeof r & { stage: Stage } => {
       if (r.stage === null) return false
+      if (r.stage === "opportunity" && !withOpps) return false
       if (r.hours.some(h => h > 0.05) || r.edited.some(Boolean)) return true
       const end = r.c.type === "oneoff" ? (r.c.deliveryEnd || r.c.deliveryStart || r.c.start) : r.c.contractedThrough
       return !end || end >= weeks[0].slice(0, 7)
     }),
-  [contracts, deliveryMonths, deliveryWeeks, weeks])
+  [contracts, deliveryMonths, deliveryWeeks, weeks, minHourlyRate, withOpps])
 
   async function saveWeek(contractId: string, week: string, hours: number | null, previous: number | null) {
     setSaveError(null)
@@ -89,10 +99,13 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
 
   const sumStage = (st: Stage) => weeks.map((_, i) => rows.filter(r => r.stage === st).reduce((s, r) => s + r.hours[i], 0))
   const signed = sumStage("committed")
+  const verbal = sumStage("verbal")
   const qualified = sumStage("qualified")
-  const opps = sumStage("opportunity")
-  // "If the pipeline closes" — qualified always; opportunities only when asked.
-  const forecast = weeks.map((_, i) => signed[i] + qualified[i] + (withOpps ? opps[i] : 0))
+  const opps = sumStage("opportunity") // all zero unless the toggle is on — rows are filtered
+  // "If the pipeline closes" — verbal + qualified always; opportunities only when toggled on.
+  const forecast = weeks.map((_, i) => signed[i] + verbal[i] + qualified[i] + opps[i])
+  const estimatedCount = rows.filter(r => r.estimated).length
+  const slippedCount = rows.filter(r => r.slippedFrom).length
 
   const signedOverAt = firstOver(signed, capacity)
   const forecastOverAt = firstOver(forecast, capacity)
@@ -128,7 +141,7 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
             ))}
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-            <input type="checkbox" checked={withOpps} onChange={e => setWithOpps(e.target.checked)} /> Count opportunities
+            <input type="checkbox" checked={withOpps} onChange={e => setWithOpps(e.target.checked)} /> Include opportunities
           </label>
           <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
             <input type="checkbox" checked={withContractors} onChange={e => setWithContractors(e.target.checked)} /> Include contractors
@@ -177,7 +190,12 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
       )}
 
       {hasTeam && (
-        <LoadChart weeks={weeks} signed={signed} qualified={qualified} opps={withOpps ? opps : null} capacity={capacity} />
+        <LoadChart weeks={weeks} capacity={capacity} layers={[
+          { label: "Signed", color: STAGE.committed.color, values: signed },
+          { label: "Verbal", color: STAGE.verbal.color, values: verbal },
+          { label: "Qualified", color: STAGE.qualified.color, values: qualified },
+          ...(withOpps ? [{ label: "Opportunities", color: STAGE.opportunity.color, values: opps }] : []),
+        ]} />
       )}
 
       {rows.length === 0 ? (
@@ -200,7 +218,7 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
               </tr>
             </thead>
             <tbody>
-              {(["committed", "qualified", "opportunity"] as const).map(st => {
+              {(["committed", "verbal", "qualified", "opportunity"] as const).map(st => {
                 const group = rows.filter(r => r.stage === st)
                 if (!group.length) return null
                 return [
@@ -210,7 +228,7 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
                       {STAGE[st].label}
                     </td>
                   </tr>,
-                  ...group.map(({ c, hours, edited, planned }) => {
+                  ...group.map(({ c, hours, edited, planned, estimated, slippedFrom }) => {
                     const acct = accountName(c.accountId)
                     const peak = Math.max(...hours, 1)
                     return (
@@ -219,7 +237,15 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
                           {clientSlug
                             ? <Link href={`/clients/${clientSlug}/projects/${c.id}`} style={{ color: "#1A1916", textDecoration: "none", fontWeight: 600 }}>{c.name}</Link>
                             : <span style={{ fontWeight: 600 }}>{c.name}</span>}
-                          {acct && <div style={{ fontSize: 10, color: "#9C9590", overflow: "hidden", textOverflow: "ellipsis" }}>{acct}</div>}
+                          {(acct || estimated || slippedFrom) && (
+                            <div style={{ fontSize: 10, color: "#9C9590", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {[
+                                acct,
+                                estimated && `~${fmtH(c.hoursPerMonth)}h${c.type === "oneoff" ? "" : "/mo"} est. from fee`,
+                                slippedFrom && `slipped from ${ymLabel(slippedFrom)}`,
+                              ].filter(Boolean).join(" · ")}
+                            </div>
+                          )}
                         </td>
                         {hours.map((h, i) => (
                           <WeekCell key={weeks[i]} hours={h} edited={edited[i]} planned={planned[i]}
@@ -241,8 +267,9 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
               })}
 
               <TotalRow label="Signed" values={signed} strong topBorder />
+              {verbal.some(h => h > 0.05) && <TotalRow label="+ Verbal" values={verbal} muted />}
               {qualified.some(h => h > 0.05) && <TotalRow label="+ Qualified" values={qualified} muted />}
-              {opps.some(h => h > 0.05) && <TotalRow label={withOpps ? "+ Opportunities" : "Opportunities (not counted)"} values={opps} muted />}
+              {opps.some(h => h > 0.05) && <TotalRow label="+ Opportunities" values={opps} muted />}
               <TotalRow label={`Team capacity${withContractors ? "" : " (in-house)"}`} values={capacity} />
               <tr>
                 <td style={{ ...stickyTd, fontWeight: 700 }}>Headroom</td>
@@ -272,7 +299,7 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
       )}
       {saveError && <div style={{ fontSize: 12, color: "#C2410C", marginTop: 8 }}>{saveError}</div>}
       <div style={{ fontSize: 11, color: "#9C9590", marginTop: 8 }}>
-        Click any project week to set its hours (Tab moves to the next week); <span style={{ borderBottom: "2px solid #1A1916" }}>underlined</span> weeks are hand-set, and clearing one returns it to the plan. Headroom and utilization count signed + qualified{withOpps ? " + opportunities" : ""} work. Project hours come from each project&apos;s hours/month (one-offs use their delivery months); capacity from billable hours on the Team tab, including any month-by-month overrides.
+        Click any project week to set its hours (Tab moves to the next week); <span style={{ borderBottom: "2px solid #1A1916" }}>underlined</span> weeks are hand-set, and clearing one returns it to the plan. Headroom and utilization count signed + verbal + qualified{withOpps ? " + opportunities" : ""} work. Project hours come from each project&apos;s hours/month (one-offs use their delivery months){estimatedCount > 0 && <>; {estimatedCount} without hours {estimatedCount === 1 ? "is" : "are"} estimated from the fee at {minHourlyRate && minHourlyRate > 0 ? `your $${minHourlyRate}/hr minimum yield` : "$150/hr"}</>}{slippedCount > 0 && <>; {slippedCount} unsigned {slippedCount === 1 ? "deal whose start has passed is" : "deals whose starts have passed are"} assumed to start next month</>}. Capacity from billable hours on the Team tab, including any month-by-month overrides.
       </div>
     </div>
   )
@@ -347,10 +374,10 @@ function TotalRow({ label, values, strong, muted, topBorder }: { label: string; 
   )
 }
 
-/** Stacked weekly load (signed / qualified / opportunities) with the capacity line stepped over it. */
-function LoadChart({ weeks, signed, qualified, opps, capacity }: { weeks: string[]; signed: number[]; qualified: number[]; opps: number[] | null; capacity: number[] }) {
+/** Stacked weekly load (signed, then each pipeline stage) with the capacity line stepped over it. */
+function LoadChart({ weeks, layers, capacity }: { weeks: string[]; layers: { label: string; color: string; values: number[] }[]; capacity: number[] }) {
   const W = 800, H = 150, PAD_L = 34, PAD_B = 16, PAD_T = 8
-  const totals = weeks.map((_, i) => signed[i] + qualified[i] + (opps?.[i] ?? 0))
+  const totals = weeks.map((_, i) => layers.reduce((s, l) => s + l.values[i], 0))
   const max = Math.max(...totals, ...capacity, 1) * 1.08
   const plotW = W - PAD_L, plotH = H - PAD_B - PAD_T
   const bw = plotW / weeks.length
@@ -358,6 +385,7 @@ function LoadChart({ weeks, signed, qualified, opps, capacity }: { weeks: string
   const ticks = [0, max / 2, max].map(v => Math.round(v / 5) * 5)
   const capPath = capacity.map((c, i) => `${i === 0 ? "M" : "L"}${PAD_L + i * bw},${y(c)} L${PAD_L + (i + 1) * bw},${y(c)}`).join(" ")
   const labelEvery = weeks.length <= 13 ? 1 : weeks.length <= 26 ? 2 : 4
+  const shown = layers.filter((l, li) => li === 0 || l.values.some(v => v > 0.05))
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -370,14 +398,14 @@ function LoadChart({ weeks, signed, qualified, opps, capacity }: { weeks: string
         ))}
         {weeks.map((w, i) => {
           const x = PAD_L + i * bw + bw * 0.15, bwi = bw * 0.7
-          const layers: [number, string][] = [[signed[i], "#E9532A"], [qualified[i], "#F5C4B4"], ...(opps ? [[opps[i], "#B4C4F5"] as [number, string]] : [])]
           let base = 0
           const over = totals[i] > capacity[i] + 0.05
           return (
             <g key={w}>
-              <title>{`Week of ${wkLabel(w)}: ${fmtH(signed[i])}h signed, ${fmtH(qualified[i])}h qualified${opps ? `, ${fmtH(opps[i])}h opportunities` : ""} · capacity ${fmtH(capacity[i])}h`}</title>
-              {layers.map(([h, color], li) => {
-                const rect = <rect key={li} x={x} width={bwi} y={y(base + h)} height={Math.max(0, y(base) - y(base + h))} fill={color} opacity={li === 0 ? 0.9 : 0.85} />
+              <title>{`Week of ${wkLabel(w)}: ${layers.map(l => `${fmtH(l.values[i])}h ${l.label.toLowerCase()}`).join(", ")} · capacity ${fmtH(capacity[i])}h`}</title>
+              {layers.map((l, li) => {
+                const h = l.values[i]
+                const rect = <rect key={li} x={x} width={bwi} y={y(base + h)} height={Math.max(0, y(base) - y(base + h))} fill={l.color} opacity={li === 0 ? 0.9 : 0.85} />
                 base += h
                 return rect
               })}
@@ -389,9 +417,7 @@ function LoadChart({ weeks, signed, qualified, opps, capacity }: { weeks: string
         <path d={capPath} fill="none" stroke="#1A1916" strokeWidth={1.5} />
       </svg>
       <div style={{ display: "flex", gap: 14, fontSize: 11, color: "#9C9590", flexWrap: "wrap", marginTop: 4 }}>
-        <Swatch color="#E9532A" label="Signed" />
-        <Swatch color="#F5C4B4" label="Qualified" />
-        {opps && <Swatch color="#B4C4F5" label="Opportunities" />}
+        {shown.map(l => <Swatch key={l.label} color={l.color} label={l.label} />)}
         <span><span style={{ display: "inline-block", width: 14, height: 2, background: "#1A1916", verticalAlign: "middle", marginRight: 4 }} />Team capacity</span>
         <span><span style={{ display: "inline-block", width: 10, height: 10, border: "1px dashed #C2410C", verticalAlign: "middle", marginRight: 4 }} />Over capacity</span>
       </div>

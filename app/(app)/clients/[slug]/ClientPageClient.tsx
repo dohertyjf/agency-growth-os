@@ -467,6 +467,7 @@ export default function ClientPageClient({
               onDeliveryWeekChange={handleDeliveryWeekChange}
               people={people}
               capacityOverrides={hoursMonths}
+              minHourlyRate={goal?.minHourlyRate ?? null}
               clientSlug={clientSlug}
             />
           ) : projectView === "profit" ? (

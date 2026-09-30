@@ -8,7 +8,7 @@
 //
 // Weeks run Sunday–Saturday to match the weekly tracker (lib/weeks.ts).
 
-import { plannedHoursFn, type CapacityContract, type DeliveryRow } from "./calc"
+import { plannedHoursFn, budgetedHours, ymAdd, ymDiff, type CapacityContract, type DeliveryRow } from "./calc"
 import { weekAdd, type WeekStart } from "./weeks"
 
 const DAY = 86400000
@@ -26,9 +26,55 @@ export interface CapacityMonthOverride { personId: string; month: string; monthl
 /** A hand-set week for one project; replaces that week's share of the monthly plan. */
 export interface DeliveryWeekRow { contractId: string; week: WeekStart; hours: number }
 
-export type Stage = "committed" | "qualified" | "opportunity"
-export const stageOf = (status: string): Stage | null =>
-  status === "active" ? "committed" : status === "potential" ? "qualified" : status === "opportunity" ? "opportunity" : null
+export type Stage = "committed" | "verbal" | "qualified" | "opportunity"
+export const stageOf = (status: string, verbal?: boolean): Stage | null =>
+  status === "active" ? "committed"
+    : status === "potential" ? (verbal ? "verbal" : "qualified")
+    : status === "opportunity" ? "opportunity" : null
+
+export interface ForecastInput extends CapacityContract { monthly: number }
+
+/**
+ * Make a project forecastable, returning what was assumed:
+ *
+ * - **Estimated hours** — a project with no hours/month (and, for one-offs, no
+ *   delivery months) gets its fee ÷ the Minimum Hourly Yield, the same default
+ *   the new-project form fills in. One-offs: the total fee → total hours.
+ * - **Slipped start** — an unsigned deal dated to start before next month
+ *   hasn't started; its whole window (end date and delivery months included)
+ *   shifts so it starts next month, keeping its length.
+ */
+export function forecastContract<C extends ForecastInput>(
+  c: C, deliveryMonths: DeliveryRow[], nowYM: string, minHourlyRate: number | null | undefined,
+): { contract: C; deliveryMonths: DeliveryRow[]; estimated: boolean; slippedFrom: string | null } {
+  let rows = deliveryMonths.filter(d => d.contractId === c.id && d.hours > 0)
+  let out: C = c
+  let estimated = false
+  if (!(c.hoursPerMonth && c.hoursPerMonth > 0) && !(c.type === "oneoff" && rows.length) && c.monthly > 0) {
+    out = { ...out, hoursPerMonth: budgetedHours(c.monthly, minHourlyRate) }
+    estimated = out.hoursPerMonth! > 0
+  }
+
+  let slippedFrom: string | null = null
+  const earliest = ymAdd(nowYM, 1)
+  const begins = c.type === "oneoff"
+    ? [c.deliveryStart || c.start, ...rows.map(r => r.month)].reduce((a, b) => a < b ? a : b)
+    : c.start
+  if (c.status !== "active" && begins < earliest) {
+    const by = ymDiff(begins, earliest)
+    const shift = (ym: string | null | undefined) => ym ? ymAdd(ym, by) : ym
+    slippedFrom = begins
+    out = {
+      ...out,
+      start: ymAdd(c.start, by),
+      contractedThrough: shift(c.contractedThrough) ?? null,
+      deliveryStart: shift(c.deliveryStart),
+      deliveryEnd: shift(c.deliveryEnd),
+    }
+    rows = rows.map(r => ({ ...r, month: ymAdd(r.month, by) }))
+  }
+  return { contract: out, deliveryMonths: rows, estimated, slippedFrom }
+}
 
 function daysOf(week: WeekStart): string[] {
   const t = new Date(`${week}T00:00:00Z`).getTime()
