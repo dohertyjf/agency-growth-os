@@ -40,7 +40,8 @@ const HORIZONS = [13, 26, 52] as const
 // Weekly load per project vs. team capacity, looking forward from this week.
 // Answers two questions: when does signed work fill the team, and when would
 // the pipeline (if it closes) push past capacity — i.e. when to hire.
-export default function ProjectCapacity({ contracts, accounts, deliveryMonths, deliveryWeeks, onDeliveryWeekChange, people, capacityOverrides, minHourlyRate, clientSlug }: {
+export default function ProjectCapacity({ clientId, contracts, accounts, deliveryMonths, deliveryWeeks, onDeliveryWeekChange, people, capacityOverrides, minHourlyRate, clientSlug }: {
+  clientId: string
   contracts: Contract[]
   accounts: Account[]
   deliveryMonths: DeliveryRow[]
@@ -61,6 +62,8 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
   const [saveError, setSaveError] = useState<string | null>(null)
   // The one cell being typed into; Tab / Shift+Tab walk it along the row.
   const [active, setActive] = useState<{ contractId: string; i: number } | null>(null)
+  // Week column whose actions menu is open.
+  const [weekMenu, setWeekMenu] = useState<number | null>(null)
 
   // Every live project gets a row — even one with no planned hours yet — so its
   // weeks can be filled in by hand. Ended projects only show if they still have hours here.
@@ -91,6 +94,26 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
     if (!res?.ok) {
       onDeliveryWeekChange(contractId, week, previous)
       setSaveError(`Couldn't save hours for the week of ${wkLabel(week)} — try again.`)
+    }
+  }
+
+  /** Zero out (hours = 0) or reset to plan (hours = null) one week across every project row. */
+  async function setWholeWeek(i: number, hours: 0 | null) {
+    setWeekMenu(null)
+    setSaveError(null)
+    const week = weeks[i]
+    const targets = rows.filter(r => hours === null ? r.edited[i] : (r.hours[i] > 0.05 || (r.edited[i] && r.hours[i] !== 0)))
+    if (!targets.length) return
+    const previous = targets.map(r => ({ id: r.c.id, hours: r.edited[i] ? r.hours[i] : null }))
+    targets.forEach(r => onDeliveryWeekChange(r.c.id, week, hours))
+    const res = await fetch(`/api/clients/${clientId}/delivery-weeks`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ week, hours, contractIds: targets.map(r => r.c.id) }),
+    }).catch(() => null)
+    if (!res?.ok) {
+      previous.forEach(p => onDeliveryWeekChange(p.id, week, p.hours))
+      setSaveError(`Couldn't ${hours === null ? "reset" : "zero out"} the week of ${wkLabel(week)} — try again.`)
     }
   }
 
@@ -208,10 +231,28 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
                 <th style={{ ...stickyTh, zIndex: 3 }}>Project</th>
                 {weeks.map((w, i) => {
                   const newMonth = i === 0 || w.slice(5, 7) !== weeks[i - 1].slice(5, 7)
+                  const anyEdited = rows.some(r => r.edited[i])
+                  // "Off" once every project row is hand-set to zero that week.
+                  const off = rows.length > 0 && rows.every(r => r.edited[i] && r.hours[i] === 0)
+                  const anyHours = rows.some(r => r.hours[i] > 0.05)
                   return (
-                    <th key={w} style={{ ...weekTh, borderLeft: newMonth && i > 0 ? "1px solid #E5E0D8" : undefined, background: i === 0 ? "#FDF6F1" : "#FBFAF7" }}>
-                      <div style={{ color: newMonth ? "#6B6560" : "transparent", fontSize: 9 }}>{MON[+w.slice(5, 7) - 1]}</div>
-                      {+w.slice(8, 10)}
+                    <th key={w} style={{ ...weekTh, position: "relative", padding: 0, borderLeft: newMonth && i > 0 ? "1px solid #E5E0D8" : undefined, background: off ? "#F0ECE5" : i === 0 ? "#FDF6F1" : "#FBFAF7" }}>
+                      <button onClick={() => setWeekMenu(weekMenu === i ? null : i)} title={`Week of ${wkLabel(w)} — zero out or reset`}
+                        style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "4px 4px 6px", font: "inherit", color: "inherit", lineHeight: 1.2 }}>
+                        <div style={{ color: newMonth ? "#6B6560" : "transparent", fontSize: 9 }}>{MON[+w.slice(5, 7) - 1]}</div>
+                        {+w.slice(8, 10)}
+                        {off && <div style={{ fontSize: 8, color: "#9C9590", fontWeight: 700, letterSpacing: "0.04em" }}>OFF</div>}
+                      </button>
+                      {weekMenu === i && (
+                        <>
+                          <div onClick={() => setWeekMenu(null)} style={{ position: "fixed", inset: 0, zIndex: 4 }} />
+                          <div style={{ position: "absolute", top: "100%", left: i > weeks.length - 4 ? undefined : 0, right: i > weeks.length - 4 ? 0 : undefined, zIndex: 5, background: "#fff", border: "1px solid #ECE7DE", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, minWidth: 190, textAlign: "left", textTransform: "none", letterSpacing: 0 }}>
+                            <div style={{ fontSize: 10, color: "#9C9590", padding: "4px 8px", fontWeight: 600 }}>Week of {wkLabel(w)}</div>
+                            <MenuItem disabled={!anyHours} onClick={() => setWholeWeek(i, 0)}>Zero out this week <span style={{ color: "#9C9590", fontWeight: 400 }}>(vacation)</span></MenuItem>
+                            <MenuItem disabled={!anyEdited} onClick={() => setWholeWeek(i, null)}>Reset week to plan</MenuItem>
+                          </div>
+                        </>
+                      )}
                     </th>
                   )
                 })}
@@ -299,7 +340,7 @@ export default function ProjectCapacity({ contracts, accounts, deliveryMonths, d
       )}
       {saveError && <div style={{ fontSize: 12, color: "#C2410C", marginTop: 8 }}>{saveError}</div>}
       <div style={{ fontSize: 11, color: "#9C9590", marginTop: 8 }}>
-        Click any project week to set its hours (Tab moves to the next week); <span style={{ borderBottom: "2px solid #1A1916" }}>underlined</span> weeks are hand-set, and clearing one returns it to the plan. Headroom and utilization count signed + verbal + qualified{withOpps ? " + opportunities" : ""} work. Project hours come from each project&apos;s hours/month (one-offs use their delivery months){estimatedCount > 0 && <>; {estimatedCount} without hours {estimatedCount === 1 ? "is" : "are"} estimated from the fee at {minHourlyRate && minHourlyRate > 0 ? `your $${minHourlyRate}/hr minimum yield` : "$150/hr"}</>}{slippedCount > 0 && <>; {slippedCount} unsigned {slippedCount === 1 ? "deal whose start has passed is" : "deals whose starts have passed are"} assumed to start next month</>}. Capacity from billable hours on the Team tab, including any month-by-month overrides.
+        Click any project week to set its hours (Tab moves to the next week), or a week&apos;s date to zero out the whole week; <span style={{ borderBottom: "2px solid #1A1916" }}>underlined</span> weeks are hand-set, and clearing one returns it to the plan. Headroom and utilization count signed + verbal + qualified{withOpps ? " + opportunities" : ""} work. Project hours come from each project&apos;s hours/month (one-offs use their delivery months){estimatedCount > 0 && <>; {estimatedCount} without hours {estimatedCount === 1 ? "is" : "are"} estimated from the fee at {minHourlyRate && minHourlyRate > 0 ? `your $${minHourlyRate}/hr minimum yield` : "$150/hr"}</>}{slippedCount > 0 && <>; {slippedCount} unsigned {slippedCount === 1 ? "deal whose start has passed is" : "deals whose starts have passed are"} assumed to start next month</>}. Capacity from billable hours on the Team tab, including any month-by-month overrides.
       </div>
     </div>
   )
@@ -359,6 +400,17 @@ function WeekInput({ initial, onDone, onCancel }: { initial: string; onDone: (dr
       }}
       onFocus={e => e.target.select()}
       style={{ width: 40, fontSize: 12, textAlign: "center", padding: "2px 2px", border: "1px solid #E9532A", borderRadius: 4, outline: "none", fontVariantNumeric: "tabular-nums" }} />
+  )
+}
+
+function MenuItem({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", borderRadius: 5, padding: "6px 8px", fontSize: 12, fontWeight: 600, color: disabled ? "#C0BAB2" : "#1A1916", cursor: disabled ? "default" : "pointer", whiteSpace: "nowrap" }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = "#F5F1EC" }}
+      onMouseLeave={e => { e.currentTarget.style.background = "none" }}>
+      {children}
+    </button>
   )
 }
 

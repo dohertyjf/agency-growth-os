@@ -460,6 +460,7 @@ export default function ClientPageClient({
           </div>
           {projectView === "capacity" ? (
             <ProjectCapacity
+              clientId={clientId}
               contracts={contracts}
               accounts={accounts}
               deliveryMonths={initialDeliveryMonths}
