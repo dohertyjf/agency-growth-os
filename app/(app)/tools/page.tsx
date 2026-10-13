@@ -7,6 +7,11 @@ interface Tool { href: string; title: string; blurb: string }
 // Tools for the agency owner's own business — open to coach and clients.
 const clientTools: Tool[] = [
   {
+    href: "/tools/package-architect",
+    title: "Package Architect",
+    blurb: "Paste an old proposal or describe what you sell. Get a three-tier package ladder with prices, a paid front end, the add-ons to pull out, and the words to say when someone pushes on price.",
+  },
+  {
     href: "/tools/content-five",
     title: "The Content Five",
     blurb: "Answer seven questions about one of your clients and get five specific pieces of content to make for them — written to their buyer, not to you.",

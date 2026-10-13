@@ -14,11 +14,13 @@ export default auth((req) => {
     pathname.startsWith("/growthreport") ||
     pathname.startsWith("/growthgap") ||
     pathname.startsWith("/lead-goal") ||
+    pathname.startsWith("/package-architect") ||
     pathname.startsWith("/embed.js") ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/intake") ||
     pathname.startsWith("/api/leads") ||
     pathname.startsWith("/api/lead-goal") ||
+    pathname.startsWith("/api/package-architect") ||
     pathname.startsWith("/api/auth")
 
   if (!isPublic && !isLoggedIn) {
