@@ -28,6 +28,10 @@ const ERROR_COPY: Record<PAErrorCode, string> = {
   error: "Something went wrong. Try again.",
 }
 
+// Signed in, the visitor is already a client, so the rate-limit copy drops the
+// sales pitch and the CTA link below is suppressed with it.
+const RATE_LIMITED_EMBEDDED = "You have hit the limit for now. Come back in an hour."
+
 class PAClientError extends Error {
   code: PAErrorCode
   constructor(code: PAErrorCode) { super(code); this.code = code }
@@ -172,8 +176,8 @@ export default function PackageArchitect({ ctaUrl, minSource, maxTotal, embedded
 
         {error && (
           <div role="alert" style={{ marginTop: 18, padding: "14px 18px", borderRadius: T.radius, background: T.accentTint, border: "1px solid #F3D2C3", color: T.ink, fontSize: 15, lineHeight: 1.5 }}>
-            {ERROR_COPY[error]}
-            {error === "rate_limited" && (
+            {error === "rate_limited" && embedded ? RATE_LIMITED_EMBEDDED : ERROR_COPY[error]}
+            {error === "rate_limited" && !embedded && (
               <>{" "}<a href={ctaUrl} target="_blank" rel="noopener noreferrer" style={{ color: T.accentDeep, fontWeight: 600 }}>Book a strategy call →</a></>
             )}
           </div>
