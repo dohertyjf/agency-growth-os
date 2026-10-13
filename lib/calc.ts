@@ -190,20 +190,50 @@ export function avgStayMonths(churnStats: ChurnStats, contracts: ContractRow[], 
   return retainers.reduce((s, c) => s + Math.max(1, ymDiff(c.start, c.contractedThrough ?? nowYM) + 1), 0) / retainers.length
 }
 
-// Whole-deal value. A payment schedule, when one is set, is the answer — the term
-// dates are delivery months and a retainer can bill on fewer of them. Otherwise a
-// one-off's `monthly` is already its total; a dated retainer is monthly × its term
-// (inclusive of both end months); an ongoing retainer is monthly × the average
-// stay, flat — an estimate, not a contracted figure.
+// The last month a payment schedule covers, or null when there isn't one.
+function scheduleEnd(payments: { month: string }[]): string | null {
+  return payments.length ? payments.reduce((a, p) => (p.month > a ? p.month : a), payments[0].month) : null
+}
+
+// Contracted revenue for one project in one month. A payment schedule overrides the
+// default for every month up to its last one — including months it leaves empty, so a
+// skipped month stays skipped. After that, a retainer still in its term carries on at
+// its monthly rate, so an ongoing retainer never runs out of schedule. Without a
+// schedule: retainers = monthly across their term; one-offs = the full total in the
+// start month. Finished (ended/churned) projects forecast nothing past `nowYM`.
+export function contractedRevenue(
+  c: { monthly: number; type?: string; status: string; start: string; contractedThrough: string | null },
+  ym: string,
+  payments: { month: string; amount: number }[],
+  nowYM: string,
+): number {
+  if (c.status === "finished" && ym > nowYM) return 0
+  const last = scheduleEnd(payments)
+  if (last && ym <= last) return payments.reduce((s, p) => (p.month === ym ? s + p.amount : s), 0)
+  if ((c.type ?? "retainer") === "oneoff") return !last && c.start === ym ? c.monthly : 0
+  return c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym) ? c.monthly : 0
+}
+
+// Whole-deal value. A one-off's `monthly` is already its total (or its payments, when
+// scheduled). A dated retainer is monthly × its term (inclusive of both end months); an
+// ongoing retainer is monthly × the average stay, flat — an estimate, not a contracted
+// figure. A schedule replaces the months it covers, and the rest of the term (or the
+// average stay) continues at the monthly rate — same rule as contractedRevenue.
 export function contractValue(
   c: { monthly: number; type?: string; start: string; contractedThrough: string | null },
   avgStay: number,
-  payments: { amount: number }[] = [],
+  payments: { month: string; amount: number }[] = [],
 ): number {
-  if (payments.length) return payments.reduce((s, p) => s + p.amount, 0)
-  if (c.type === "oneoff") return c.monthly
-  if (c.contractedThrough) return c.monthly * Math.max(1, ymDiff(c.start, c.contractedThrough) + 1)
-  return c.monthly * avgStay
+  const scheduled = payments.reduce((s, p) => s + p.amount, 0)
+  const last = scheduleEnd(payments)
+  if (c.type === "oneoff") return last ? scheduled : c.monthly
+  if (!last) {
+    if (c.contractedThrough) return c.monthly * Math.max(1, ymDiff(c.start, c.contractedThrough) + 1)
+    return c.monthly * avgStay
+  }
+  if (c.contractedThrough) return scheduled + c.monthly * Math.max(0, ymDiff(last, c.contractedThrough))
+  const covered = Math.max(1, ymDiff(c.start, last) + 1)
+  return scheduled + c.monthly * Math.max(0, avgStay - covered)
 }
 
 export interface AccountContractRow extends ContractRow {
@@ -651,16 +681,18 @@ export function plannedHoursFn(deliveryMonths: DeliveryRow[]): (c: CapacityContr
       const only = c.deliveryStart || c.start
       return m === only ? hpm : 0
     }
+    // Retainers run at hoursPerMonth across their term, unless the hours schedule sets a
+    // different figure for a month (a ramp-up, a quiet month) — then the schedule wins.
     const end = c.contractedThrough
-    if (c.start <= m && (!end || m <= end)) return hpm
+    if (c.start <= m && (!end || m <= end)) return byContract.get(c.id)?.get(m) ?? hpm
     return 0
   }
 }
 
 // Planned delivery hours per month: committed (signed/active) and pipeline
-// (qualified/opportunity). Retainers spread hoursPerMonth over their term;
-// one-offs use their delivery-month rows, falling back to hoursPerMonth in the
-// delivery/payment month when none are set.
+// (qualified/opportunity). Retainers spread hoursPerMonth over their term, with
+// scheduled months overriding it; one-offs use their delivery-month rows, falling
+// back to hoursPerMonth in the delivery/payment month when none are set.
 export function capacityByMonth(
   contracts: CapacityContract[],
   deliveryMonths: DeliveryRow[],

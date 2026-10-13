@@ -202,8 +202,10 @@ export default function ProjectDetailClient(props: Props) {
   }, [contract.ownerId, members, memberHours, people])
 
   const hoursOf = (personId: string, m: string) => memberHours.find(h => h.personId === personId && h.month === m)?.hours ?? null
-  const hasMemberRows = (m: string) => memberHours.some(h => h.month === m && h.hours > 0)
-  const legacyTotal = (m: string) => contractHours.find(h => h.month === m)?.hours ?? null
+  const memberSum = (m: string) => memberHours.filter(h => h.month === m).reduce((s, h) => s + h.hours, 0)
+  // Hours in the project total beyond the per-person rows — logged on the Yield view
+  // as a single number. Kept (not overwritten) when people start logging individually.
+  const unassignedOf = (m: string) => Math.max(0, (contractHours.find(h => h.month === m)?.hours ?? 0) - memberSum(m))
 
   async function saveHours(personId: string, month: string, hours: number): Promise<boolean> {
     const res = await fetch(`/api/contracts/${contract.id}/member-hours`, {
@@ -219,6 +221,21 @@ export default function ProjectDetailClient(props: Props) {
     setContractHours(prev => {
       const rest = prev.filter(h => h.month !== month)
       return data.total > 0 ? [...rest, { contractId: contract.id, month, hours: data.total }] : rest
+    })
+    return true
+  }
+
+  // Editing the unassigned bucket rewrites the project total as people + unassigned.
+  async function saveUnassigned(month: string, hours: number): Promise<boolean> {
+    const total = memberSum(month) + hours
+    const res = await fetch(`/api/contracts/${contract.id}/hours`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ month, hours: total }),
+    })
+    if (!res.ok) return false
+    setContractHours(prev => {
+      const rest = prev.filter(h => h.month !== month)
+      return total > 0 ? [...rest, { contractId: contract.id, month, hours: total }] : rest
     })
     return true
   }
@@ -475,7 +492,7 @@ export default function ProjectDetailClient(props: Props) {
                       const differs = mRate != null && rate != null && Math.round(mRate) !== Math.round(rate)
                       return (
                         <td key={m} style={{ ...td, padding: "4px 6px", background: inWindow(m) ? undefined : "#FBFAF7" }}>
-                          <EditCell value={hoursOf(r.id, m)} display={fmtHrs} placeholder="0h" onSave={v => saveHours(r.id, m, v)} />
+                          <EditCell value={hoursOf(r.id, m)} display={fmtHrs} placeholder={m > now ? "—" : "0h"} disabled={m > now} onSave={v => saveHours(r.id, m, v)} />
                           {rateVaries && (
                             <div style={{ fontSize: 10, color: differs ? "#B45309" : "#C0BAB2", marginTop: -2 }} title={`Cost/hr in ${ymLabel(m)} (salary override on the Team tab)`}>
                               {mRate == null ? "no rate" : `@ ${fmt(mRate)}`}
@@ -494,11 +511,15 @@ export default function ProjectDetailClient(props: Props) {
                   </tr>
                 )
               })}
-              {/* Hours logged as a project total (Yield view) before anyone was assigned. */}
-              {months.some(m => !hasMemberRows(m) && (legacyTotal(m) ?? 0) > 0) && (
+              {/* Hours logged as a project total (Yield view) that aren't on anyone yet. */}
+              {months.some(m => unassignedOf(m) > 0) && (
                 <tr style={{ borderTop: "1px solid #F5F1EC" }}>
-                  <td style={{ ...tdLeft, color: "#9C9590", fontStyle: "italic" }}>Unassigned (logged as project total)</td>
-                  {months.map(m => <td key={m} style={{ ...td, color: "#9C9590" }}>{!hasMemberRows(m) && (legacyTotal(m) ?? 0) > 0 ? fmtHrs(legacyTotal(m) as number) : ""}</td>)}
+                  <td style={{ ...tdLeft, color: "#9C9590", fontStyle: "italic" }} title="Logged on the Yield view as a project total. Move them onto a person by adding their hours and lowering this.">Unassigned (logged as project total)</td>
+                  {months.map(m => (
+                    <td key={m} style={{ ...td, padding: "4px 6px", color: "#9C9590" }}>
+                      {unassignedOf(m) > 0 && <EditCell value={unassignedOf(m)} display={fmtHrs} placeholder="0h" onSave={v => saveUnassigned(m, v)} />}
+                    </td>
+                  ))}
                   <td style={{ ...td, borderLeft: "1px solid #ECE7DE" }} />
                   <td />
                 </tr>

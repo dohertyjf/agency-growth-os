@@ -10,7 +10,7 @@ import CapacityLiveTool from "./CapacityLiveTool"
 import {
   netProfit, grossProfit, netMargin, momDelta, fmtCurrency, fmtPercent,
   projectMetric, ymAdd, ymLabel, bookedAhead, BOOKED_AHEAD_MONTHS,
-  mrrGoal, goalProgress, trailingChurn, activeAccountsIn, churnedStayMonths, avgStayMonths,
+  mrrGoal, goalProgress, trailingChurn, activeAccountsIn, churnedStayMonths, avgStayMonths, contractedRevenue,
   type ContractRow, type ProjectionInput, type ProjectableMetric, type CapacityInputs, type AccountContractRow,
 } from "@/lib/calc"
 
@@ -263,10 +263,8 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     type: (c.type ?? "retainer") as "retainer" | "oneoff",
   }))
 
-  // Contracted revenue by month. A payment schedule wins when one is set — a
-  // retainer's term is delivery months and may bill on fewer of them. Without one:
-  // retainers = MRR across their term; one-offs = the full total in the start month.
-  // Keeps a lump one-off from inflating a single month's Contracted figure.
+  // Contracted revenue by month — see contractedRevenue: a payment schedule overrides
+  // the months it covers, and a retainer still running carries on at MRR after it.
   const paysByContract = new Map<string, { month: string; amount: number }[]>()
   payments.forEach(p => { const a = paysByContract.get(p.contractId); if (a) a.push(p); else paysByContract.set(p.contractId, [p]) })
   type Tier = "contracted" | "verbal" | "qualified" | "opportunity"
@@ -278,16 +276,7 @@ export default function Dashboard({ clientId, projectionState, clientSlug, clien
     let total = 0
     for (const c of contracts) {
       if (c.status === "lost" || !include.includes(tierOf(c))) continue
-      const pays = paysByContract.get(c.id) ?? []
-      if (pays.length) {
-        if (c.status === "finished" && ym > nowYM) continue
-        total += pays.reduce((sub, p) => p.month === ym ? sub + p.amount : sub, 0)
-      } else if ((c.type ?? "retainer") === "oneoff") {
-        if (c.start === ym) total += c.monthly
-      } else if (c.start <= ym && (c.contractedThrough === null || c.contractedThrough >= ym)) {
-        if (c.status === "finished" && ym > nowYM) continue  // finished/churned: no future forecast
-        total += c.monthly
-      }
+      total += contractedRevenue(c, ym, paysByContract.get(c.id) ?? [], nowYM)
     }
     return total
   }

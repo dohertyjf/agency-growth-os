@@ -16,7 +16,7 @@ interface DeliveryRow { contractId: string; month: string; hours: number }
 const r1 = (n: number) => Math.round(n * 10) / 10
 
 // Forward capacity commitment: planned (sold) delivery hours per month vs. team capacity.
-// Retainers spread hoursPerMonth across their term; one-offs use their delivery months
+// Retainers spread hoursPerMonth across their term (scheduled months override it); one-offs use their delivery months
 // (falling back to hoursPerMonth in the delivery/payment month if none are set).
 export default function CapacitySold({ contracts, deliveryMonths, teamCapacity, now }: {
   contracts: Contract[]

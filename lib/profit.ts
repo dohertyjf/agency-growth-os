@@ -139,12 +139,13 @@ export function projectRevenue(c: ProfitContract, month: string, inp: Pick<Profi
   return am ? am.actual : c.monthly
 }
 
-// Hours on a project in a month: the per-person rows when any exist, else the
-// legacy project total logged on the Yield view.
+// Hours on a project in a month. The project total includes any unassigned hours
+// (logged on the Yield view) on top of the per-person rows; the larger of the two
+// covers older data where the total was never kept in step.
 export function projectHours(contractId: string, month: string, inp: Pick<ProfitInputs, "memberHours" | "contractHours">): number {
-  const rows = inp.memberHours.filter(h => h.contractId === contractId && h.month === month)
-  if (rows.length) return rows.reduce((s, h) => s + h.hours, 0)
-  return inp.contractHours.find(h => h.contractId === contractId && h.month === month)?.hours ?? 0
+  const memberSum = inp.memberHours.filter(h => h.contractId === contractId && h.month === month).reduce((s, h) => s + h.hours, 0)
+  const total = inp.contractHours.find(h => h.contractId === contractId && h.month === month)?.hours ?? 0
+  return Math.max(memberSum, total)
 }
 export function hasMemberHours(contractId: string, month: string, inp: Pick<ProfitInputs, "memberHours">): boolean {
   return inp.memberHours.some(h => h.contractId === contractId && h.month === month && h.hours > 0)
