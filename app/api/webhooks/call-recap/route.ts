@@ -53,6 +53,24 @@ function parseDate(input: string): string | null {
 
 const emptyToUndefined = (s?: string) => (s && s.trim() ? s.trim() : undefined)
 
+// Ping Slack when a recap lands as a draft so it doesn't sit unassigned.
+// RECAP_SLACK_WEBHOOK_URL picks a separate channel; otherwise the lead-alert
+// webhook is reused. Slack being down never fails the webhook.
+async function notifyDraft(args: { callId: string; title: string; date: string; emails: string[] }) {
+  const url = process.env.RECAP_SLACK_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
+  if (!url) return
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || ""
+  const who = args.emails.length ? ` with ${args.emails.join(", ")}` : ""
+  const text =
+    `📝 New call recap needs a client: *${args.title}* (${args.date})${who}\n` +
+    `<${appUrl}/calls?call=${args.callId}|Assign it in August →>`
+  try {
+    await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) })
+  } catch {
+    // ignore
+  }
+}
+
 export async function POST(req: Request) {
   if (!secretMatches(req.headers.get("authorization"))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
@@ -114,6 +132,8 @@ export async function POST(req: Request) {
   const call = existing
     ? await prisma.call.update({ where: { id: existing.id }, data })
     : await prisma.call.create({ data: { clientId, date, title, ...data } })
+
+  if (!existing && !clientId) await notifyDraft({ callId: call.id, title, date, emails })
 
   return Response.json(
     {

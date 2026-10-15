@@ -25,6 +25,7 @@ interface Props {
   isCoach: boolean
   defaultClientId?: string
   embedded?: boolean
+  initialCallId?: string // open this call first (e.g. from a Slack link)
 }
 
 const PAGE_SIZE = 10
@@ -68,11 +69,13 @@ function DraftBadge() {
   )
 }
 
-export default function CallsClient({ calls: initialCalls, clients, programs = [], isCoach, defaultClientId, embedded }: Props) {
+export default function CallsClient({ calls: initialCalls, clients, programs = [], isCoach, defaultClientId, embedded, initialCallId }: Props) {
   const isMobile = useIsMobile()
   const byDateDesc = (a: Call, b: Call) => (b.date || "").localeCompare(a.date || "")
   const [calls, setCalls] = useState<Call[]>([...initialCalls].sort(byDateDesc))
-  const [selected, setSelected] = useState<Call | null>([...initialCalls].sort(byDateDesc)[0] ?? null)
+  const [selected, setSelected] = useState<Call | null>(
+    initialCalls.find(c => c.id === initialCallId) ?? [...initialCalls].sort(byDateDesc)[0] ?? null
+  )
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ clientId: defaultClientId ?? clients[0]?.id ?? "", date: new Date().toISOString().slice(0, 10), title: "", isGroupCall: false, programId: "" })
   const [saving, setSaving] = useState(false)

@@ -3,7 +3,8 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import CallsClient from "./CallsClient"
 
-export default async function CallsPage() {
+export default async function CallsPage({ searchParams }: { searchParams: Promise<{ call?: string }> }) {
+  const { call: initialCallId } = await searchParams
   const session = await auth()
   if (!session) redirect("/auth/signin")
 
@@ -31,5 +32,5 @@ export default async function CallsPage() {
     isCoach ? prisma.program.findMany({ select: { id: true, name: true, isGroup: true }, orderBy: { name: "asc" } }) : Promise.resolve([]),
   ])
 
-  return <CallsClient calls={calls} clients={clients} programs={programs.filter(p => p.isGroup)} isCoach={isCoach} defaultClientId={clientId} />
+  return <CallsClient calls={calls} clients={clients} programs={programs.filter(p => p.isGroup)} isCoach={isCoach} defaultClientId={clientId} initialCallId={initialCallId} />
 }
