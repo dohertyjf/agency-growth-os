@@ -21,6 +21,7 @@ export default auth((req) => {
     pathname.startsWith("/api/leads") ||
     pathname.startsWith("/api/lead-goal") ||
     pathname.startsWith("/api/package-architect") ||
+    pathname.startsWith("/api/webhooks") || // secret-checked inside each route
     pathname.startsWith("/api/auth")
 
   if (!isPublic && !isLoggedIn) {
