@@ -17,8 +17,9 @@ import { z } from "zod"
 //   transcript  — optional transcript text or link
 //   video       — optional recording link
 //
-// Calls with no matching client (prospects, intro calls) are saved as drafts
-// with no client; the coach assigns them on the Calls page. Re-sending the
+// Calls with no matching client (prospects, intro calls) are saved as sales
+// calls with no client and land on the Calls page's Sales Calls tab; if one
+// was really a client call, the coach assigns the client there. Re-sending the
 // same call (same client, date and title) updates it instead of creating a
 // duplicate.
 
@@ -53,17 +54,18 @@ function parseDate(input: string): string | null {
 
 const emptyToUndefined = (s?: string) => (s && s.trim() ? s.trim() : undefined)
 
-// Ping Slack when a recap lands as a draft so it doesn't sit unassigned.
+// Ping Slack when a recap is filed as a sales call (no client matched), so the
+// coach can review it, and assign a client if it was really a client call.
 // RECAP_SLACK_WEBHOOK_URL picks a separate channel; otherwise the lead-alert
 // webhook is reused. Slack being down never fails the webhook.
-async function notifyDraft(args: { callId: string; title: string; date: string; emails: string[] }) {
+async function notifySalesCall(args: { callId: string; title: string; date: string; emails: string[] }) {
   const url = process.env.RECAP_SLACK_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
   if (!url) return
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || ""
   const who = args.emails.length ? ` with ${args.emails.join(", ")}` : ""
   const text =
-    `📝 New call recap needs a client: *${args.title}* (${args.date})${who}\n` +
-    `<${appUrl}/calls?call=${args.callId}|Assign it in August →>`
+    `📝 New sales call recap (no client matched): *${args.title}* (${args.date})${who}\n` +
+    `<${appUrl}/calls?call=${args.callId}|Review it in August →>`
   try {
     await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) })
   } catch {
@@ -124,25 +126,27 @@ export async function POST(req: Request) {
     if (u?.clientId) { clientId = u.clientId; clientName = u.client?.name ?? ""; break }
   }
 
-  // No match → draft (clientId null). A resend only ever updates the same
-  // client's call, or an unassigned draft — never another client's call.
+  // No match → sales call (clientId null). A resend only ever updates the
+  // same client's call, or an unassigned call — never another client's call.
   const existing = await prisma.call.findFirst({ where: { clientId, date, title } })
   const data = { synopsis: recap, ...(transcript && { transcript }), ...(video && { video }) }
 
   const call = existing
     ? await prisma.call.update({ where: { id: existing.id }, data })
-    : await prisma.call.create({ data: { clientId, date, title, ...data } })
+    : await prisma.call.create({
+        data: { clientId, date, title, ...data, ...(!clientId && { isSalesCall: true, prospectEmail: emails[0] }) },
+      })
 
-  if (!existing && !clientId) await notifyDraft({ callId: call.id, title, date, emails })
+  if (!existing && !clientId) await notifySalesCall({ callId: call.id, title, date, emails })
 
   return Response.json(
     {
       ok: true,
-      action: existing ? "updated" : clientId ? "created" : "drafted",
+      action: existing ? "updated" : clientId ? "created" : "sales",
       callId: call.id,
       client: clientId ? clientName : null,
       date,
-      ...(clientId ? {} : { note: "No August client matches these emails; saved as a draft to assign", emails }),
+      ...(clientId ? {} : { note: "No August client matches these emails; saved as a sales call", emails }),
     },
     { status: existing ? 200 : 201 }
   )

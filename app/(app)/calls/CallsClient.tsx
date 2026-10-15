@@ -13,6 +13,8 @@ interface Call {
   notes: string | null
   isGroupCall: boolean
   programId: string | null
+  isSalesCall: boolean // prospect call → Sales Calls tab; never has a client
+  prospectEmail: string | null
   questions: Question[]
 }
 interface Client { id: string; name: string }
@@ -69,13 +71,26 @@ function DraftBadge() {
   )
 }
 
+function SalesBadge() {
+  return (
+    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 8, background: "#DCFCE7", color: "#166534", textTransform: "uppercase", letterSpacing: "0.04em", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+      Sales
+    </span>
+  )
+}
+
 export default function CallsClient({ calls: initialCalls, clients, programs = [], isCoach, defaultClientId, embedded, initialCallId }: Props) {
   const isMobile = useIsMobile()
   const byDateDesc = (a: Call, b: Call) => (b.date || "").localeCompare(a.date || "")
+  // Coach's /calls page splits client recaps from sales calls; clients and the
+  // embedded client-page view never see sales calls (they have no client).
+  const showTabs = isCoach && !embedded
+  // A deep link (?call=<id>, e.g. from a Slack alert) opens that call on its own tab.
+  const linkedCall = initialCalls.find(c => c.id === initialCallId)
+  const [tab, setTab] = useState<"client" | "sales">(showTabs && linkedCall?.isSalesCall ? "sales" : "client")
+  const inTab = (c: Call, t = tab) => !showTabs || c.isSalesCall === (t === "sales")
   const [calls, setCalls] = useState<Call[]>([...initialCalls].sort(byDateDesc))
-  const [selected, setSelected] = useState<Call | null>(
-    initialCalls.find(c => c.id === initialCallId) ?? [...initialCalls].sort(byDateDesc)[0] ?? null
-  )
+  const [selected, setSelected] = useState<Call | null>(linkedCall ?? [...initialCalls].sort(byDateDesc).find(c => inTab(c)) ?? null)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ clientId: defaultClientId ?? clients[0]?.id ?? "", date: new Date().toISOString().slice(0, 10), title: "", isGroupCall: false, programId: "" })
   const [saving, setSaving] = useState(false)
@@ -84,17 +99,20 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
   const [qForm, setQForm] = useState({ q: "" })
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
-  const sortedCalls = [...calls].sort(byDateDesc)
+  const sortedCalls = calls.filter(c => inTab(c)).sort(byDateDesc)
   const visibleCalls = sortedCalls.slice(0, visibleCount)
   const remaining = sortedCalls.length - visibleCount
 
   async function handleAddCall(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const res = await fetch(`/api/clients/${form.clientId}/calls`, {
+    const sales = showTabs && tab === "sales"
+    const res = await fetch(sales ? "/api/calls" : `/api/clients/${form.clientId}/calls`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: form.date, title: form.title, isGroupCall: form.isGroupCall, programId: form.isGroupCall ? (form.programId || null) : null }),
+      body: JSON.stringify(sales
+        ? { date: form.date, title: form.title }
+        : { date: form.date, title: form.title, isGroupCall: form.isGroupCall, programId: form.isGroupCall ? (form.programId || null) : null }),
     })
     const data = await res.json()
     if (res.ok && data.id) {
@@ -127,6 +145,13 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
     })
   }
 
+  function switchTab(t: "client" | "sales") {
+    setTab(t)
+    setVisibleCount(PAGE_SIZE)
+    setAdding(false)
+    setSelected([...calls].sort(byDateDesc).find(c => inTab(c, t)) ?? null)
+  }
+
   async function handleAddQuestion(e: React.FormEvent) {
     e.preventDefault()
     if (!selected) return
@@ -151,6 +176,15 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
     setCalls(prev => prev.map(c => c.id === selected.id ? updatedCall : c))
     setSelected(updatedCall)
     await fetch(`/api/questions/${questionId}`, { method: "DELETE" })
+  }
+
+  async function handleDeleteCall(call: Call) {
+    if (!confirm(`Delete "${call.title}"? Its recap, notes and questions go with it. This can't be undone.`)) return
+    const res = await fetch(`/api/calls/${call.id}`, { method: "DELETE" })
+    if (!res.ok) { alert("Couldn't delete that call."); return }
+    const rest = calls.filter(c => c.id !== call.id)
+    setCalls(rest)
+    setSelected([...rest].sort(byDateDesc).find(c => inTab(c)) ?? null)
   }
 
   async function handleAnswerBlur(questionId: string, answer: string) {
@@ -186,17 +220,32 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
       >
         <span style={{ flex: 1 }}>{selected.title}</span>
         {selected.isGroupCall && <GroupBadge />}
-        {!selected.isGroupCall && !selected.clientId && <DraftBadge />}
+        {selected.isSalesCall && <SalesBadge />}
+        {!selected.isGroupCall && !selected.isSalesCall && !selected.clientId && <DraftBadge />}
         {isMobile && <span style={{ fontSize: 12, color: "#9C9590", fontFamily: "inherit" }}>▲</span>}
       </h2>
       <div style={{ fontSize: 12, color: "#9C9590", marginBottom: 20, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <span>{selected.date}</span>
-        {isCoach && !embedded && !selected.isGroupCall && clients.length > 0 && (
+        {selected.isSalesCall && selected.prospectEmail && <span>{selected.prospectEmail}</span>}
+        {isCoach && !embedded && !selected.isGroupCall && (
+          <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={selected.isSalesCall}
+              onChange={e => patchCall(selected.id, e.target.checked
+                ? { isSalesCall: true, clientId: null, isGroupCall: false, programId: null }
+                : { isSalesCall: false })}
+              style={{ accentColor: "#E9532A" }}
+            />
+            Sales call
+          </label>
+        )}
+        {isCoach && !embedded && !selected.isGroupCall && !selected.isSalesCall && clients.length > 0 && (
           <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <span>Client:</span>
             <select
               value={selected.clientId ?? ""}
-              onChange={e => { if (e.target.value) patchCall(selected.id, { clientId: e.target.value }) }}
+              onChange={e => { if (e.target.value) patchCall(selected.id, { clientId: e.target.value, isSalesCall: false }) }}
               style={{ padding: "3px 6px", border: `1px solid ${selected.clientId ? "#ECE7DE" : "#F59E0B"}`, borderRadius: 5, fontSize: 12 }}
             >
               {!selected.clientId && <option value="">Choose a client…</option>}
@@ -204,7 +253,7 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
             </select>
           </label>
         )}
-        {isCoach && (
+        {isCoach && !selected.isSalesCall && (
           <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
             <input type="checkbox" checked={selected.isGroupCall} onChange={e => patchCall(selected.id, { isGroupCall: e.target.checked, ...(e.target.checked ? {} : { programId: null }) })} style={{ accentColor: "#E9532A" }} />
             Group call
@@ -222,6 +271,14 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
               {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </label>
+        )}
+        {isCoach && (
+          <button
+            onClick={() => handleDeleteCall(selected)}
+            style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "#B91C1C", background: "none", border: "1px solid #F3D4D4", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}
+          >
+            Delete call
+          </button>
         )}
       </div>
 
@@ -348,6 +405,7 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
       return prog ? `Group · ${prog.name}` : "Group · unassigned"
     }
     if (embedded) return null // client's own page — the client is obvious
+    if (call.isSalesCall) return call.prospectEmail
     if (!call.clientId) return "Needs a client"
     return clients.find(c => c.id === call.clientId)?.name ?? null
   }
@@ -367,7 +425,7 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
         <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ flex: 1 }}>{call.title}</span>
           {call.isGroupCall && <GroupBadge />}
-          {!call.isGroupCall && !call.clientId && <DraftBadge />}
+          {!call.isGroupCall && !call.isSalesCall && !call.clientId && <DraftBadge />}
         </div>
         <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>{call.date}{who ? ` · ${who}` : ""}</div>
       </div>
@@ -394,6 +452,24 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
         )}
       </div>
 
+      {showTabs && (
+        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #ECE7DE", marginBottom: 16 }}>
+          {([["client", "Client Calls"], ["sales", "Sales Calls"]] as const).map(([t, label]) => {
+            const active = tab === t
+            const count = calls.filter(c => inTab(c, t)).length
+            return (
+              <button
+                key={t}
+                onClick={() => switchTab(t)}
+                style={{ padding: "8px 14px", background: "none", border: "none", borderBottom: `2px solid ${active ? "#E9532A" : "transparent"}`, marginBottom: -1, fontSize: 13, fontWeight: 600, color: active ? "#1A1916" : "#9C9590", cursor: "pointer" }}
+              >
+                {label} <span style={{ fontWeight: 500, color: "#9C9590" }}>{count}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Add call form */}
       {adding && isCoach && (
         <form onSubmit={handleAddCall} style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 10, padding: 16, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -405,7 +481,7 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
             <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Date</label>
             <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required style={{ padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 13 }} />
           </div>
-          {clients.length > 1 && (
+          {!(showTabs && tab === "sales") && clients.length > 1 && (
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Client</label>
               <select value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))} style={{ padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 13 }}>
@@ -413,11 +489,11 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
               </select>
             </div>
           )}
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#1A1916", cursor: "pointer", padding: "7px 0" }}>
+          {!(showTabs && tab === "sales") && <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#1A1916", cursor: "pointer", padding: "7px 0" }}>
             <input type="checkbox" checked={form.isGroupCall} onChange={e => setForm(f => ({ ...f, isGroupCall: e.target.checked }))} style={{ accentColor: "#E9532A" }} />
             Group call
-          </label>
-          {form.isGroupCall && (
+          </label>}
+          {form.isGroupCall && !(showTabs && tab === "sales") && (
             <div>
               <label style={{ fontSize: 11, color: "#9C9590", display: "block", marginBottom: 4 }}>Program</label>
               <select value={form.programId} onChange={e => setForm(f => ({ ...f, programId: e.target.value }))} style={{ padding: "7px 10px", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 13 }}>
@@ -430,8 +506,8 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
         </form>
       )}
 
-      {calls.length === 0 ? (
-        <div style={{ color: "#9C9590", fontSize: 13, padding: "8px 0" }}>No calls yet.</div>
+      {sortedCalls.length === 0 ? (
+        <div style={{ color: "#9C9590", fontSize: 13, padding: "8px 0" }}>{showTabs && tab === "sales" ? "No sales calls yet." : "No calls yet."}</div>
       ) : isMobile ? (
         // Mobile: single scrolling column; tapping a call expands its notes inline.
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

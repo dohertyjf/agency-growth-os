@@ -162,6 +162,8 @@ interface Call {
   notes: string | null
   isGroupCall: boolean
   programId: string | null
+  isSalesCall: boolean
+  prospectEmail: string | null
   questions: CallQuestion[]
 }
 
