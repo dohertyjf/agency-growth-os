@@ -281,8 +281,8 @@ model ContractDeliveryMonth {
 
 model Call {
   id         String     @id @default(cuid())
-  clientId   String
-  client     Client     @relation(fields: [clientId], references: [id])
+  clientId   String?    // null = draft recap from a non-client email; coach assigns it
+  client     Client?    @relation(fields: [clientId], references: [id])
   date        String
   title       String
   transcript  String?

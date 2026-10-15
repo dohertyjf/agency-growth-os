@@ -153,7 +153,7 @@ interface RoadmapItem {
 interface CallQuestion { id: string; q: string; a: string | null; order: number }
 interface Call {
   id: string
-  clientId: string
+  clientId: string | null
   date: string
   title: string
   transcript: string | null
