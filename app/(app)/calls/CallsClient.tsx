@@ -27,6 +27,7 @@ interface Props {
   isCoach: boolean
   defaultClientId?: string
   embedded?: boolean
+  initialCallId?: string // open this call first (e.g. from a Slack link)
 }
 
 const PAGE_SIZE = 10
@@ -78,16 +79,18 @@ function SalesBadge() {
   )
 }
 
-export default function CallsClient({ calls: initialCalls, clients, programs = [], isCoach, defaultClientId, embedded }: Props) {
+export default function CallsClient({ calls: initialCalls, clients, programs = [], isCoach, defaultClientId, embedded, initialCallId }: Props) {
   const isMobile = useIsMobile()
   const byDateDesc = (a: Call, b: Call) => (b.date || "").localeCompare(a.date || "")
   // Coach's /calls page splits client recaps from sales calls; clients and the
   // embedded client-page view never see sales calls (they have no client).
   const showTabs = isCoach && !embedded
-  const [tab, setTab] = useState<"client" | "sales">("client")
+  // A deep link (?call=<id>, e.g. from a Slack alert) opens that call on its own tab.
+  const linkedCall = initialCalls.find(c => c.id === initialCallId)
+  const [tab, setTab] = useState<"client" | "sales">(showTabs && linkedCall?.isSalesCall ? "sales" : "client")
   const inTab = (c: Call, t = tab) => !showTabs || c.isSalesCall === (t === "sales")
   const [calls, setCalls] = useState<Call[]>([...initialCalls].sort(byDateDesc))
-  const [selected, setSelected] = useState<Call | null>([...initialCalls].sort(byDateDesc).find(c => inTab(c)) ?? null)
+  const [selected, setSelected] = useState<Call | null>(linkedCall ?? [...initialCalls].sort(byDateDesc).find(c => inTab(c)) ?? null)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ clientId: defaultClientId ?? clients[0]?.id ?? "", date: new Date().toISOString().slice(0, 10), title: "", isGroupCall: false, programId: "" })
   const [saving, setSaving] = useState(false)
