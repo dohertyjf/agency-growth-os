@@ -8,8 +8,9 @@ import { z } from "zod"
 //
 // Body (JSON):
 //   emails      — attendee email(s): a string (comma/space separated) or array.
-//                 The first one that belongs to a client (Client.email or a
-//                 client login's email) decides who the call is for.
+//                 The coach's own addresses are ignored; the first remaining
+//                 one that belongs to a client (Client.email or a client
+//                 login's email) decides who the call is for.
 //   title       — call title, e.g. the Meet event name
 //   date        — anything containing YYYY-MM-DD or YYYY/MM/DD
 //   recap       — the recap text (stored as the call's Recap / synopsis)
@@ -69,8 +70,16 @@ export async function POST(req: Request) {
   const date = parseDate(parsed.data.date)
   if (!date) return Response.json({ error: "Could not read a date (need YYYY-MM-DD)" }, { status: 422 })
 
-  const emails = parseEmails(parsed.data.emails)
-  if (emails.length === 0) return Response.json({ error: "No email addresses found" }, { status: 422 })
+  // The coach is on every call, so their own address(es) never decide the
+  // client: coach logins plus anything in COACH_EMAILS are dropped first.
+  const coachEmails = new Set([
+    ...(await prisma.user.findMany({ where: { role: "coach" }, select: { email: true } })).map(u => u.email.toLowerCase()),
+    ...parseEmails(process.env.COACH_EMAILS ?? ""),
+  ])
+  const emails = parseEmails(parsed.data.emails).filter(e => !coachEmails.has(e))
+  if (emails.length === 0) {
+    return Response.json({ error: "No attendee emails other than the coach's were sent" }, { status: 422 })
+  }
 
   // Match on the client's own email first, then on any client login's email.
   const [clients, users] = await Promise.all([
