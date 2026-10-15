@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 interface Question { id: string; q: string; a: string | null; order: number }
 interface Call {
   id: string
-  clientId: string
+  clientId: string | null // null = draft from the recap webhook, waiting for a client
   date: string
   title: string
   transcript: string | null
@@ -56,6 +56,14 @@ function GroupBadge() {
   return (
     <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 8, background: "#EDE9FE", color: "#6D28D9", textTransform: "uppercase", letterSpacing: "0.04em", verticalAlign: "middle", whiteSpace: "nowrap" }}>
       Group
+    </span>
+  )
+}
+
+function DraftBadge() {
+  return (
+    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 8, background: "#FEF3C7", color: "#92400E", textTransform: "uppercase", letterSpacing: "0.04em", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+      Draft
     </span>
   )
 }
@@ -175,10 +183,24 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
       >
         <span style={{ flex: 1 }}>{selected.title}</span>
         {selected.isGroupCall && <GroupBadge />}
+        {!selected.isGroupCall && !selected.clientId && <DraftBadge />}
         {isMobile && <span style={{ fontSize: 12, color: "#9C9590", fontFamily: "inherit" }}>▲</span>}
       </h2>
       <div style={{ fontSize: 12, color: "#9C9590", marginBottom: 20, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <span>{selected.date}</span>
+        {isCoach && !embedded && !selected.isGroupCall && clients.length > 0 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span>Client:</span>
+            <select
+              value={selected.clientId ?? ""}
+              onChange={e => { if (e.target.value) patchCall(selected.id, { clientId: e.target.value }) }}
+              style={{ padding: "3px 6px", border: `1px solid ${selected.clientId ? "#ECE7DE" : "#F59E0B"}`, borderRadius: 5, fontSize: 12 }}
+            >
+              {!selected.clientId && <option value="">Choose a client…</option>}
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+        )}
         {isCoach && (
           <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
             <input type="checkbox" checked={selected.isGroupCall} onChange={e => patchCall(selected.id, { isGroupCall: e.target.checked, ...(e.target.checked ? {} : { programId: null }) })} style={{ accentColor: "#E9532A" }} />
@@ -323,6 +345,7 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
       return prog ? `Group · ${prog.name}` : "Group · unassigned"
     }
     if (embedded) return null // client's own page — the client is obvious
+    if (!call.clientId) return "Needs a client"
     return clients.find(c => c.id === call.clientId)?.name ?? null
   }
 
@@ -341,6 +364,7 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
         <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1916", display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ flex: 1 }}>{call.title}</span>
           {call.isGroupCall && <GroupBadge />}
+          {!call.isGroupCall && !call.clientId && <DraftBadge />}
         </div>
         <div style={{ fontSize: 11, color: "#9C9590", marginTop: 2 }}>{call.date}{who ? ` · ${who}` : ""}</div>
       </div>

@@ -16,9 +16,10 @@ import { z } from "zod"
 //   transcript  — optional transcript text or link
 //   video       — optional recording link
 //
-// Calls with no matching client (prospects, intro calls) are skipped with a
-// 200 so Zapier doesn't flag them as errors. Re-sending the same call
-// (same client, date and title) updates it instead of creating a duplicate.
+// Calls with no matching client (prospects, intro calls) are saved as drafts
+// with no client; the coach assigns them on the Calls page. Re-sending the
+// same call (same client, date and title) updates it instead of creating a
+// duplicate.
 
 const schema = z.object({
   emails: z.union([z.string(), z.array(z.string())]),
@@ -96,10 +97,8 @@ export async function POST(req: Request) {
     if (u?.clientId) { clientId = u.clientId; clientName = u.client?.name ?? ""; break }
   }
 
-  if (!clientId) {
-    return Response.json({ skipped: true, reason: "No August client matches these emails", emails })
-  }
-
+  // No match → draft (clientId null). A resend only ever updates the same
+  // client's call, or an unassigned draft — never another client's call.
   const existing = await prisma.call.findFirst({ where: { clientId, date, title } })
   const data = { synopsis: recap, ...(transcript && { transcript }), ...(video && { video }) }
 
@@ -108,7 +107,14 @@ export async function POST(req: Request) {
     : await prisma.call.create({ data: { clientId, date, title, ...data } })
 
   return Response.json(
-    { ok: true, action: existing ? "updated" : "created", callId: call.id, client: clientName, date },
+    {
+      ok: true,
+      action: existing ? "updated" : clientId ? "created" : "drafted",
+      callId: call.id,
+      client: clientId ? clientName : null,
+      date,
+      ...(clientId ? {} : { note: "No August client matches these emails; saved as a draft to assign", emails }),
+    },
     { status: existing ? 200 : 201 }
   )
 }
