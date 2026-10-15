@@ -148,7 +148,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       checklistMonth={nowYM}
       initialChecklist={initialChecklist}
       goal={goal}
-      initialCalls={calls.map(c => ({ id: c.id, clientId: c.clientId, date: c.date, title: c.title, transcript: c.transcript ?? null, video: c.video ?? null, synopsis: c.synopsis ?? null, notes: c.notes ?? null, isGroupCall: c.isGroupCall, programId: c.programId ?? null, questions: c.questions.map(q => ({ id: q.id, q: q.q, a: q.a ?? null, order: q.order })) }))}
+      initialCalls={calls.map(c => ({ id: c.id, clientId: c.clientId, date: c.date, title: c.title, transcript: c.transcript ?? null, video: c.video ?? null, synopsis: c.synopsis ?? null, notes: c.notes ?? null, isGroupCall: c.isGroupCall, programId: c.programId ?? null, isSalesCall: c.isSalesCall, prospectEmail: c.prospectEmail ?? null, questions: c.questions.map(q => ({ id: q.id, q: q.q, a: q.a ?? null, order: q.order })) }))}
       products={products.map(p => ({ id: p.id, name: p.name, description: p.description ?? null, type: p.type as "retainer" | "ongoing" | "oneoff", monthly: p.monthly }))}
       initialRoadmap={roadmapItems.map(r => ({ key: r.key, status: r.status as "none" | "red" | "yellow" | "green" }))}
     />

@@ -17,8 +17,9 @@ import { z } from "zod"
 //   transcript  — optional transcript text or link
 //   video       — optional recording link
 //
-// Calls with no matching client (prospects, intro calls) are saved as drafts
-// with no client; the coach assigns them on the Calls page. Re-sending the
+// Calls with no matching client (prospects, intro calls) are saved as sales
+// calls with no client and land on the Calls page's Sales Calls tab; if one
+// was really a client call, the coach assigns the client there. Re-sending the
 // same call (same client, date and title) updates it instead of creating a
 // duplicate.
 
@@ -106,23 +107,25 @@ export async function POST(req: Request) {
     if (u?.clientId) { clientId = u.clientId; clientName = u.client?.name ?? ""; break }
   }
 
-  // No match → draft (clientId null). A resend only ever updates the same
-  // client's call, or an unassigned draft — never another client's call.
+  // No match → sales call (clientId null). A resend only ever updates the
+  // same client's call, or an unassigned call — never another client's call.
   const existing = await prisma.call.findFirst({ where: { clientId, date, title } })
   const data = { synopsis: recap, ...(transcript && { transcript }), ...(video && { video }) }
 
   const call = existing
     ? await prisma.call.update({ where: { id: existing.id }, data })
-    : await prisma.call.create({ data: { clientId, date, title, ...data } })
+    : await prisma.call.create({
+        data: { clientId, date, title, ...data, ...(!clientId && { isSalesCall: true, prospectEmail: emails[0] }) },
+      })
 
   return Response.json(
     {
       ok: true,
-      action: existing ? "updated" : clientId ? "created" : "drafted",
+      action: existing ? "updated" : clientId ? "created" : "sales",
       callId: call.id,
       client: clientId ? clientName : null,
       date,
-      ...(clientId ? {} : { note: "No August client matches these emails; saved as a draft to assign", emails }),
+      ...(clientId ? {} : { note: "No August client matches these emails; saved as a sales call", emails }),
     },
     { status: existing ? 200 : 201 }
   )

@@ -291,6 +291,8 @@ model Call {
   notes       String?
   isGroupCall Boolean    @default(false) // group call → visible to its program's clients
   programId   String?    // group calls: which program/cohort this call is for
+  isSalesCall   Boolean  @default(false) // sales/prospect call → Sales Calls tab; always clientId null
+  prospectEmail String?  // sales calls: the attendee the webhook couldn't match to a client
   program     Program?   @relation(fields: [programId], references: [id], onDelete: SetNull)
   questions   Question[]
   createdAt   DateTime   @default(now())
