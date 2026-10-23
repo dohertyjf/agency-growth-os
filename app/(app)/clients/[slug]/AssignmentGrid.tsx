@@ -23,7 +23,13 @@ export default function AssignmentGrid({ clientSlug, contracts, people, members,
 
   const projects = contracts.filter(c => c.status === "active").sort((a, b) => a.name.localeCompare(b.name))
   const team = people.filter(p => !p.isExternal && !(p.endDate && p.endDate < today))
-  if (projects.length === 0 || team.length === 0) return null
+  if (projects.length === 0 || team.length === 0) {
+    return (
+      <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, fontSize: 13, color: "#9C9590" }}>
+        {team.length === 0 ? "Add your team first, then assign them to projects here." : "No active projects to assign yet."}
+      </div>
+    )
+  }
 
   const isMember = (cId: string, pId: string) => members.some(m => m.contractId === cId && m.personId === pId)
   const onProject = (c: Project, pId: string) => c.ownerId === pId || isMember(c.id, pId)
@@ -48,7 +54,7 @@ export default function AssignmentGrid({ clientSlug, contracts, people, members,
   const sticky: React.CSSProperties = { position: "sticky", left: 0, background: "#fff", zIndex: 1 }
 
   return (
-    <div id="assignments" style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20, marginTop: 20 }}>
+    <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1916" }}>Project Assignments</div>

@@ -7,11 +7,12 @@ import ClientPageClient from "../ClientPageClient"
 const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "services", "goals", "team", "calls", "projection", "weekly"] as const
 type Tab = typeof VALID_TABS[number]
 
-export default async function ClientTabPage({ params }: { params: Promise<{ slug: string; tab: string }> }) {
+export default async function ClientTabPage({ params, searchParams }: { params: Promise<{ slug: string; tab: string }>; searchParams: Promise<{ view?: string }> }) {
   const session = await auth()
   if (!session) redirect("/auth/signin")
 
   const { slug, tab } = await params
+  const { view } = await searchParams
   // "insights" is a flagged tab, valid only for allowlisted profiles.
   const showInsights = insightsEnabledForSlug(slug)
   const isValidTab = VALID_TABS.includes(tab as Tab) || (tab === "insights" && showInsights)
@@ -126,6 +127,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       clientName={client.name}
       clientAgency={client.agency ?? null}
       currentTab={tab as Tab}
+      initialView={view ?? null}
       initialWeekly={weeklyMetrics.map(w => ({ weekStart: w.weekStart, leads: w.leads, callsScheduled: w.callsScheduled, callsHeld: w.callsHeld, deepDives: w.deepDives, proposalsSent: w.proposalsSent, newClients: w.newClients, marketingSpend: w.marketingSpend, revenue: w.revenue }))}
       initialStatus={client.status as "potential" | "active" | "paused"}
       initialStartDate={client.startDate ?? null}

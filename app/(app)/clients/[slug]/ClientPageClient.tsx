@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import Dashboard from "@/components/Dashboard"
 import ContractsPanel from "./ContractsPanel"
@@ -181,6 +181,7 @@ interface Props {
   clientName: string
   clientAgency: string | null
   currentTab: Tab
+  initialView: string | null
   initialStatus: "potential" | "active" | "paused"
   initialStartDate: string | null
   initialEndDate: string | null
@@ -233,7 +234,7 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function ClientPageClient({
-  clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
+  clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab, initialView,
   initialStatus, initialStartDate, initialEndDate,
   metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialProjectMembers, initialCostItems, initialCostMonths, initialDeliveryMonths, initialDeliveryWeeks, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
 }: Props) {
@@ -248,6 +249,9 @@ export default function ClientPageClient({
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
   const [reconView, setReconView] = useState<"reconcile" | "projection" | "yield" | "capacity">("reconcile")
   const [projectView, setProjectView] = useState<"list" | "timeline" | "capacity" | "yield" | "profit">("list")
+  // ?view=assignments (the Close-Out link) opens the Team tab on Assignments.
+  const [teamView, setTeamView] = useState<"team" | "assignments">(initialView === "assignments" ? "assignments" : "team")
+  useEffect(() => { if (initialView === "assignments") setTeamView("assignments") }, [initialView])
   const [pulses, setPulses] = useState<Pulse[]>(initialPulses)
   // Hand-edited weekly hours live here so they survive switching Projects views.
   const [deliveryWeeks, setDeliveryWeeks] = useState<DeliveryWeekRow[]>(initialDeliveryWeeks)
@@ -610,6 +614,17 @@ export default function ClientPageClient({
       )}
 
       {currentTab === "team" && (
+        <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 16 }}>
+          {([["team", "Team"], ["assignments", "Assignments"]] as const).map(([v, label]) => (
+            <button key={v} onClick={() => setTeamView(v)}
+              style={{ padding: "4px 14px", fontSize: 12, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: teamView === v ? "#fff" : "transparent", color: teamView === v ? "#1A1916" : "#9C9590", boxShadow: teamView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {currentTab === "team" && teamView === "team" && (
         <PeoplePanel
           clientId={clientId}
           initialPeople={people}
@@ -633,7 +648,7 @@ export default function ClientPageClient({
           })}
         />
       )}
-      {currentTab === "team" && (
+      {currentTab === "team" && teamView === "assignments" && (
         <AssignmentGrid
           clientSlug={clientSlug}
           contracts={contracts}
