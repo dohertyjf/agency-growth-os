@@ -28,7 +28,7 @@ export default function MonthlyChecklist({
   const items: Item[] = [
     { key: "numbers", label: `Enter ${prevLabel}'s numbers on the Dashboard`, tab: "dashboard" },
     { key: "reconcile", label: "Reconcile payments — what's collected vs. not", tab: "reconciliation" },
-    { key: "owners", label: "Make sure every active project has an owner", tab: "projects", hint: unownedCount > 0 ? `${unownedCount} without an owner` : undefined },
+    { key: "owners", label: "Make sure every active project has an owner and its team assigned", tab: "team#assignments", hint: unownedCount > 0 ? `${unownedCount} without an owner` : undefined },
     {
       key: "hours", label: `Log ${prevLabel}'s hours — every team member, on every project they're on`, tab: "projects",
       hint: hourGaps.length > 0 ? `${hourGaps.length} missing` : undefined,

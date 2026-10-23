@@ -15,6 +15,7 @@ import GoalsPanel from "./GoalsPanel"
 import ClientLoginPanel from "./ClientLoginPanel"
 import ProgramAssignPanel from "./ProgramAssignPanel"
 import PeoplePanel from "./PeoplePanel"
+import AssignmentGrid from "./AssignmentGrid"
 import PipelinePanel from "./PipelinePanel"
 import CapacitySold from "./CapacitySold"
 import ProjectCapacity from "./ProjectCapacity"
@@ -237,6 +238,7 @@ export default function ClientPageClient({
   metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialProjectMembers, initialCostItems, initialCostMonths, initialDeliveryMonths, initialDeliveryWeeks, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
+  const [projectMembers, setProjectMembers] = useState(initialProjectMembers)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
   const [payments, setPayments] = useState<Payment[]>(initialPayments)
@@ -300,6 +302,11 @@ export default function ClientPageClient({
     })
   }
 
+  function handleOwnerChange(contractId: string, ownerId: string | null) {
+    setContracts(prev => prev.map(c => c.id === contractId ? { ...c, ownerId } : c))
+    fetch(`/api/contracts/${contractId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ownerId }) }).catch(() => {})
+  }
+
   function handleContractAccountChange(contractId: string, accountId: string | null) {
     setContracts(prev => prev.map(c => c.id === contractId ? { ...c, accountId } : c))
   }
@@ -322,7 +329,7 @@ export default function ClientPageClient({
   // Ownership checks: every active project has an owner; everyone on a project
   // logged hours against it for the month being closed out.
   const unownedCount = unownedProjects(contracts).length
-  const hourGaps = hoursGaps(contracts, initialProjectMembers, people, initialMemberHours, prevYM, checklistMonth)
+  const hourGaps = hoursGaps(contracts, projectMembers, people, initialMemberHours, prevYM, checklistMonth)
 
   const currency = goal?.currency ?? "USD"
 
@@ -624,6 +631,16 @@ export default function ClientPageClient({
             if (idx >= 0) return prev.map((h, i) => i === idx ? hm : h)
             return [...prev, hm]
           })}
+        />
+      )}
+      {currentTab === "team" && (
+        <AssignmentGrid
+          clientSlug={clientSlug}
+          contracts={contracts}
+          people={people}
+          members={projectMembers}
+          onOwnerChange={handleOwnerChange}
+          onMembersChange={setProjectMembers}
         />
       )}
     </div>

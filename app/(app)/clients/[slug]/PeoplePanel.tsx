@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo, useRef, useEffect } from "react"
+import { Fragment, useState, useMemo, useRef, useEffect } from "react"
 import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
 import { ymLabel, ymAdd } from "@/lib/calc"
 import type { ProfitContract, AccountMonthRow, PaymentRow } from "@/lib/profit"
@@ -1500,7 +1500,7 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
             {shownPeople.map((p) => {
               const rowBorder = "1px solid #ECE7DE"
               return (
-                <>
+                <Fragment key={p.id}>
                   {/* Salary row */}
                   <tr key={`${p.id}-salary`}>
                     <td style={{ ...stickyLabel, paddingTop: 10, borderBottom: "none", fontWeight: 500, fontSize: 13, color: "#1A1916" }}>
@@ -1566,7 +1566,7 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
                       <td colSpan={months.length + 1} style={{ borderBottom: rowBorder, padding: 0, height: 1 }} />
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
 

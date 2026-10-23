@@ -48,6 +48,13 @@ export async function PUT(
       update: { hours },
       create: { contractId, personId, month, hours },
     })
+    // Logging time on a project puts the person on it, so assignments keep
+    // themselves current. An existing member's title is left alone.
+    await prisma.projectMember.upsert({
+      where: { contractId_personId: { contractId, personId } },
+      update: {},
+      create: { contractId, personId },
+    })
   }
 
   const agg = await prisma.projectMemberHoursMonth.aggregate({ where: { contractId, month }, _sum: { hours: true } })
