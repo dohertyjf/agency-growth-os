@@ -20,6 +20,7 @@ import CapacitySold from "./CapacitySold"
 import ProjectCapacity from "./ProjectCapacity"
 import type { DeliveryWeekRow } from "@/lib/capacityWeekly"
 import MonthlyChecklist from "./MonthlyChecklist"
+import { unownedProjects, hoursGaps } from "@/lib/ownership"
 import WeeklyTracker, { type WeeklyRow } from "@/components/WeeklyTracker"
 import CallsClient from "../../calls/CallsClient"
 import InsightsClient from "../../insights/InsightsClient"
@@ -189,6 +190,7 @@ interface Props {
   initialPayments: Payment[]
   initialContractHours: ContractHours[]
   initialMemberHours: MemberHoursRow[]
+  initialProjectMembers: { contractId: string; personId: string }[]
   initialCostItems: CostItemRow[]
   initialCostMonths: CostMonthRow[]
   initialDeliveryMonths: ContractHours[]
@@ -232,7 +234,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialCostItems, initialCostMonths, initialDeliveryMonths, initialDeliveryWeeks, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialProjectMembers, initialCostItems, initialCostMonths, initialDeliveryMonths, initialDeliveryWeeks, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
@@ -317,6 +319,11 @@ export default function ClientPageClient({
     })
   }).length
 
+  // Ownership checks: every active project has an owner; everyone on a project
+  // logged hours against it for the month being closed out.
+  const unownedCount = unownedProjects(contracts).length
+  const hourGaps = hoursGaps(contracts, initialProjectMembers, people, initialMemberHours, prevYM, checklistMonth)
+
   const currency = goal?.currency ?? "USD"
 
   return (
@@ -340,6 +347,8 @@ export default function ClientPageClient({
         initial={initialChecklist}
         renewalCount={renewalCount}
         atRiskCount={atRiskCount}
+        unownedCount={unownedCount}
+        hourGaps={hourGaps}
       />
 
       <div className="tab-strip" style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE", overflowX: "auto", scrollbarWidth: "none" }}>
@@ -600,6 +609,8 @@ export default function ClientPageClient({
           initialSalaryMonths={salaryMonths}
           initialHoursMonths={hoursMonths}
           contracts={contracts}
+          accountMonths={initialAccountMonths}
+          payments={payments}
           goal={goal}
           metrics={metrics.map(m => ({ month: m.month, closeRate: m.closeRate, leads: m.leads, newClients: m.newClients }))}
           onPeopleChange={setPeople}

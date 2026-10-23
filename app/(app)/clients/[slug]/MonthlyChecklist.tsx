@@ -2,11 +2,14 @@
 import { useState } from "react"
 import Link from "next/link"
 import { ymAdd, ymLabel } from "@/lib/calc"
+import type { HoursGap } from "@/lib/ownership"
+
+const GAPS_SHOWN = 8
 
 interface Item { key: string; label: string; tab: string; hint?: string }
 
 export default function MonthlyChecklist({
-  clientId, clientSlug, month, initial, renewalCount, atRiskCount,
+  clientId, clientSlug, month, initial, renewalCount, atRiskCount, unownedCount, hourGaps,
 }: {
   clientId: string
   clientSlug: string
@@ -14,6 +17,8 @@ export default function MonthlyChecklist({
   initial: { dismissed: boolean; checkedKeys: string[] } | null
   renewalCount: number
   atRiskCount: number
+  unownedCount: number
+  hourGaps: HoursGap[]
 }) {
   const [dismissed, setDismissed] = useState(initial?.dismissed ?? false)
   const [checked, setChecked] = useState<Set<string>>(new Set(initial?.checkedKeys ?? []))
@@ -23,7 +28,11 @@ export default function MonthlyChecklist({
   const items: Item[] = [
     { key: "numbers", label: `Enter ${prevLabel}'s numbers on the Dashboard`, tab: "dashboard" },
     { key: "reconcile", label: "Reconcile payments — what's collected vs. not", tab: "reconciliation" },
-    { key: "hours", label: `Log ${prevLabel}'s hours`, tab: "reconciliation" },
+    { key: "owners", label: "Make sure every active project has an owner", tab: "projects", hint: unownedCount > 0 ? `${unownedCount} without an owner` : undefined },
+    {
+      key: "hours", label: `Log ${prevLabel}'s hours — every team member, on every project they're on`, tab: "projects",
+      hint: hourGaps.length > 0 ? `${hourGaps.length} missing` : undefined,
+    },
     { key: "pulse", label: "Update Pulse scores for active projects", tab: "projects" },
     { key: "finished", label: "Confirm finished projects (auto-moved — anything look off?)", tab: "projects" },
     { key: "pipeline", label: "Make sure the Pipeline is up to date", tab: "pipeline" },
@@ -77,7 +86,8 @@ export default function MonthlyChecklist({
         {items.map(item => {
           const on = checked.has(item.key)
           return (
-            <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid #F5F1EC" }}>
+            <div key={item.key} style={{ borderTop: "1px solid #F5F1EC" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0" }}>
               <button onClick={() => toggle(item.key)} aria-label={on ? "Uncheck" : "Check"}
                 style={{ width: 20, height: 20, flexShrink: 0, borderRadius: 5, border: on ? "none" : "1.5px solid #D8CFC2", background: on ? "#1F7A4D" : "#fff", color: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
                 {on ? "✓" : ""}
@@ -87,6 +97,17 @@ export default function MonthlyChecklist({
                 <span style={{ fontSize: 10, fontWeight: 700, color: "#B45309", background: "#FEF3C7", borderRadius: 20, padding: "2px 9px", whiteSpace: "nowrap" }}>{item.hint}</span>
               )}
               <Link href={`/clients/${clientSlug}/${item.tab}`} style={{ fontSize: 12, color: "#E9532A", textDecoration: "none", fontWeight: 600, whiteSpace: "nowrap" }}>Go →</Link>
+            </div>
+            {item.key === "hours" && !on && hourGaps.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", padding: "0 0 8px 30px", fontSize: 12, color: "#6B6760" }}>
+                {hourGaps.slice(0, GAPS_SHOWN).map(g => (
+                  <Link key={g.contractId + g.personId} href={`/clients/${clientSlug}/projects/${g.contractId}`} style={{ color: "#6B6760", textDecoration: "none" }}>
+                    <strong style={{ color: "#1A1916", fontWeight: 600 }}>{g.personName}</strong> · {g.contractName}
+                  </Link>
+                ))}
+                {hourGaps.length > GAPS_SHOWN && <span style={{ color: "#9C9590" }}>+{hourGaps.length - GAPS_SHOWN} more</span>}
+              </div>
+            )}
             </div>
           )
         })}

@@ -79,9 +79,10 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   const contractHours = await prisma.contractHoursMonth.findMany({ where: { contract: { clientId: id } } })
   // Per-project profit inputs: per-person hours and cost line items.
-  const [memberHours, costItems] = await Promise.all([
+  const [memberHours, costItems, projectMembers] = await Promise.all([
     prisma.projectMemberHoursMonth.findMany({ where: { contract: { clientId: id } } }),
     prisma.projectCostItem.findMany({ where: { contract: { clientId: id } }, include: { months: true } }),
+    prisma.projectMember.findMany({ where: { contract: { clientId: id } }, select: { contractId: true, personId: true } }),
   ])
   const deliveryMonths = await prisma.contractDeliveryMonth.findMany({ where: { contract: { clientId: id } } })
   // Tolerant of the table not existing yet, so a deploy that lands before the
@@ -139,6 +140,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
       initialContractHours={contractHours.map(h => ({ contractId: h.contractId, month: h.month, hours: h.hours }))}
       initialMemberHours={memberHours.map(h => ({ contractId: h.contractId, personId: h.personId, month: h.month, hours: h.hours }))}
+      initialProjectMembers={projectMembers}
       initialCostItems={costItems.map(i => ({ id: i.id, contractId: i.contractId, name: i.name, category: i.category, reimbursed: i.reimbursed }))}
       initialCostMonths={costItems.flatMap(i => i.months.map(m => ({ costItemId: m.costItemId, month: m.month, amount: m.amount })))}
       initialDeliveryMonths={deliveryMonths.map(d => ({ contractId: d.contractId, month: d.month, hours: d.hours }))}
