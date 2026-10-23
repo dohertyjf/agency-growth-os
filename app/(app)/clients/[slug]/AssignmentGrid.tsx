@@ -6,6 +6,12 @@ import Link from "next/link"
 // Click a cell to put someone on a project (or take them off); pick the owner
 // per row. Same saves as the project page — ProjectMember rows and ownerId.
 
+// "Matt Bryant" → "Matt B", so two Matts stay distinguishable in the header.
+function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}` : parts[0]
+}
+
 interface Project { id: string; name: string; status: string; ownerId?: string | null }
 interface Person { id: string; name: string; isExternal: boolean; endDate: string | null }
 interface Member { contractId: string; personId: string }
@@ -74,7 +80,7 @@ export default function AssignmentGrid({ clientSlug, contracts, people, members,
             <tr>
               <th style={{ ...th, ...sticky, textAlign: "left", minWidth: 170 }}>Project</th>
               <th style={{ ...th, textAlign: "left" }}>Owner</th>
-              {team.map(p => <th key={p.id} style={{ ...th, textAlign: "center" }}>{p.name.split(" ")[0]}</th>)}
+              {team.map(p => <th key={p.id} title={p.name} style={{ ...th, textAlign: "center" }}>{shortName(p.name)}</th>)}
             </tr>
           </thead>
           <tbody>
