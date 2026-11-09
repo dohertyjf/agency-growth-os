@@ -30,3 +30,7 @@ textarea:focus, input:focus {
 
 /* Hide scrollbar on tab strips while keeping scroll behaviour */
 .tab-strip::-webkit-scrollbar { display: none; }
+
+/* Contact emails that open a Gmail draft: plain until hovered. */
+.gmail-link { text-decoration: none; }
+.gmail-link:hover { text-decoration: underline; }

@@ -28,7 +28,19 @@ interface Contract {
   kickoffDate: string | null
 }
 
-interface Account { id: string; name: string }
+interface Account { id: string; name: string; contactEmail?: string | null }
+
+// Contact email that opens a Gmail compose draft in a new tab. Not draggable, so
+// grabbing it on a board card doesn't start a stage drag.
+function GmailLink({ email, color }: { email: string; color: string }) {
+  return (
+    <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`}
+      target="_blank" rel="noopener noreferrer" title="Draft an email in Gmail" draggable={false} className="gmail-link"
+      style={{ fontSize: 11, color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+      {email}
+    </a>
+  )
+}
 interface Person { id: string; name: string; isExternal: boolean }
 interface Product { id: string; name: string; type: string; monthly: number }
 interface Payment { contractId: string; month: string; amount: number }
@@ -383,7 +395,9 @@ interface DealCardProps {
 }
 
 function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, onEdit, onDelete, fmt$, noteCount = 0, onNoteCountChange, secondaryLabel, onSecondary, product, dealValue }: DealCardProps) {
-  const accountName = deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name : null
+  const account = deal.accountId ? accounts.find(a => a.id === deal.accountId) : undefined
+  const accountName = account?.name ?? null
+  const contactEmail = account?.contactEmail ?? null
   const daysSinceCall = daysSince(deal.callDate)
 
   return (
@@ -397,6 +411,7 @@ function DealCard({ deal, accounts, advanceLabel, onAdvance, onLost, onRevert, o
           {accountName && (
             <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>{accountName}</div>
           )}
+          {contactEmail && <div style={{ marginTop: 1 }}><GmailLink email={contactEmail} color="#9C9590" /></div>}
           <div style={{ fontSize: 11, color: "#C0BAB2", marginTop: 2 }}>{dealMeta(deal)}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6, fontSize: 11, color: "#9C9590" }}>
             {deal.callDate && (
@@ -530,8 +545,8 @@ function DealGroup({ title, subtitle, deals, accounts, advanceLabel, onAdvance, 
   )
 }
 
-function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage }: {
-  deal: Contract; accountName: string | null; product?: string; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void; onSetStage: (id: string, stage: Stage) => void
+function BoardCard({ deal, accountName, contactEmail, product, count, fmt$, onEdit, onSetStage }: {
+  deal: Contract; accountName: string | null; contactEmail?: string | null; product?: string; count: number; fmt$: (v: number) => string; onEdit: (d: Contract) => void; onSetStage: (id: string, stage: Stage) => void
 }) {
   return (
     <div draggable
@@ -542,6 +557,7 @@ function BoardCard({ deal, accountName, product, count, fmt$, onEdit, onSetStage
         <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1916", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{fmt$(deal.monthly)}</span>
       </div>
       {accountName && <div style={{ fontSize: 11, color: "#9C9590" }}>{accountName}</div>}
+      {contactEmail && <GmailLink email={contactEmail} color="#9C9590" />}
       {product && <div style={{ fontSize: 9, fontWeight: 700, color: "#4B5563", background: "#F0EBE3", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.03em", display: "inline-block" }}>{product}</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
         {count > 0 && <span title="Call notes" style={{ fontSize: 10, background: "#F0EBE3", color: "#6B6760", borderRadius: 99, padding: "1px 7px", fontWeight: 700 }}>📝 {count}</span>}
@@ -600,6 +616,7 @@ function BoardColumn({ col, deals, accounts, products, noteCounts, fmt$, onEdit,
         {shown.map(deal => (
           <BoardCard key={deal.id} deal={deal} count={noteCounts[deal.id] ?? 0} fmt$={fmt$} onEdit={onEdit} onSetStage={onSetStage}
             accountName={deal.accountId ? accounts.find(a => a.id === deal.accountId)?.name ?? null : null}
+            contactEmail={deal.accountId ? accounts.find(a => a.id === deal.accountId)?.contactEmail ?? null : null}
             product={deal.productId ? products.find(p => p.id === deal.productId)?.name ?? undefined : undefined} />
         ))}
         {shown.length === 0 && <div style={{ fontSize: 11, color: "#C0BAB2", textAlign: "center", padding: "8px 0" }}>Drop here</div>}

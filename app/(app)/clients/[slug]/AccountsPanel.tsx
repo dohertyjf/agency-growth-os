@@ -531,7 +531,7 @@ export default function AccountsPanel({ clientId, clientSlug, initialAccounts, p
                         {account.contactName}
                         {account.contactName && account.contactEmail && " · "}
                         {account.contactEmail && (
-                          <a href={`mailto:${account.contactEmail}`} style={{ color: "#9C9590" }}>{account.contactEmail}</a>
+                          <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(account.contactEmail)}`} target="_blank" rel="noopener noreferrer" title="Draft an email in Gmail" className="gmail-link" style={{ color: "#9C9590" }}>{account.contactEmail}</a>
                         )}
                       </div>
                     )}
