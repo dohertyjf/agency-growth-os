@@ -292,7 +292,7 @@ export default function AccountDetailClient(props: Props) {
           <div style={{ fontSize: 13, color: "#6B6760" }}>
             {account.contactName}
             {account.contactName && account.contactEmail && " · "}
-            {account.contactEmail && <a href={`mailto:${account.contactEmail}`} style={{ color: "#6B6760" }}>{account.contactEmail}</a>}
+            {account.contactEmail && <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(account.contactEmail)}`} target="_blank" rel="noopener noreferrer" title="Draft an email in Gmail" className="gmail-link" style={{ color: "#6B6760" }}>{account.contactEmail}</a>}
             {!account.contactName && !account.contactEmail && <span style={{ color: "#9C9590" }}>No contact set</span>}
           </div>
         </div>
