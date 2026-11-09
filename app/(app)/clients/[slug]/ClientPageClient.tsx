@@ -137,6 +137,7 @@ interface Goal {
   peoplePct?: number
   currency?: string
   minHourlyRate?: number | null
+  ownerMultiple?: number | null
 }
 
 interface Product {
@@ -359,7 +360,7 @@ export default function ClientPageClient({
         renewalCount={renewalCount}
         atRiskCount={atRiskCount}
         unownedCount={unownedCount}
-        hourGaps={hourGaps}
+        missingHoursCount={hourGaps.length}
       />
 
       <div className="tab-strip" style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE", overflowX: "auto", scrollbarWidth: "none" }}>

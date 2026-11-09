@@ -79,6 +79,7 @@ type Contract = ProfitContract
 interface Goal {
   peoplePct?: number | null
   closeRatePct?: number
+  ownerMultiple?: number | null
 }
 
 interface Metric { month: string; closeRate: number; leads: number; newClients: number }
@@ -319,16 +320,20 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
   // month, against a multiple of their own salary for that month.
   const nowYM = new Date().toISOString().slice(0, 7)
   const [ownedMonth, setOwnedMonth] = useState(nowYM)
-  const [ownerMultiple, setOwnerMultiple] = useState(DEFAULT_OWNER_MULTIPLE)
-  useEffect(() => {
-    try {
-      const v = parseFloat(localStorage.getItem(`ownerMultiple:${clientId}`) ?? "")
-      if (v > 0) setOwnerMultiple(v)
-    } catch {}
-  }, [clientId])
+  // Target multiple is a per-client setting (Settings tab → Project Ownership),
+  // also editable here. Saved shortly after typing stops.
+  const [ownerMultiple, setOwnerMultiple] = useState(goal?.ownerMultiple ?? DEFAULT_OWNER_MULTIPLE)
+  const ownerSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   function saveOwnerMultiple(v: number) {
     setOwnerMultiple(v)
-    try { localStorage.setItem(`ownerMultiple:${clientId}`, String(v)) } catch {}
+    if (ownerSaveTimer.current) clearTimeout(ownerSaveTimer.current)
+    ownerSaveTimer.current = setTimeout(() => {
+      fetch(`/api/clients/${clientId}/goal`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ownerMultiple: v }),
+      }).catch(() => {})
+    }, 600)
   }
   const ownership = useMemo(() => {
     const map = new Map<string, { total: number; names: string[]; multiple: number | null }>()

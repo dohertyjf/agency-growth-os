@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { fmtCurrency } from "@/lib/calc"
+import { DEFAULT_OWNER_MULTIPLE } from "@/lib/ownership"
 
 function currencySymbol(c: string) {
   if (c === "GBP") return "£"
@@ -15,6 +16,7 @@ interface Goal {
   peoplePct?: number
   currency?: string
   minHourlyRate?: number | null
+  ownerMultiple?: number | null
 }
 
 interface Props {
@@ -60,6 +62,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
   const [closeRatePct, setCloseRatePct] = useState(initialGoal ? String(initialGoal.closeRatePct) : "50")
   const [peoplePct, setPeoplePct] = useState(initialGoal?.peoplePct != null ? String(initialGoal.peoplePct) : "30")
   const [minHourlyRate, setMinHourlyRate] = useState(initialGoal?.minHourlyRate != null ? String(initialGoal.minHourlyRate) : "")
+  const [ownerMultiple, setOwnerMultiple] = useState(initialGoal?.ownerMultiple != null ? String(initialGoal.ownerMultiple) : "")
   const [currency, setCurrency] = useState(initialGoal?.currency ?? "USD")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -72,6 +75,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
   const closeRatePctNum = parseFloat(closeRatePct) || 0
   const peoplePctNum = parseFloat(peoplePct) || 0
   const minHourlyRateNum = parseFloat(minHourlyRate) || 0
+  const ownerMultipleNum = parseFloat(ownerMultiple) || 0
 
   function handleAnnualChange(val: string) {
     const n = parseFloat(val) || 0
@@ -93,7 +97,7 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
       const res = await fetch(`/api/clients/${clientId}/goal`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ monthlyRevenue: monthlyNum, netProfitPct: netProfitPctNum, closeRatePct: closeRatePctNum, peoplePct: peoplePctNum, currency, minHourlyRate: minHourlyRateNum > 0 ? minHourlyRateNum : null }),
+        body: JSON.stringify({ monthlyRevenue: monthlyNum, netProfitPct: netProfitPctNum, closeRatePct: closeRatePctNum, peoplePct: peoplePctNum, currency, minHourlyRate: minHourlyRateNum > 0 ? minHourlyRateNum : null, ownerMultiple: ownerMultipleNum > 0 ? ownerMultipleNum : null }),
       })
       if (!res.ok) throw new Error("Save failed")
       setSaved(true)
@@ -215,6 +219,19 @@ export default function GoalsPanel({ clientId, initialGoal }: Props) {
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: "#9C9590" }}>
               The floor your projects should earn per hour. Used to flag under-performing projects and to budget hours (revenue ÷ this rate).
+            </div>
+          </div>
+        </div>
+
+        {/* Project ownership */}
+        <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 20 }}>
+          <SectionLabel>Project Ownership</SectionLabel>
+          <div style={{ maxWidth: 220 }}>
+            <FieldLabel hint="× salary">Owner Revenue Target</FieldLabel>
+            <input style={inputStyle} type="number" min={1} step={0.5}
+              value={ownerMultiple} onChange={e => setOwnerMultiple(e.target.value)} placeholder={String(DEFAULT_OWNER_MULTIPLE)} />
+            <div style={{ marginTop: 8, fontSize: 12, color: "#9C9590" }}>
+              How much monthly project revenue each project owner should oversee, as a multiple of their monthly salary. Shown as &ldquo;Revenue owned&rdquo; on the Team tab. Leave blank for {DEFAULT_OWNER_MULTIPLE}×.
             </div>
           </div>
         </div>

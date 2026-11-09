@@ -138,6 +138,7 @@ model Goal {
   peoplePct      Float  @default(30)
   currency       String @default("USD")
   minHourlyRate  Float? // minimum acceptable $/hr, used to flag projects on the yield table
+  ownerMultiple  Float? // revenue each project owner should oversee, as a multiple of their salary (null = 6×)
 }
 
 model Contract {

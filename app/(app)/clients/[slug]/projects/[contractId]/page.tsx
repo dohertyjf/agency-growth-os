@@ -51,7 +51,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         }}
         account={account ? { id: account.id, name: account.name } : null}
         products={products.map(p => ({ id: p.id, name: p.name, type: p.type }))}
-        people={people.map(p => ({ id: p.id, name: p.name, role: p.role ?? null, isExternal: p.isExternal, annualSalary: p.annualSalary, billableHours: p.billableHours }))}
+        people={people.map(p => ({ id: p.id, name: p.name, role: p.role ?? null, isExternal: p.isExternal, annualSalary: p.annualSalary, billableHours: p.billableHours, startDate: p.startDate ?? null, endDate: p.endDate ?? null }))}
         salaryMonths={salaryMonths.map(s => ({ personId: s.personId, month: s.month, monthlySalary: s.monthlySalary }))}
         capacityMonths={capacityMonths.map(h => ({ personId: h.personId, month: h.month, monthlyHours: h.monthlyHours }))}
         members={members.map(m => ({ personId: m.personId, role: m.role ?? null }))}
