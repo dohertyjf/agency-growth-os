@@ -1,18 +1,23 @@
 import type { Metadata } from "next"
-import { Cormorant_Garamond, Hanken_Grotesk } from "next/font/google"
+import localFont from "next/font/local"
 import "./globals.css"
 
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
+// Self-hosted (latin, variable weight) so builds don't depend on fetching from Google Fonts.
+const cormorant = localFont({
+  src: [
+    { path: "./fonts/CormorantGaramond.woff2", weight: "400 700", style: "normal" },
+    { path: "./fonts/CormorantGaramond-Italic.woff2", weight: "400 700", style: "italic" },
+  ],
   variable: "--font-cormorant",
+  display: "swap",
+  adjustFontFallback: "Times New Roman",
 })
 
-const hanken = Hanken_Grotesk({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+const hanken = localFont({
+  src: "./fonts/HankenGrotesk.woff2",
+  weight: "400 800",
   variable: "--font-hanken",
+  display: "swap",
 })
 
 export const metadata: Metadata = {
