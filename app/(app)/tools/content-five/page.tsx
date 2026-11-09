@@ -1,10 +1,10 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { DM_Sans } from "next/font/google"
+import localFont from "next/font/local"
 import ContentFiveTool from "@/components/ContentFiveTool"
 
-const dmSans = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-dm" })
+const dmSans = localFont({ src: "../../../fonts/DMSans.woff2", weight: "400 700", variable: "--font-dm", display: "swap" })
 
 export const metadata = { title: "The Content Five — Agency Growth OS" }
 
