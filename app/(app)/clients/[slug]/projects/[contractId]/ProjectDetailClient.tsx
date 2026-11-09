@@ -8,9 +8,10 @@ import {
   COST_CATEGORIES, deliveryMonths, deliveryWindow, personCostRate, projectMonthPnl, projectLifetimePnl, ymAdd,
   type ProfitContract, type ProfitInputs, type MonthPnl,
 } from "@/lib/profit"
+import { hoursGaps, signedInMonth } from "@/lib/ownership"
 import type { Pulse } from "../../ProjectPulse"
 
-interface Person { id: string; name: string; role: string | null; isExternal: boolean; annualSalary: number; billableHours: number }
+interface Person { id: string; name: string; role: string | null; isExternal: boolean; annualSalary: number; billableHours: number; startDate: string | null; endDate: string | null }
 interface Member { personId: string; role: string | null }
 interface CostItem { id: string; contractId: string; name: string; category: string; reimbursed: boolean }
 
@@ -201,6 +202,18 @@ export default function ProjectDetailClient(props: Props) {
     })
   }, [contract.ownerId, members, memberHours, people])
 
+  // Last month's hours: if the project was running then, flag a month with no
+  // hours at all, or the people on it who haven't logged theirs.
+  const prevMonth = ymAdd(now, -1)
+  const prevMissing = useMemo(() => {
+    if (!signedInMonth(contract, prevMonth, now)) return null
+    const total = memberHours.filter(h => h.month === prevMonth).reduce((s, h) => s + h.hours, 0)
+      + (contractHours.find(h => h.month === prevMonth)?.hours ?? 0)
+    if (total <= 0) return { none: true, names: [] as string[] }
+    const gaps = hoursGaps([contract], members.map(m => ({ contractId: contract.id, personId: m.personId })), people, memberHours, prevMonth, now)
+    return gaps.length > 0 ? { none: false, names: gaps.map(g => g.personName) } : null
+  }, [contract, members, people, memberHours, contractHours, prevMonth])
+
   const hoursOf = (personId: string, m: string) => memberHours.find(h => h.personId === personId && h.month === m)?.hours ?? null
   const memberSum = (m: string) => memberHours.filter(h => h.month === m).reduce((s, h) => s + h.hours, 0)
   // Hours in the project total beyond the per-person rows — logged on the Yield view
@@ -356,6 +369,13 @@ export default function ProjectDetailClient(props: Props) {
             </span>
           </div>
           {statusError && <div style={{ fontSize: 11, color: "#B23A1B", marginTop: 6 }}>{statusError} — set it in the Delivery field.</div>}
+          {prevMissing && (
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#B23A1B", marginTop: 8 }}>
+              {prevMissing.none
+                ? `No hours provided for ${ymLabel(prevMonth)}`
+                : `No hours provided for ${ymLabel(prevMonth)} by ${prevMissing.names.join(", ")}`}
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div>

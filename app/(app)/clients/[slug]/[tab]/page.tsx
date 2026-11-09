@@ -7,11 +7,12 @@ import ClientPageClient from "../ClientPageClient"
 const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "services", "goals", "team", "calls", "projection", "weekly"] as const
 type Tab = typeof VALID_TABS[number]
 
-export default async function ClientTabPage({ params }: { params: Promise<{ slug: string; tab: string }> }) {
+export default async function ClientTabPage({ params, searchParams }: { params: Promise<{ slug: string; tab: string }>; searchParams: Promise<{ view?: string }> }) {
   const session = await auth()
   if (!session) redirect("/auth/signin")
 
   const { slug, tab } = await params
+  const { view } = await searchParams
   // "insights" is a flagged tab, valid only for allowlisted profiles.
   const showInsights = insightsEnabledForSlug(slug)
   const isValidTab = VALID_TABS.includes(tab as Tab) || (tab === "insights" && showInsights)
@@ -79,9 +80,10 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
 
   const contractHours = await prisma.contractHoursMonth.findMany({ where: { contract: { clientId: id } } })
   // Per-project profit inputs: per-person hours and cost line items.
-  const [memberHours, costItems] = await Promise.all([
+  const [memberHours, costItems, projectMembers] = await Promise.all([
     prisma.projectMemberHoursMonth.findMany({ where: { contract: { clientId: id } } }),
     prisma.projectCostItem.findMany({ where: { contract: { clientId: id } }, include: { months: true } }),
+    prisma.projectMember.findMany({ where: { contract: { clientId: id } }, select: { contractId: true, personId: true } }),
   ])
   const deliveryMonths = await prisma.contractDeliveryMonth.findMany({ where: { contract: { clientId: id } } })
   // Tolerant of the table not existing yet, so a deploy that lands before the
@@ -125,6 +127,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       clientName={client.name}
       clientAgency={client.agency ?? null}
       currentTab={tab as Tab}
+      initialView={view ?? null}
       initialWeekly={weeklyMetrics.map(w => ({ weekStart: w.weekStart, leads: w.leads, callsScheduled: w.callsScheduled, callsHeld: w.callsHeld, deepDives: w.deepDives, proposalsSent: w.proposalsSent, newClients: w.newClients, marketingSpend: w.marketingSpend, revenue: w.revenue }))}
       initialStatus={client.status as "potential" | "active" | "paused"}
       initialStartDate={client.startDate ?? null}
@@ -139,6 +142,7 @@ export default async function ClientTabPage({ params }: { params: Promise<{ slug
       initialPayments={payments.map(p => ({ contractId: p.contractId, month: p.month, amount: p.amount }))}
       initialContractHours={contractHours.map(h => ({ contractId: h.contractId, month: h.month, hours: h.hours }))}
       initialMemberHours={memberHours.map(h => ({ contractId: h.contractId, personId: h.personId, month: h.month, hours: h.hours }))}
+      initialProjectMembers={projectMembers}
       initialCostItems={costItems.map(i => ({ id: i.id, contractId: i.contractId, name: i.name, category: i.category, reimbursed: i.reimbursed }))}
       initialCostMonths={costItems.flatMap(i => i.months.map(m => ({ costItemId: m.costItemId, month: m.month, amount: m.amount })))}
       initialDeliveryMonths={deliveryMonths.map(d => ({ contractId: d.contractId, month: d.month, hours: d.hours }))}

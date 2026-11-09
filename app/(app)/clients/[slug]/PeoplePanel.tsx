@@ -1,7 +1,9 @@
 "use client"
-import { useState, useMemo, useRef, useEffect } from "react"
+import { Fragment, useState, useMemo, useRef, useEffect } from "react"
 import { useFmtCurrency, useCurrency } from "@/lib/CurrencyContext"
-import { ymLabel } from "@/lib/calc"
+import { ymLabel, ymAdd } from "@/lib/calc"
+import type { ProfitContract, AccountMonthRow, PaymentRow } from "@/lib/profit"
+import { ownedRevenue, unownedProjects, DEFAULT_OWNER_MULTIPLE } from "@/lib/ownership"
 
 const PEOPLE_STYLES = `
   .pm-cards { display: none; }
@@ -72,15 +74,12 @@ interface PersonHoursMonth {
   monthlyHours: number
 }
 
-interface Contract {
-  status: string
-  monthly: number
-  hoursPerMonth: number
-}
+type Contract = ProfitContract
 
 interface Goal {
   peoplePct?: number | null
   closeRatePct?: number
+  ownerMultiple?: number | null
 }
 
 interface Metric { month: string; closeRate: number; leads: number; newClients: number }
@@ -91,6 +90,8 @@ interface Props {
   initialSalaryMonths: PersonSalaryMonth[]
   initialHoursMonths?: PersonHoursMonth[]
   contracts?: Contract[]
+  accountMonths?: AccountMonthRow[]
+  payments?: PaymentRow[]
   goal?: Goal | null
   metrics?: Metric[]
   onPeopleChange?: (people: Person[]) => void
@@ -176,7 +177,7 @@ type AddMode = "none" | "internal" | "external" | "bulk"
 
 const emptyForm = { name: "", role: "", coreRoles: [] as string[], description: "", annualSalary: "", billableHours: "", startDate: "", endDate: "", isFullTime: true }
 
-export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, initialHoursMonths = [], contracts = [], goal, metrics = [], onPeopleChange, onSalaryMonthChange, onHoursMonthChange }: Props) {
+export default function PeoplePanel({ clientId, initialPeople, initialSalaryMonths, initialHoursMonths = [], contracts = [], accountMonths = [], payments = [], goal, metrics = [], onPeopleChange, onSalaryMonthChange, onHoursMonthChange }: Props) {
   const fmt$ = useFmtCurrency()
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [salaryMonths, setSalaryMonths] = useState<PersonSalaryMonth[]>(initialSalaryMonths)
@@ -314,6 +315,54 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
 
   const internalHours = internal.reduce((s, p) => s + p.billableHours, 0)
   const internalSalaries = internal.reduce((s, p) => s + p.annualSalary, 0)
+
+  // Revenue owned — signed project revenue each person oversees in the chosen
+  // month, against a multiple of their own salary for that month.
+  const nowYM = new Date().toISOString().slice(0, 7)
+  const [ownedMonth, setOwnedMonth] = useState(nowYM)
+  // Target multiple is a per-client setting (Settings tab → Project Ownership),
+  // also editable here. Saved shortly after typing stops.
+  const [ownerMultiple, setOwnerMultiple] = useState(goal?.ownerMultiple ?? DEFAULT_OWNER_MULTIPLE)
+  const ownerSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function saveOwnerMultiple(v: number) {
+    setOwnerMultiple(v)
+    if (ownerSaveTimer.current) clearTimeout(ownerSaveTimer.current)
+    ownerSaveTimer.current = setTimeout(() => {
+      fetch(`/api/clients/${clientId}/goal`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ownerMultiple: v }),
+      }).catch(() => {})
+    }, 600)
+  }
+  const ownership = useMemo(() => {
+    const map = new Map<string, { total: number; names: string[]; multiple: number | null }>()
+    for (const p of internal) {
+      const { total, rows } = ownedRevenue(p.id, contracts, ownedMonth, { accountMonths, payments }, nowYM)
+      const salary = salaryMonths.find(s => s.personId === p.id && s.month === ownedMonth)?.monthlySalary ?? p.annualSalary / 12
+      map.set(p.id, { total, names: rows.map(r => r.contract.name), multiple: salary > 0 ? total / salary : null })
+    }
+    return map
+  }, [internal, contracts, ownedMonth, accountMonths, payments, salaryMonths, nowYM])
+  const ownedTotal = [...ownership.values()].reduce((s, o) => s + o.total, 0)
+  const unownedCount = unownedProjects(contracts).length
+  const ownedMonthOptions = Array.from({ length: 12 }, (_, i) => ymAdd(nowYM, -i))
+
+  function ownedCell(p: Person, align: "left" | "right") {
+    const o = ownership.get(p.id)
+    if (!o || o.total === 0) return <span style={{ color: "#C0BAB2" }}>—</span>
+    const hit = o.multiple !== null && o.multiple >= ownerMultiple
+    return (
+      <div title={o.names.join("\n")} style={{ textAlign: align, cursor: "help" }}>
+        <div style={{ fontSize: 13, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmt$(o.total)}/mo</div>
+        {o.multiple !== null && (
+          <div style={{ fontSize: 11, fontWeight: 700, color: hit ? "#166534" : "#B45309", fontVariantNumeric: "tabular-nums" }}>
+            {o.multiple.toFixed(1)}× salary
+          </div>
+        )}
+      </div>
+    )
+  }
   const externalCosts = external.reduce((s, p) => s + p.annualSalary, 0)
 
   return (
@@ -424,6 +473,9 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                       {p.annualSalary > 0 && <span><strong style={{ color: "#1A1916" }}>{fmt$(p.annualSalary)}</strong>/yr</span>}
                       {p.billableHours > 0 && <span>{p.billableHours} hrs/mo</span>}
                     </div>
+                    {(ownership.get(p.id)?.total ?? 0) > 0 && (
+                      <div style={{ marginTop: 6 }}>{ownedCell(p, "left")}</div>
+                    )}
                   </div>
                 )
               })}
@@ -433,8 +485,8 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    {["Name", "Title", "Core Roles", "Annual Salary", "Billable hrs/mo", "Cost/hr", ""].map(h => (
-                      <th key={h} title={h === "Cost/hr" ? "Monthly salary ÷ billable hours — what an hour of this person costs on a project" : undefined} style={{ textAlign: h === "Annual Salary" || h === "Billable hrs/mo" || h === "Cost/hr" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
+                    {["Name", "Title", "Core Roles", "Annual Salary", "Billable hrs/mo", "Cost/hr", "Revenue owned", ""].map(h => (
+                      <th key={h} title={h === "Cost/hr" ? "Monthly salary ÷ billable hours — what an hour of this person costs on a project" : h === "Revenue owned" ? `Signed project revenue this person owns in ${ymLabel(ownedMonth)}, as a multiple of their monthly salary (target ${ownerMultiple}×)` : undefined} style={{ textAlign: h === "Annual Salary" || h === "Billable hrs/mo" || h === "Cost/hr" || h === "Revenue owned" ? "right" : "left", fontSize: 11, fontWeight: 600, color: "#9C9590", padding: "4px 8px", borderBottom: "1px solid #ECE7DE" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -468,6 +520,7 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
                         <td style={{ padding: "10px 8px", fontSize: 13, color: "#6B6760", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                           {p.annualSalary > 0 && p.billableHours > 0 ? fmt$(p.annualSalary / 12 / p.billableHours) : <span style={{ color: "#C0BAB2" }}>—</span>}
                         </td>
+                        <td style={{ padding: "10px 8px", textAlign: "right" }}>{ownedCell(p, "right")}</td>
                         <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
                           <button onClick={() => startEdit(p)} style={{ fontSize: 11, color: "#9C9590", background: "none", border: "1px solid #ECE7DE", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>Edit</button>
                           <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "#C2410C", background: "none", border: "1px solid #FCA5A5", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>Remove</button>
@@ -499,6 +552,36 @@ export default function PeoplePanel({ clientId, initialPeople, initialSalaryMont
               <div>
                 <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 2 }}>Total annual salaries</div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmt$(internalSalaries)}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {internal.length > 0 && (
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #ECE7DE", display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 2 }}>Revenue owned in</div>
+              <select value={ownedMonth} onChange={e => setOwnedMonth(e.target.value)}
+                style={{ fontSize: 13, border: "1px solid #ECE7DE", borderRadius: 6, padding: "4px 8px", background: "#fff", color: "#1A1916", fontFamily: "inherit", cursor: "pointer" }}>
+                {ownedMonthOptions.map(m => <option key={m} value={m}>{ymLabel(m)}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 2 }}>Owned across the team</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1916", fontVariantNumeric: "tabular-nums" }}>{fmt$(ownedTotal)}/mo</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#9C9590", marginBottom: 2 }} title="Each owner should oversee at least this multiple of their own salary in project revenue">Owner target</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input type="number" min={1} step={0.5} value={ownerMultiple}
+                  onChange={e => { const v = parseFloat(e.target.value); if (v > 0) saveOwnerMultiple(v) }}
+                  style={{ ...inputStyle, width: 64, padding: "4px 8px", textAlign: "right" }} />
+                <span style={{ fontSize: 13, color: "#6B6760" }}>× salary</span>
+              </div>
+            </div>
+            {unownedCount > 0 && (
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#B45309", background: "#FEF3C7", borderRadius: 20, padding: "3px 10px", marginBottom: 3 }}>
+                {unownedCount} active project{unownedCount === 1 ? "" : "s"} without an owner
               </div>
             )}
           </div>
@@ -1422,7 +1505,7 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
             {shownPeople.map((p) => {
               const rowBorder = "1px solid #ECE7DE"
               return (
-                <>
+                <Fragment key={p.id}>
                   {/* Salary row */}
                   <tr key={`${p.id}-salary`}>
                     <td style={{ ...stickyLabel, paddingTop: 10, borderBottom: "none", fontWeight: 500, fontSize: 13, color: "#1A1916" }}>
@@ -1488,7 +1571,7 @@ function PersonSalaryTable({ people, salaryMonths, hoursMonths, clientId, onSala
                       <td colSpan={months.length + 1} style={{ borderBottom: rowBorder, padding: 0, height: 1 }} />
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
 

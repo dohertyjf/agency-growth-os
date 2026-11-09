@@ -29,6 +29,7 @@ const schema = z.object({
   peoplePct: z.number().min(0).max(100).default(30),
   currency: z.enum(["USD", "GBP", "EUR", "CAD"]).default("USD"),
   minHourlyRate: z.number().min(0).nullable().optional(),
+  ownerMultiple: z.number().positive().max(100).nullable().optional(),
 })
 
 export async function PUT(
@@ -43,7 +44,7 @@ export async function PUT(
   const parsed = schema.safeParse(body)
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
 
-  const { monthlyRevenue, netProfitPct, closeRatePct, peoplePct, currency, minHourlyRate } = parsed.data
+  const { monthlyRevenue, netProfitPct, closeRatePct, peoplePct, currency, minHourlyRate, ownerMultiple } = parsed.data
   const data = {
     monthlyRevenue,
     netProfitPct,
@@ -53,6 +54,7 @@ export async function PUT(
     annualRevenue: monthlyRevenue * 12,
     profit: monthlyRevenue * (netProfitPct / 100) * 12,
     ...(minHourlyRate !== undefined ? { minHourlyRate } : {}),
+    ...(ownerMultiple !== undefined ? { ownerMultiple } : {}),
   }
 
   const goal = await prisma.goal.upsert({
@@ -67,6 +69,7 @@ export async function PUT(
 // so callers don't need to resend the whole goal.
 const patchSchema = z.object({
   minHourlyRate: z.number().min(0).nullable().optional(),
+  ownerMultiple: z.number().positive().max(100).nullable().optional(),
 })
 
 export async function PATCH(

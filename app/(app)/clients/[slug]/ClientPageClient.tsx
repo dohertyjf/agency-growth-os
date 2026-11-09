@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import Dashboard from "@/components/Dashboard"
 import ContractsPanel from "./ContractsPanel"
@@ -15,11 +15,13 @@ import GoalsPanel from "./GoalsPanel"
 import ClientLoginPanel from "./ClientLoginPanel"
 import ProgramAssignPanel from "./ProgramAssignPanel"
 import PeoplePanel from "./PeoplePanel"
+import AssignmentGrid from "./AssignmentGrid"
 import PipelinePanel from "./PipelinePanel"
 import CapacitySold from "./CapacitySold"
 import ProjectCapacity from "./ProjectCapacity"
 import type { DeliveryWeekRow } from "@/lib/capacityWeekly"
 import MonthlyChecklist from "./MonthlyChecklist"
+import { unownedProjects, hoursGaps } from "@/lib/ownership"
 import WeeklyTracker, { type WeeklyRow } from "@/components/WeeklyTracker"
 import CallsClient from "../../calls/CallsClient"
 import InsightsClient from "../../insights/InsightsClient"
@@ -135,6 +137,7 @@ interface Goal {
   peoplePct?: number
   currency?: string
   minHourlyRate?: number | null
+  ownerMultiple?: number | null
 }
 
 interface Product {
@@ -179,6 +182,7 @@ interface Props {
   clientName: string
   clientAgency: string | null
   currentTab: Tab
+  initialView: string | null
   initialStatus: "potential" | "active" | "paused"
   initialStartDate: string | null
   initialEndDate: string | null
@@ -189,6 +193,7 @@ interface Props {
   initialPayments: Payment[]
   initialContractHours: ContractHours[]
   initialMemberHours: MemberHoursRow[]
+  initialProjectMembers: { contractId: string; personId: string }[]
   initialCostItems: CostItemRow[]
   initialCostMonths: CostMonthRow[]
   initialDeliveryMonths: ContractHours[]
@@ -230,11 +235,12 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function ClientPageClient({
-  clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab,
+  clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab, initialView,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialCostItems, initialCostMonths, initialDeliveryMonths, initialDeliveryWeeks, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialProjectMembers, initialCostItems, initialCostMonths, initialDeliveryMonths, initialDeliveryWeeks, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
+  const [projectMembers, setProjectMembers] = useState(initialProjectMembers)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
   const [payments, setPayments] = useState<Payment[]>(initialPayments)
@@ -244,6 +250,9 @@ export default function ClientPageClient({
   const [hoursMonths, setHoursMonths] = useState<PersonHoursMonth[]>(initialHoursMonths)
   const [reconView, setReconView] = useState<"reconcile" | "projection" | "yield" | "capacity">("reconcile")
   const [projectView, setProjectView] = useState<"list" | "timeline" | "capacity" | "yield" | "profit">("list")
+  // ?view=assignments (the Close-Out link) opens the Team tab on Assignments.
+  const [teamView, setTeamView] = useState<"team" | "assignments">(initialView === "assignments" ? "assignments" : "team")
+  useEffect(() => { if (initialView === "assignments") setTeamView("assignments") }, [initialView])
   const [pulses, setPulses] = useState<Pulse[]>(initialPulses)
   // Hand-edited weekly hours live here so they survive switching Projects views.
   const [deliveryWeeks, setDeliveryWeeks] = useState<DeliveryWeekRow[]>(initialDeliveryWeeks)
@@ -298,6 +307,11 @@ export default function ClientPageClient({
     })
   }
 
+  function handleOwnerChange(contractId: string, ownerId: string | null) {
+    setContracts(prev => prev.map(c => c.id === contractId ? { ...c, ownerId } : c))
+    fetch(`/api/contracts/${contractId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ownerId }) }).catch(() => {})
+  }
+
   function handleContractAccountChange(contractId: string, accountId: string | null) {
     setContracts(prev => prev.map(c => c.id === contractId ? { ...c, accountId } : c))
   }
@@ -316,6 +330,11 @@ export default function ClientPageClient({
       return (cur && cur.score <= 2) || (cur && prev && cur.score < prev.score)
     })
   }).length
+
+  // Ownership checks: every active project has an owner; everyone on a project
+  // logged hours against it for the month being closed out.
+  const unownedCount = unownedProjects(contracts).length
+  const hourGaps = hoursGaps(contracts, projectMembers, people, initialMemberHours, prevYM, checklistMonth)
 
   const currency = goal?.currency ?? "USD"
 
@@ -340,6 +359,8 @@ export default function ClientPageClient({
         initial={initialChecklist}
         renewalCount={renewalCount}
         atRiskCount={atRiskCount}
+        unownedCount={unownedCount}
+        missingHoursCount={hourGaps.length}
       />
 
       <div className="tab-strip" style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: "2px solid #ECE7DE", overflowX: "auto", scrollbarWidth: "none" }}>
@@ -594,12 +615,25 @@ export default function ClientPageClient({
       )}
 
       {currentTab === "team" && (
+        <div style={{ display: "flex", gap: 2, background: "#F5F1EC", borderRadius: 6, padding: 2, width: "fit-content", marginBottom: 16 }}>
+          {([["team", "Team"], ["assignments", "Assignments"]] as const).map(([v, label]) => (
+            <button key={v} onClick={() => setTeamView(v)}
+              style={{ padding: "4px 14px", fontSize: 12, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer", background: teamView === v ? "#fff" : "transparent", color: teamView === v ? "#1A1916" : "#9C9590", boxShadow: teamView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {currentTab === "team" && teamView === "team" && (
         <PeoplePanel
           clientId={clientId}
           initialPeople={people}
           initialSalaryMonths={salaryMonths}
           initialHoursMonths={hoursMonths}
           contracts={contracts}
+          accountMonths={initialAccountMonths}
+          payments={payments}
           goal={goal}
           metrics={metrics.map(m => ({ month: m.month, closeRate: m.closeRate, leads: m.leads, newClients: m.newClients }))}
           onPeopleChange={setPeople}
@@ -613,6 +647,16 @@ export default function ClientPageClient({
             if (idx >= 0) return prev.map((h, i) => i === idx ? hm : h)
             return [...prev, hm]
           })}
+        />
+      )}
+      {currentTab === "team" && teamView === "assignments" && (
+        <AssignmentGrid
+          clientSlug={clientSlug}
+          contracts={contracts}
+          people={people}
+          members={projectMembers}
+          onOwnerChange={handleOwnerChange}
+          onMembersChange={setProjectMembers}
         />
       )}
     </div>

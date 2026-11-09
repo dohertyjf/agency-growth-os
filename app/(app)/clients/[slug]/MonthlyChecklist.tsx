@@ -6,7 +6,7 @@ import { ymAdd, ymLabel } from "@/lib/calc"
 interface Item { key: string; label: string; tab: string; hint?: string }
 
 export default function MonthlyChecklist({
-  clientId, clientSlug, month, initial, renewalCount, atRiskCount,
+  clientId, clientSlug, month, initial, renewalCount, atRiskCount, unownedCount, missingHoursCount,
 }: {
   clientId: string
   clientSlug: string
@@ -14,6 +14,8 @@ export default function MonthlyChecklist({
   initial: { dismissed: boolean; checkedKeys: string[] } | null
   renewalCount: number
   atRiskCount: number
+  unownedCount: number
+  missingHoursCount: number
 }) {
   const [dismissed, setDismissed] = useState(initial?.dismissed ?? false)
   const [checked, setChecked] = useState<Set<string>>(new Set(initial?.checkedKeys ?? []))
@@ -23,7 +25,11 @@ export default function MonthlyChecklist({
   const items: Item[] = [
     { key: "numbers", label: `Enter ${prevLabel}'s numbers on the Dashboard`, tab: "dashboard" },
     { key: "reconcile", label: "Reconcile payments — what's collected vs. not", tab: "reconciliation" },
-    { key: "hours", label: `Log ${prevLabel}'s hours`, tab: "reconciliation" },
+    { key: "owners", label: "Make sure every active project has an owner and its team assigned", tab: "team?view=assignments", hint: unownedCount > 0 ? `${unownedCount} without an owner` : undefined },
+    {
+      key: "hours", label: `Log ${prevLabel}'s hours — every team member, on every project they're on`, tab: "projects",
+      hint: missingHoursCount > 0 ? `${missingHoursCount} missing — flagged in red on each project` : undefined,
+    },
     { key: "pulse", label: "Update Pulse scores for active projects", tab: "projects" },
     { key: "finished", label: "Confirm finished projects (auto-moved — anything look off?)", tab: "projects" },
     { key: "pipeline", label: "Make sure the Pipeline is up to date", tab: "pipeline" },
