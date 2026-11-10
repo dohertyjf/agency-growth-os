@@ -6,6 +6,7 @@ import { canSeeSessions } from "@/lib/libraryServer"
 import { lines, categoryLabel } from "@/lib/library"
 import { videoEmbedUrl } from "@/lib/video"
 import ImplementChecklist from "@/components/library/ImplementChecklist"
+import PublishButton from "@/components/library/PublishButton"
 
 const resourceLink: React.CSSProperties = {
   display: "block", padding: "10px 14px", border: "1px solid #ECE7DE", borderRadius: 8, fontSize: 13, fontWeight: 600,
@@ -56,7 +57,10 @@ export default async function TrainingPage({ params }: { params: Promise<{ id: s
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 6, flexWrap: "wrap" }}>
         <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 32, fontWeight: 600, margin: 0, color: "#1A1916", flex: 1, lineHeight: 1.15 }}>{training.title}</h1>
         {isCoach && (
-          <Link href={`/sessions/${id}/edit`} style={{ padding: "6px 14px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, color: "#4A4640", textDecoration: "none", background: "#fff" }}>Edit</Link>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Link href={`/sessions/${id}/edit`} style={{ padding: "6px 14px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, color: "#4A4640", textDecoration: "none", background: "#fff" }}>Edit</Link>
+            <PublishButton trainingId={id} published={!!training.publishedAt} />
+          </div>
         )}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", fontSize: 12, color: "#9C9590", marginBottom: 22 }}>
