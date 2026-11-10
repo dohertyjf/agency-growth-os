@@ -25,6 +25,7 @@ export default async function ProgramsPage() {
         id: p.id,
         name: p.name,
         isGroup: p.isGroup,
+        sessionsAccess: p.sessionsAccess,
         callCount: p._count.calls,
         clientIds: p.memberships.map(m => m.clientId),
       }))}

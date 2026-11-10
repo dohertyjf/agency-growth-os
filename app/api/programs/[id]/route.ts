@@ -9,6 +9,7 @@ function coachOnly(session: import("next-auth").Session | null) {
 const schema = z.object({
   name: z.string().min(1).optional(),
   isGroup: z.boolean().optional(),
+  sessionsAccess: z.boolean().optional(),
 })
 
 export async function PATCH(
@@ -20,9 +21,10 @@ export async function PATCH(
   const { id } = await params
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return Response.json({ error: "Invalid" }, { status: 422 })
-  const data: { name?: string; isGroup?: boolean } = {}
+  const data: { name?: string; isGroup?: boolean; sessionsAccess?: boolean } = {}
   if (parsed.data.name !== undefined) data.name = parsed.data.name.trim()
   if (parsed.data.isGroup !== undefined) data.isGroup = parsed.data.isGroup
+  if (parsed.data.sessionsAccess !== undefined) data.sessionsAccess = parsed.data.sessionsAccess
   const program = await prisma.program.update({ where: { id }, data })
   return Response.json(program)
 }

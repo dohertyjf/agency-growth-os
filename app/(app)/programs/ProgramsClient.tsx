@@ -1,7 +1,7 @@
 "use client"
 import { useState } from "react"
 
-interface Program { id: string; name: string; isGroup: boolean; callCount: number; clientIds: string[] }
+interface Program { id: string; name: string; isGroup: boolean; sessionsAccess: boolean; callCount: number; clientIds: string[] }
 interface Client { id: string; name: string; status: string }
 
 const isActive = (c: Client) => c.status === "active"
@@ -69,7 +69,7 @@ export default function ProgramsClient({ initialPrograms, allClients }: { initia
     setSaving(false)
     if (res.ok) {
       const p = await res.json()
-      setPrograms(prev => [...prev, { id: p.id, name: p.name, isGroup: p.isGroup, callCount: 0, clientIds: [] }]
+      setPrograms(prev => [...prev, { id: p.id, name: p.name, isGroup: p.isGroup, sessionsAccess: p.sessionsAccess ?? false, callCount: 0, clientIds: [] }]
         .sort((a, b) => Number(b.isGroup) - Number(a.isGroup) || a.name.localeCompare(b.name)))
       setNewName(""); setNewIsGroup(false)
     }
@@ -87,6 +87,11 @@ export default function ProgramsClient({ initialPrograms, allClients }: { initia
   async function toggleType(id: string, isGroup: boolean) {
     patchLocal(id, { isGroup })
     await fetch(`/api/programs/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isGroup }) })
+  }
+
+  async function toggleSessions(id: string, sessionsAccess: boolean) {
+    patchLocal(id, { sessionsAccess })
+    await fetch(`/api/programs/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionsAccess }) })
   }
 
   async function toggleClient(programId: string, clientId: string, current: string[]) {
@@ -110,7 +115,7 @@ export default function ProgramsClient({ initialPrograms, allClients }: { initia
     <div>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Programs</h1>
-        <p style={{ fontSize: 13, color: "#9C9590", margin: 0 }}>Your offerings. Mark each as Group or 1:1, then add clients. Clients in a <strong>Group</strong> program see that program&apos;s group-call recaps; 1:1 programs are just how you categorize clients.</p>
+        <p style={{ fontSize: 13, color: "#9C9590", margin: 0 }}>Your offerings. Mark each as Group or 1:1, then add clients. Clients in a <strong>Group</strong> program see that program&apos;s group-call recaps; 1:1 programs are just how you categorize clients. Clients in a program with <strong>Sessions</strong> on can see the Sessions trainings.</p>
       </div>
 
       <div style={{ background: unassignedActive.length ? "#FDF6EC" : "#F0FAF4", border: `1px solid ${unassignedActive.length ? "#F5D9A8" : "#BBEFCE"}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, maxWidth: 640 }}>
@@ -149,13 +154,17 @@ export default function ProgramsClient({ initialPrograms, allClients }: { initia
                 ) : (
                   <>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1916", display: "flex", alignItems: "center", gap: 8 }}>{p.name} <TypeBadge isGroup={p.isGroup} /></div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1916", display: "flex", alignItems: "center", gap: 8 }}>{p.name} <TypeBadge isGroup={p.isGroup} />{p.sessionsAccess && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "#FDF1EC", color: "#C2410C", textTransform: "uppercase", letterSpacing: "0.04em" }}>Sessions</span>}</div>
                       <div style={{ fontSize: 12, color: "#9C9590", marginTop: 2 }}>{p.clientIds.length} client{p.clientIds.length === 1 ? "" : "s"}{p.isGroup ? ` · ${p.callCount} group call${p.callCount === 1 ? "" : "s"}` : ""}</div>
                     </div>
                     <select value={p.isGroup ? "group" : "solo"} onChange={e => toggleType(p.id, e.target.value === "group")} style={{ ...inputStyle, padding: "5px 8px", fontSize: 12 }}>
                       <option value="solo">1:1</option>
                       <option value="group">Group</option>
                     </select>
+                    <label title="Members of this program can see Sessions" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#6B6760", cursor: "pointer", whiteSpace: "nowrap" }}>
+                      <input type="checkbox" checked={p.sessionsAccess} onChange={e => toggleSessions(p.id, e.target.checked)} />
+                      Sessions
+                    </label>
                     <button onClick={() => setExpandedId(expandedId === p.id ? null : p.id)} style={{ background: "none", border: "1px solid #ECE7DE", borderRadius: 5, fontSize: 12, color: "#6B6760", cursor: "pointer", padding: "5px 10px" }}>
                       {expandedId === p.id ? "Done" : "Clients"}
                     </button>

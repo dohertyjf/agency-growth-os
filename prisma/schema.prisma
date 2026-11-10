@@ -45,60 +45,61 @@ model User {
 }
 
 model Client {
-  id            String          @id @default(cuid())
-  slug          String?         @unique
-  name          String
-  agency        String?
-  email         String          @unique
-  status        ClientStatus    @default(active)
-  startDate     String?
-  endDate       String?
-  projectionState String?       // JSON: saved Growth Projection input state
-  memberships   ProgramMembership[] // programs/cohorts this client belongs to
-  users         User[]
-  goal          Goal?
-  metrics       MonthlyMetric[]
-  contracts     Contract[]
-  accounts      Account[]
-  calls         Call[]
-  products      Product[]
-  roadmapItems  RoadmapItem[]
-  people        Person[]
+  id                String              @id @default(cuid())
+  slug              String?             @unique
+  name              String
+  agency            String?
+  email             String              @unique
+  status            ClientStatus        @default(active)
+  startDate         String?
+  endDate           String?
+  projectionState   String? // JSON: saved Growth Projection input state
+  memberships       ProgramMembership[] // programs/cohorts this client belongs to
+  users             User[]
+  goal              Goal?
+  metrics           MonthlyMetric[]
+  contracts         Contract[]
+  accounts          Account[]
+  calls             Call[]
+  products          Product[]
+  roadmapItems      RoadmapItem[]
+  people            Person[]
   monthlyChecklists MonthlyChecklist[]
-  weeklyMetrics WeeklyMetric[]
-  createdAt     DateTime        @default(now())
+  weeklyMetrics     WeeklyMetric[]
+  libraryProgress   LibraryProgress[]
+  createdAt         DateTime            @default(now())
 }
 
 model Account {
-  id           String     @id @default(cuid())
+  id           String        @id @default(cuid())
   clientId     String
-  client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name         String
   contactName  String?
   contactEmail String?
   notes        String?
-  ownerId      String?    // account owner (AM); defaults to a project owner in the UI
-  createdAt    DateTime   @default(now())
+  ownerId      String? // account owner (AM); defaults to a project owner in the UI
+  createdAt    DateTime      @default(now())
   contracts    Contract[]
   notesLog     AccountNote[]
 }
 
 model MonthlyMetric {
-  id            String @id @default(cuid())
-  clientId      String
-  client        Client @relation(fields: [clientId], references: [id])
-  month         String
-  revenue       Float  @default(0)
-  totalExpenses Float  @default(0)
-  salaries      Float  @default(0)
-  software      Float  @default(0)
-  cashInBank    Float  @default(0)
+  id             String @id @default(cuid())
+  clientId       String
+  client         Client @relation(fields: [clientId], references: [id])
+  month          String
+  revenue        Float  @default(0)
+  totalExpenses  Float  @default(0)
+  salaries       Float  @default(0)
+  software       Float  @default(0)
+  cashInBank     Float  @default(0)
   leads          Float  @default(0)
   newClients     Float  @default(0)
-  closeRate       Float  @default(0)
-  churn           Float  @default(0)
-  marketingSpend  Float  @default(0)
-  activeClients   Float  @default(0) // clients served that month; 0 = not entered, derive from projects
+  closeRate      Float  @default(0)
+  churn          Float  @default(0)
+  marketingSpend Float  @default(0)
+  activeClients  Float  @default(0) // clients served that month; 0 = not entered, derive from projects
 
   @@unique([clientId, month])
 }
@@ -109,18 +110,18 @@ model MonthlyMetric {
 // month here is not the calendar month. Deliberately independent of
 // MonthlyMetric, which stays the authority on calendar-month figures.
 model WeeklyMetric {
-  id             String @id @default(cuid())
+  id             String   @id @default(cuid())
   clientId       String
-  client         Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   weekStart      String // YYYY-MM-DD, always a Sunday
-  leads          Float  @default(0)
-  callsScheduled Float  @default(0)
-  callsHeld      Float  @default(0)
-  deepDives      Float  @default(0)
-  proposalsSent  Float  @default(0)
-  newClients     Float  @default(0)
-  marketingSpend Float  @default(0)
-  revenue        Float  @default(0) // collected — "revenue in bank"
+  leads          Float    @default(0)
+  callsScheduled Float    @default(0)
+  callsHeld      Float    @default(0)
+  deepDives      Float    @default(0)
+  proposalsSent  Float    @default(0)
+  newClients     Float    @default(0)
+  marketingSpend Float    @default(0)
+  revenue        Float    @default(0) // collected — "revenue in bank"
   updatedAt      DateTime @updatedAt
 
   @@unique([clientId, weekStart])
@@ -142,31 +143,31 @@ model Goal {
 }
 
 model Contract {
-  id                String         @id @default(cuid())
+  id                String                    @id @default(cuid())
   clientId          String
-  client            Client         @relation(fields: [clientId], references: [id])
+  client            Client                    @relation(fields: [clientId], references: [id])
   name              String
   monthly           Float
-  hoursPerMonth     Float          @default(0)
-  actualHours       Float?         // one-offs: real hours spent, vs hoursPerMonth (sold/projected)
+  hoursPerMonth     Float                     @default(0)
+  actualHours       Float? // one-offs: real hours spent, vs hoursPerMonth (sold/projected)
   start             String
   contractedThrough String?
-  status            ContractStatus @default(active)
-  verbal            Boolean        @default(false) // pipeline: verbal yes, not yet signed/paid
-  stageEnteredAt    DateTime?      @default(now()) // when the deal last changed pipeline stage
-  updatedAt         DateTime       @updatedAt      // last edit of any kind
-  type              ContractType   @default(retainer)
+  status            ContractStatus            @default(active)
+  verbal            Boolean                   @default(false) // pipeline: verbal yes, not yet signed/paid
+  stageEnteredAt    DateTime?                 @default(now()) // when the deal last changed pipeline stage
+  updatedAt         DateTime                  @updatedAt // last edit of any kind
+  type              ContractType              @default(retainer)
   accountId         String?
-  productId         String?        // which Product (package) this project signed onto
-  deliveryStart     String?        // one-offs: work window start (YYYY-MM), decoupled from payment
-  deliveryEnd       String?        // one-offs: work window end (YYYY-MM)
-  ownerId           String?        // Person who owns/manages this account
-  account           Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  product           Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId         String? // which Product (package) this project signed onto
+  deliveryStart     String? // one-offs: work window start (YYYY-MM), decoupled from payment
+  deliveryEnd       String? // one-offs: work window end (YYYY-MM)
+  ownerId           String? // Person who owns/manages this account
+  account           Account?                  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  product           Product?                  @relation(fields: [productId], references: [id], onDelete: SetNull)
   callDate          String?
   signedDate        String?
   kickoffDate       String?
-  createdAt         DateTime       @default(now())
+  createdAt         DateTime                  @default(now())
   accountMonths     AccountMonth[]
   payments          ContractPayment[]
   hoursMonths       ContractHoursMonth[]
@@ -184,8 +185,8 @@ model ContractPulse {
   id         String   @id @default(cuid())
   contractId String
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  month      String   // YYYY-MM
-  score      Int      // 1–5
+  month      String // YYYY-MM
+  score      Int // 1–5
   note       String?
   createdAt  DateTime @default(now())
 
@@ -193,19 +194,19 @@ model ContractPulse {
 }
 
 model Person {
-  id               String              @id @default(cuid())
+  id               String                    @id @default(cuid())
   clientId         String
-  client           Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client           Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name             String
   role             String?
   responsibilities String?
-  isExternal       Boolean             @default(false)
-  isFullTime       Boolean             @default(true)
-  annualSalary     Float               @default(0)
-  billableHours    Float               @default(0)
+  isExternal       Boolean                   @default(false)
+  isFullTime       Boolean                   @default(true)
+  annualSalary     Float                     @default(0)
+  billableHours    Float                     @default(0)
   startDate        String?
   endDate          String?
-  createdAt        DateTime            @default(now())
+  createdAt        DateTime                  @default(now())
   salaryMonths     PersonSalaryMonth[]
   hoursMonths      PersonHoursMonth[]
   projectMembers   ProjectMember[]
@@ -262,7 +263,7 @@ model ContractHoursMonth {
   id         String   @id @default(cuid())
   contractId String
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  month      String   // YYYY-MM
+  month      String // YYYY-MM
   hours      Float
 
   @@unique([contractId, month])
@@ -274,35 +275,37 @@ model ContractDeliveryMonth {
   id         String   @id @default(cuid())
   contractId String
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  month      String   // YYYY-MM
+  month      String // YYYY-MM
   hours      Float
 
   @@unique([contractId, month])
 }
 
 model Call {
-  id         String     @id @default(cuid())
-  clientId   String?    // null = draft recap from a non-client email; coach assigns it
-  client     Client?    @relation(fields: [clientId], references: [id])
-  date        String
-  title       String
-  transcript  String?
-  video       String?
-  synopsis    String?
-  notes       String?
-  isGroupCall Boolean    @default(false) // group call → visible to its program's clients
-  programId   String?    // group calls: which program/cohort this call is for
-  isSalesCall   Boolean  @default(false) // sales/prospect call → Sales Calls tab; always clientId null
-  prospectEmail String?  // sales calls: the attendee the webhook couldn't match to a client
-  program     Program?   @relation(fields: [programId], references: [id], onDelete: SetNull)
-  questions   Question[]
-  createdAt   DateTime   @default(now())
+  id               String            @id @default(cuid())
+  clientId         String? // null = draft recap from a non-client email; coach assigns it
+  client           Client?           @relation(fields: [clientId], references: [id])
+  date             String
+  title            String
+  transcript       String?
+  video            String?
+  synopsis         String?
+  notes            String?
+  isGroupCall      Boolean           @default(false) // group call → visible to its program's clients
+  programId        String? // group calls: which program/cohort this call is for
+  isSalesCall      Boolean           @default(false) // sales/prospect call → Sales Calls tab; always clientId null
+  prospectEmail    String? // sales calls: the attendee the webhook couldn't match to a client
+  program          Program?          @relation(fields: [programId], references: [id], onDelete: SetNull)
+  questions        Question[]
+  libraryTrainings LibraryTraining[] // trainings published from this call
+  createdAt        DateTime          @default(now())
 }
 
 model Program {
   id          String              @id @default(cuid())
   name        String
   isGroup     Boolean             @default(false) // group program → members see its group-call recaps
+  sessionsAccess Boolean          @default(false) // members can see Sessions (the training library)
   memberships ProgramMembership[]
   calls       Call[]
   createdAt   DateTime            @default(now())
@@ -347,10 +350,10 @@ model LeadGoalSubmission {
   name           String?
   agency         String?
   currency       String   @default("USD")
-  inputs         String   // JSON: the numbers the visitor submitted
-  result         String   // JSON: computed LeadsGoalResult snapshot at submit time
-  adjustedInputs String?  // JSON: John's working-copy tweaks (never overwrites `inputs`)
-  takeaways      String?  // John's editable notes for the report
+  inputs         String // JSON: the numbers the visitor submitted
+  result         String // JSON: computed LeadsGoalResult snapshot at submit time
+  adjustedInputs String? // JSON: John's working-copy tweaks (never overwrites `inputs`)
+  takeaways      String? // John's editable notes for the report
   scheduled      Boolean  @default(false)
   reportSent     Boolean  @default(false)
   createdAt      DateTime @default(now())
@@ -363,7 +366,7 @@ model ContractDeliveryWeek {
   id         String   @id @default(cuid())
   contractId String
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  week       String   // YYYY-MM-DD, the Sunday starting the week
+  week       String // YYYY-MM-DD, the Sunday starting the week
   hours      Float
 
   @@unique([contractId, week])
@@ -375,10 +378,10 @@ model CapacityLead {
   name           String?
   agency         String?
   currency       String   @default("USD")
-  inputs         String   // JSON: the numbers the visitor submitted
-  result         String   // JSON: computed CapacityResult snapshot at submit time
-  adjustedInputs String?  // JSON: John's working-copy tweaks (never overwrites `inputs`)
-  takeaways      String?  // John's editable notes for the report
+  inputs         String // JSON: the numbers the visitor submitted
+  result         String // JSON: computed CapacityResult snapshot at submit time
+  adjustedInputs String? // JSON: John's working-copy tweaks (never overwrites `inputs`)
+  takeaways      String? // John's editable notes for the report
   scheduled      Boolean  @default(false)
   reportSent     Boolean  @default(false)
   createdAt      DateTime @default(now())
@@ -423,7 +426,7 @@ model ProjectMember {
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
   personId   String
   person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
-  role       String?  // per-project title, e.g. "Content Writer"
+  role       String? // per-project title, e.g. "Content Writer"
   createdAt  DateTime @default(now())
 
   @@unique([contractId, personId])
@@ -438,7 +441,7 @@ model ProjectMemberHoursMonth {
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
   personId   String
   person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
-  month      String   // YYYY-MM
+  month      String // YYYY-MM
   hours      Float
 
   @@unique([contractId, personId, month])
@@ -447,13 +450,13 @@ model ProjectMemberHoursMonth {
 // A recurring direct-cost line on a project ("Blog Posts", "Directory Listings",
 // a vendor), with an amount per month. Vendors live here, not in the team grid.
 model ProjectCostItem {
-  id         String   @id @default(cuid())
+  id         String             @id @default(cuid())
   contractId String
-  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contract   Contract           @relation(fields: [contractId], references: [id], onDelete: Cascade)
   name       String
-  category   String   @default("other") // content | ads | software | vendor | other
-  reimbursed Boolean  @default(false)    // client pays it back → shown, excluded from margin
-  createdAt  DateTime @default(now())
+  category   String             @default("other") // content | ads | software | vendor | other
+  reimbursed Boolean            @default(false) // client pays it back → shown, excluded from margin
+  createdAt  DateTime           @default(now())
   months     ProjectCostMonth[]
 }
 
@@ -461,7 +464,7 @@ model ProjectCostMonth {
   id         String          @id @default(cuid())
   costItemId String
   costItem   ProjectCostItem @relation(fields: [costItemId], references: [id], onDelete: Cascade)
-  month      String          // YYYY-MM
+  month      String // YYYY-MM
   amount     Float
 
   @@unique([costItemId, month])
@@ -493,7 +496,7 @@ model MonthlyChecklist {
   id          String   @id @default(cuid())
   clientId    String
   client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  month       String   // YYYY-MM the checklist is shown for
+  month       String // YYYY-MM the checklist is shown for
   dismissed   Boolean  @default(false)
   checkedKeys String   @default("[]") // JSON array of ticked item keys
   updatedAt   DateTime @updatedAt
@@ -510,4 +513,58 @@ model ToolRun {
   createdAt DateTime @default(now())
 
   @@index([userId, tool, createdAt])
+}
+
+// The Studio Library: past calls curated into trainings any client can browse.
+// Each training sits in one of three fixed categories (see lib/library.ts) and
+// can carry any number of tags.
+model LibraryTraining {
+  id           String               @id @default(cuid())
+  title        String
+  category     String // "pipeline" | "offer" | "delivery"
+  date         String? // when it was recorded (YYYY-MM-DD)
+  summary      String?
+  takeaways    String? // one per line
+  actionSteps  String? // one per line — the "Implement this" checklist
+  video        String?
+  worksheet    String? // link to the worksheet (Google Doc, PDF, etc.)
+  transcript   String?
+  sourceCallId String?
+  sourceCall   Call?                @relation(fields: [sourceCallId], references: [id], onDelete: SetNull)
+  publishedAt  DateTime? // null = draft, coach-only
+  tags         LibraryTrainingTag[]
+  progress     LibraryProgress[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([category])
+}
+
+model LibraryTag {
+  id        String               @id @default(cuid())
+  name      String               @unique // stored lowercase
+  trainings LibraryTrainingTag[]
+}
+
+model LibraryTrainingTag {
+  trainingId String
+  tagId      String
+  training   LibraryTraining @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  tag        LibraryTag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([trainingId, tagId])
+  @@index([tagId])
+}
+
+// Which "Implement this" steps a client has ticked off, by line index.
+model LibraryProgress {
+  clientId   String
+  trainingId String
+  doneSteps  Int[]           @default([])
+  client     Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  training   LibraryTraining @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime        @updatedAt
+
+  @@id([clientId, trainingId])
+  @@index([trainingId])
 }
