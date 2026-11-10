@@ -24,6 +24,7 @@ export default function AppNav({ role, userName, showSessions }: Props) {
     ...(role === "coach" ? [{ href: "/leads", label: "Leads" }] : []),
     { href: "/tools", label: "Tools" },
     ...(role === "coach" ? [{ href: "/programs", label: "Programs" }] : []),
+    ...(role === "coach" ? [{ href: "/users", label: "Users" }] : []),
     // Insights is a work in progress — not shipped to clients yet. The page is
     // still reachable at /insights directly for development. Re-add here to launch.
     // { href: "/insights", label: "Insights" },
