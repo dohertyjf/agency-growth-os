@@ -21,6 +21,7 @@ import CapacitySold from "./CapacitySold"
 import ProjectCapacity from "./ProjectCapacity"
 import type { DeliveryWeekRow } from "@/lib/capacityWeekly"
 import MonthlyChecklist from "./MonthlyChecklist"
+import OffersPanel, { type OfferSummary } from "./OffersPanel"
 import { unownedProjects, hoursGaps } from "@/lib/ownership"
 import WeeklyTracker, { type WeeklyRow } from "@/components/WeeklyTracker"
 import CallsClient from "../../calls/CallsClient"
@@ -170,7 +171,7 @@ interface Call {
   questions: CallQuestion[]
 }
 
-type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "services" | "goals" | "team" | "calls" | "projection" | "weekly" | "insights"
+type Tab = "dashboard" | "accounts" | "pipeline" | "projects" | "reconciliation" | "progress" | "services" | "goals" | "team" | "calls" | "projection" | "weekly" | "insights" | "offers"
 
 interface Props {
   clientId: string
@@ -201,6 +202,7 @@ interface Props {
   initialPulses: Pulse[]
   goal: Goal | null
   initialCalls: Call[]
+  offers: OfferSummary[]
   products: Product[]
   initialRoadmap: RoadmapItem[]
   initialPeople: Person[]
@@ -230,6 +232,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "services", label: "Services" },
   { key: "progress", label: "Progress" },
   { key: "calls", label: "Calls" },
+  { key: "offers", label: "Offers" },
   { key: "goals", label: "Settings" },
   { key: "reconciliation", label: "Reconciliation" },
 ]
@@ -237,7 +240,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ClientPageClient({
   clientId, projectionState, clientSlug, initialNoteCounts, checklistMonth, initialChecklist, clientName, clientAgency, currentTab, initialView,
   initialStatus, initialStartDate, initialEndDate,
-  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialProjectMembers, initialCostItems, initialCostMonths, initialDeliveryMonths, initialDeliveryWeeks, initialPulses, goal, initialCalls, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
+  metrics: initialMetrics, initialContracts, initialAccounts, initialAccountMonths, initialPayments, initialContractHours, initialMemberHours, initialProjectMembers, initialCostItems, initialCostMonths, initialDeliveryMonths, initialDeliveryWeeks, initialPulses, goal, initialCalls, offers, products, initialRoadmap, initialPeople, initialSalaryMonths, initialHoursMonths, initialWeekly, isCoach, showInsights, insights, programs, clientProgramIds,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>(initialContracts)
   const [projectMembers, setProjectMembers] = useState(initialProjectMembers)
@@ -578,6 +581,8 @@ export default function ClientPageClient({
           )}
         </div>
       )}
+
+      {currentTab === "offers" && <OffersPanel offers={offers} isCoach={isCoach} />}
 
       {/* isCoach flows through so a client sees calls read-only (no note editing) */}
       {currentTab === "calls" && (

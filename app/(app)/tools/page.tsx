@@ -12,6 +12,11 @@ const clientTools: Tool[] = [
     blurb: "Paste an old proposal or describe what you sell. Get a three-tier package ladder with prices, a paid front end, the add-ons to pull out, and the words to say when someone pushes on price.",
   },
   {
+    href: "/tools/offer-builder",
+    title: "Offer Builder",
+    blurb: "Build an offer your Ideal Client can't ignore. Get a gap check against the four pillars, pick the fixes you want, and choose from three rebuilt versions. Save one for each Ideal Client.",
+  },
+  {
     href: "/tools/content-five",
     title: "The Content Five",
     blurb: "Answer seven questions about one of your clients and get five specific pieces of content to make for them — written to their buyer, not to you.",

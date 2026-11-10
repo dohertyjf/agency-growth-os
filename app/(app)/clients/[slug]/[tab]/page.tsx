@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { computeInsights, insightsEnabledForSlug } from "@/lib/insights"
 import ClientPageClient from "../ClientPageClient"
 
-const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "services", "goals", "team", "calls", "projection", "weekly"] as const
+const VALID_TABS = ["dashboard", "accounts", "pipeline", "projects", "reconciliation", "progress", "services", "goals", "team", "calls", "projection", "weekly", "offers"] as const
 type Tab = typeof VALID_TABS[number]
 
 export default async function ClientTabPage({ params, searchParams }: { params: Promise<{ slug: string; tab: string }>; searchParams: Promise<{ view?: string }> }) {
@@ -67,6 +67,9 @@ export default async function ClientTabPage({ params, searchParams }: { params: 
     where: { clientId: id, program: { isGroup: true } },
     select: { programId: true },
   })).map(m => m.programId)
+  const offers = tab === "offers"
+    ? await prisma.offer.findMany({ where: { clientId: id }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true, idealClient: true, current: true, updatedAt: true } })
+    : []
   const calls = await prisma.call.findMany({
     where: {
       OR: [
@@ -153,6 +156,7 @@ export default async function ClientTabPage({ params, searchParams }: { params: 
       initialChecklist={initialChecklist}
       goal={goal}
       initialCalls={calls.map(c => ({ id: c.id, clientId: c.clientId, date: c.date, title: c.title, transcript: c.transcript ?? null, video: c.video ?? null, synopsis: c.synopsis ?? null, notes: c.notes ?? null, isGroupCall: c.isGroupCall, programId: c.programId ?? null, isSalesCall: c.isSalesCall, prospectEmail: c.prospectEmail ?? null, questions: c.questions.map(q => ({ id: q.id, q: q.q, a: q.a ?? null, order: q.order })) }))}
+      offers={offers.map(o => ({ id: o.id, name: o.name, idealClient: o.idealClient ?? null, headline: (o.current as { headline?: string } | null)?.headline ?? null, updatedAt: o.updatedAt.toISOString() }))}
       products={products.map(p => ({ id: p.id, name: p.name, description: p.description ?? null, type: p.type as "retainer" | "ongoing" | "oneoff", monthly: p.monthly }))}
       initialRoadmap={roadmapItems.map(r => ({ key: r.key, status: r.status as "none" | "red" | "yellow" | "green" }))}
     />

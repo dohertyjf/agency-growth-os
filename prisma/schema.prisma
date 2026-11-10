@@ -67,6 +67,7 @@ model Client {
   monthlyChecklists MonthlyChecklist[]
   weeklyMetrics     WeeklyMetric[]
   libraryProgress   LibraryProgress[]
+  offers            Offer[]
   createdAt         DateTime            @default(now())
 }
 
@@ -567,4 +568,21 @@ model LibraryProgress {
 
   @@id([clientId, trainingId])
   @@index([trainingId])
+}
+
+// Offer Builder: a client's named offers (one per Ideal Client, or e.g. an
+// event offer). `inputs` holds the guided-form answers; `current` is the
+// latest version they saved after the gap check / options loop. No history.
+model Offer {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  idealClient String?
+  inputs      Json
+  current     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([clientId])
 }
