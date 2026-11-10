@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import AppNav from "@/components/AppNav"
 import ImpersonationBar from "@/components/ImpersonationBar"
+import { canSeeSessions } from "@/lib/libraryServer"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -19,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {session.user.impersonator && (
         <ImpersonationBar asName={session.user.name ?? session.user.email} coachId={session.user.impersonator.id} coachName={session.user.impersonator.name} />
       )}
-      <AppNav role={session.user.role} userName={session.user.name} />
+      <AppNav role={session.user.role} userName={session.user.name} showSessions={await canSeeSessions(session.user)} />
       <main style={{ maxWidth: 1280, margin: "0 auto", padding: "32px 24px" }}>
         {children}
       </main>

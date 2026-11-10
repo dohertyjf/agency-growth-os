@@ -8,9 +8,10 @@ import AccountMenu from "./AccountMenu"
 interface Props {
   role: "coach" | "client"
   userName: string | null | undefined
+  showSessions: boolean
 }
 
-export default function AppNav({ role, userName }: Props) {
+export default function AppNav({ role, userName, showSessions }: Props) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -18,6 +19,7 @@ export default function AppNav({ role, userName }: Props) {
     { href: "/dashboard", label: "Dashboard" },
     ...(role === "coach" ? [{ href: "/clients", label: "Clients" }] : []),
     { href: "/calls", label: "Calls" },
+    ...(showSessions ? [{ href: "/sessions", label: "Sessions" }] : []),
     ...(role === "coach" ? [{ href: "/prospects", label: "Prospects" }] : []),
     ...(role === "coach" ? [{ href: "/leads", label: "Leads" }] : []),
     { href: "/tools", label: "Tools" },

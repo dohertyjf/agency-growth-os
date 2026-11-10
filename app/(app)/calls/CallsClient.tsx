@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import { videoEmbedUrl } from "@/lib/video"
 
 interface Question { id: string; q: string; a: string | null; order: number }
 interface Call {
@@ -16,6 +17,7 @@ interface Call {
   isSalesCall: boolean // prospect call → Sales Calls tab; never has a client
   prospectEmail: string | null
   questions: Question[]
+  libraryTrainings?: { id: string }[] // trainings published from this call
 }
 interface Client { id: string; name: string }
 interface Program { id: string; name: string }
@@ -30,17 +32,6 @@ interface Props {
 }
 
 const PAGE_SIZE = 10
-
-// Convert a share link into an embeddable player URL. Falls back to null (plain link).
-function videoEmbedUrl(url: string): string | null {
-  const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/)
-  if (yt) return `https://www.youtube.com/embed/${yt[1]}`
-  const loom = url.match(/loom\.com\/(?:share|embed)\/([\w-]+)/)
-  if (loom) return `https://www.loom.com/embed/${loom[1]}`
-  const vimeo = url.match(/vimeo\.com\/(\d+)/)
-  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`
-  return null
-}
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(false)
@@ -269,10 +260,18 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
             </select>
           </label>
         )}
+        {isCoach && !selected.isSalesCall && (
+          <a
+            href={selected.libraryTrainings?.length ? `/sessions/${selected.libraryTrainings[0].id}` : `/sessions/new?fromCall=${selected.id}`}
+            style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "#E9532A", border: "1px solid #F5CFC0", borderRadius: 5, padding: "3px 10px", textDecoration: "none" }}
+          >
+            {selected.libraryTrainings?.length ? "In Sessions ↗" : "Publish to Sessions"}
+          </a>
+        )}
         {isCoach && (
           <button
             onClick={() => handleDeleteCall(selected)}
-            style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "#B91C1C", background: "none", border: "1px solid #F3D4D4", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}
+            style={{ marginLeft: selected.isSalesCall ? "auto" : 0, fontSize: 11, fontWeight: 600, color: "#B91C1C", background: "none", border: "1px solid #F3D4D4", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}
           >
             Delete call
           </button>

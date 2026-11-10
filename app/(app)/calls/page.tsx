@@ -22,7 +22,10 @@ export default async function CallsPage() {
     where: isCoach
       ? {}
       : { OR: [{ clientId }, ...(groupProgramIds.length ? [{ isGroupCall: true, programId: { in: groupProgramIds } }] : [])] },
-    include: { questions: { orderBy: { order: "asc" } } },
+    include: {
+      questions: { orderBy: { order: "asc" } },
+      libraryTrainings: { select: { id: true } },
+    },
     orderBy: { date: "desc" },
   })
 

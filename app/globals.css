@@ -34,3 +34,7 @@ textarea:focus, input:focus {
 /* Contact emails that open a Gmail draft: plain until hovered. */
 .gmail-link { text-decoration: none; }
 .gmail-link:hover { text-decoration: underline; }
+
+/* Session page: recap (65%) beside resources (35%); stacked on narrow screens. */
+.session-cols { display: grid; grid-template-columns: minmax(0, 65fr) minmax(0, 35fr); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .session-cols { grid-template-columns: minmax(0, 1fr); } }
