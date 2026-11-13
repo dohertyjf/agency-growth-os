@@ -524,6 +524,7 @@ model LibraryTraining {
   category     String // "pipeline" | "offer" | "delivery"
   date         String? // when it was recorded (YYYY-MM-DD)
   summary      String?
+  outline      String? // "What we covered": short topic list in session order, one per line (optional "0:25 · " timestamp)
   takeaways    String? // one per line
   actionSteps  String? // one per line — the "Implement this" checklist
   video        String?

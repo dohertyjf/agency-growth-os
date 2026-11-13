@@ -75,6 +75,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
       OR: [
         { title: { contains: q, mode: "insensitive" } },
         { summary: { contains: q, mode: "insensitive" } },
+        { outline: { contains: q, mode: "insensitive" } },
         { takeaways: { contains: q, mode: "insensitive" } },
         { actionSteps: { contains: q, mode: "insensitive" } },
         { transcript: { contains: q, mode: "insensitive" } },

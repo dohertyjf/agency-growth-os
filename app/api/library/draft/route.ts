@@ -17,6 +17,7 @@ Return ONLY a JSON object, no prose, with these keys:
 - "title": a specific, plain title naming what the training teaches (max 70 characters). Not "Group Call Week 3".
 - "category": whichever of ${CATEGORIES.map(c => `"${c.key}"`).join(", ")} the call mostly teaches.
 - "summary": 2-3 sentences on what the viewer will learn and why it matters.
+- "outline": 4-8 short strings, the topics the call covered in the order it covered them, so someone can scan what's in the recording and find it by search. Each one names the topic plus a few words of what was said (max ~90 characters), e.g. "The 9-word email — re-open leads that went quiet". Name the specific frameworks, campaigns and tools discussed. If the transcript has timestamps, start each with the approximate time like "0:25 · ".
 - "takeaways": 3-5 strings, each one concrete idea from the call.
 - "actionSteps": 3-6 strings, each an action the viewer can do this week, starting with a verb.
 - "tags": 2-4 short lowercase topic tags (e.g. "growth", "sales", "pricing").
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
       title: z.string().default(""),
       category: z.enum(CATEGORY_KEYS).optional().catch(undefined),
       summary: z.string().default(""),
+      outline: z.array(z.string()).default([]),
       takeaways: z.array(z.string()).default([]),
       actionSteps: z.array(z.string()).default([]),
       tags: z.array(z.string()).default([]),

@@ -22,7 +22,7 @@ export default async function EditTrainingPage({ params }: { params: Promise<{ i
     <TrainingEditor
       initial={{
         id: training.id, title: training.title, category: training.category, date: training.date ?? "",
-        summary: training.summary ?? "", takeaways: training.takeaways ?? "", actionSteps: training.actionSteps ?? "",
+        summary: training.summary ?? "", outline: training.outline ?? "", takeaways: training.takeaways ?? "", actionSteps: training.actionSteps ?? "",
         video: training.video ?? "", worksheet: training.worksheet ?? "", transcript: training.transcript ?? "",
         sourceCallId: training.sourceCallId, published: !!training.publishedAt,
         tags: training.tags.map(t => t.tag.name).sort(),
