@@ -19,7 +19,7 @@ export default async function NewTrainingPage({ searchParams }: { searchParams: 
     <TrainingEditor
       initial={{
         title: call?.title ?? "", category: "", date: call?.date ?? "",
-        summary: call?.synopsis ?? "", takeaways: "", actionSteps: "",
+        summary: call?.synopsis ?? "", outline: "", takeaways: "", actionSteps: "",
         video: call?.video ?? "", worksheet: "", transcript: call?.transcript ?? "",
         sourceCallId: call?.id ?? null, published: false, tags: [],
       }}

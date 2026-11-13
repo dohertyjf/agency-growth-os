@@ -9,6 +9,7 @@ export interface EditorTraining {
   category: string
   date: string
   summary: string
+  outline: string
   takeaways: string
   actionSteps: string
   video: string
@@ -70,6 +71,7 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
       title: data.title || t.title,
       category: t.category || data.category || "",
       summary: data.summary || t.summary,
+      outline: data.outline?.length ? data.outline.join("\n") : t.outline,
       takeaways: data.takeaways?.length ? data.takeaways.join("\n") : t.takeaways,
       actionSteps: data.actionSteps?.length ? data.actionSteps.join("\n") : t.actionSteps,
       tags: [...new Set([...t.tags, ...(data.tags ?? []).map((s: string) => s.toLowerCase())])],
@@ -81,7 +83,7 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
     setSaving(true); setError(null)
     const body = {
       title: t.title, category: t.category, date: t.date || null,
-      summary: t.summary, takeaways: t.takeaways, actionSteps: t.actionSteps,
+      summary: t.summary, outline: t.outline, takeaways: t.takeaways, actionSteps: t.actionSteps,
       video: t.video.trim() || null, worksheet: t.worksheet.trim() || null, transcript: t.transcript || null,
       sourceCallId: t.sourceCallId, published, tags: t.tags,
     }
@@ -110,7 +112,7 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
           {t.id ? "Edit training" : "New training"}
         </h1>
         <button onClick={draft} disabled={drafting || (!t.transcript.trim() && !synopsis?.trim())}
-          title={!t.transcript.trim() && !synopsis?.trim() ? "Paste a transcript first" : "Fill in the title, summary, takeaways, steps and tags from the transcript"}
+          title={!t.transcript.trim() && !synopsis?.trim() ? "Paste a transcript first" : "Fill in the title, summary, outline, takeaways, steps and tags from the transcript"}
           style={{ padding: "7px 14px", background: "#fff", border: "1px solid #E9532A", color: "#E9532A", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: drafting || (!t.transcript.trim() && !synopsis?.trim()) ? 0.5 : 1 }}>
           {drafting ? "Drafting… (~30s)" : "✦ Draft with Claude"}
         </button>
@@ -171,6 +173,10 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
 
         <Field label="Summary" hint="What they'll learn">
           <textarea value={t.summary} onChange={e => set({ summary: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+        </Field>
+
+        <Field label="What we covered" hint="Short topic list in session order, one per line — optional 0:25 timestamp">
+          <textarea value={t.outline} onChange={e => set({ outline: e.target.value })} rows={6} placeholder={"0:20 · Pick one ICP — the magnifying glass\n0:30 · Audit the leads you already have"} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
         </Field>
 
         <Field label="Key takeaways" hint="One per line">

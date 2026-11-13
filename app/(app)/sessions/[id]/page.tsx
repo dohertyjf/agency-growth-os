@@ -43,6 +43,10 @@ export default async function TrainingPage({ params }: { params: Promise<{ id: s
     : null
 
   const embed = training.video ? videoEmbedUrl(training.video) : null
+  const outline = lines(training.outline).map(l => {
+    const m = l.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s*[·•\-–—|]?\s*(.*)$/)
+    return m ? { time: m[1], text: m[2] } : { time: null, text: l }
+  })
   const takeaways = lines(training.takeaways)
   const steps = lines(training.actionSteps)
   const tags = training.tags.map(t => t.tag.name).sort()
@@ -81,6 +85,19 @@ export default async function TrainingPage({ params }: { params: Promise<{ id: s
         {training.summary && (
           <Section label="What you'll learn">
             <p style={{ fontSize: 15, color: "#1A1916", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>{training.summary}</p>
+          </Section>
+        )}
+
+        {outline.length > 0 && (
+          <Section label="What we covered">
+            <ol style={{ margin: 0, padding: 0, listStyle: "none", fontSize: 14, color: "#1A1916", lineHeight: 1.5 }}>
+              {outline.map((o, i) => (
+                <li key={i} style={{ display: "flex", gap: 12, padding: "6px 0", borderTop: i ? "1px solid #F3EFE8" : "none" }}>
+                  <span style={{ flexShrink: 0, width: 38, fontSize: 12, color: "#9C9590", fontVariantNumeric: "tabular-nums", paddingTop: 1 }}>{o.time ?? `${i + 1}.`}</span>
+                  <span>{o.text}</span>
+                </li>
+              ))}
+            </ol>
           </Section>
         )}
 

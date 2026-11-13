@@ -8,6 +8,7 @@ export const trainingSchema = z.object({
   category: z.enum(CATEGORY_KEYS),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   summary: z.string().nullable().optional(),
+  outline: z.string().nullable().optional(),
   takeaways: z.string().nullable().optional(),
   actionSteps: z.string().nullable().optional(),
   video: z.string().nullable().optional(),
