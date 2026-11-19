@@ -1,9 +1,9 @@
 import { auth } from "@/auth"
-import { notFound, redirect } from "next/navigation"
+import { notFound, permanentRedirect, redirect } from "next/navigation"
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
-import { canSeeSessions } from "@/lib/libraryServer"
-import { lines, categoryLabel } from "@/lib/library"
+import { canSeeSessions, sessionParamWhere } from "@/lib/libraryServer"
+import { lines, categoryLabel, sessionHref } from "@/lib/library"
 import { videoEmbedUrl } from "@/lib/video"
 import ImplementChecklist from "@/components/library/ImplementChecklist"
 import PublishButton from "@/components/library/PublishButton"
@@ -28,15 +28,19 @@ export default async function TrainingPage({ params }: { params: Promise<{ id: s
   if (!(await canSeeSessions(session.user))) redirect("/dashboard")
   const isCoach = session.user.role === "coach"
   const clientId = session.user.clientId ?? null
-  const { id } = await params
+  const { id: param } = await params
 
   const training = await prisma.libraryTraining.findFirst({
-    where: { id, ...(isCoach ? {} : { publishedAt: { not: null } }) },
+    where: { ...sessionParamWhere(param), ...(isCoach ? {} : { publishedAt: { not: null } }) },
     include: {
       tags: { include: { tag: true } },
     },
   })
   if (!training) notFound()
+  // Old id links move to the slug URL.
+  if (training.slug && param !== training.slug) permanentRedirect(sessionHref(training))
+  const id = training.id
+  const href = sessionHref(training)
 
   const progress = clientId
     ? await prisma.libraryProgress.findUnique({ where: { clientId_trainingId: { clientId, trainingId: id } } })
@@ -62,7 +66,7 @@ export default async function TrainingPage({ params }: { params: Promise<{ id: s
         <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 32, fontWeight: 600, margin: 0, color: "#1A1916", flex: 1, lineHeight: 1.15 }}>{training.title}</h1>
         {isCoach && (
           <div style={{ display: "flex", gap: 8 }}>
-            <Link href={`/sessions/${id}/edit`} style={{ padding: "6px 14px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, color: "#4A4640", textDecoration: "none", background: "#fff" }}>Edit</Link>
+            <Link href={`${href}/edit`} style={{ padding: "6px 14px", border: "1px solid #ECE7DE", borderRadius: 6, fontSize: 13, color: "#4A4640", textDecoration: "none", background: "#fff" }}>Edit</Link>
             <PublishButton trainingId={id} published={!!training.publishedAt} />
           </div>
         )}
@@ -126,7 +130,7 @@ export default async function TrainingPage({ params }: { params: Promise<{ id: s
             )}
             {training.transcript && (/^https?:\/\/\S+$/.test(training.transcript.trim())
               ? <a href={training.transcript.trim()} target="_blank" rel="noopener noreferrer" style={resourceLink}>Raw transcript ↗</a>
-              : <Link href={`/sessions/${id}/transcript`} style={resourceLink}>Raw transcript</Link>)}
+              : <Link href={`${href}/transcript`} style={resourceLink}>Raw transcript</Link>)}
           </div>
         ) : (
           <div style={{ fontSize: 13, color: "#9C9590" }}>No worksheet or transcript for this session yet.</div>

@@ -521,6 +521,7 @@ model ToolRun {
 model LibraryTraining {
   id           String               @id @default(cuid())
   title        String
+  slug         String?              @unique // the URL: /sessions/<slug>; falls back to the id
   category     String // "pipeline" | "offer" | "delivery"
   date         String? // when it was recorded (YYYY-MM-DD)
   summary      String?

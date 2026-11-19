@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 import { videoEmbedUrl } from "@/lib/video"
+import { sessionHref } from "@/lib/library"
 
 interface Question { id: string; q: string; a: string | null; order: number }
 interface Call {
@@ -17,7 +18,7 @@ interface Call {
   isSalesCall: boolean // prospect call → Sales Calls tab; never has a client
   prospectEmail: string | null
   questions: Question[]
-  libraryTrainings?: { id: string }[] // trainings published from this call
+  libraryTrainings?: { id: string; slug: string | null }[] // trainings published from this call
 }
 interface Client { id: string; name: string }
 interface Program { id: string; name: string }
@@ -262,7 +263,7 @@ export default function CallsClient({ calls: initialCalls, clients, programs = [
         )}
         {isCoach && !selected.isSalesCall && (
           <a
-            href={selected.libraryTrainings?.length ? `/sessions/${selected.libraryTrainings[0].id}` : `/sessions/new?fromCall=${selected.id}`}
+            href={selected.libraryTrainings?.length ? sessionHref(selected.libraryTrainings[0]) : `/sessions/new?fromCall=${selected.id}`}
             style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "#E9532A", border: "1px solid #F5CFC0", borderRadius: 5, padding: "3px 10px", textDecoration: "none" }}
           >
             {selected.libraryTrainings?.length ? "In Sessions ↗" : "Publish to Sessions"}

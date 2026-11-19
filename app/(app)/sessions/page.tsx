@@ -4,10 +4,11 @@ import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { canSeeSessions } from "@/lib/libraryServer"
 import type { Prisma } from "@/app/generated/prisma/client"
-import { CATEGORIES, lines, categoryLabel } from "@/lib/library"
+import { CATEGORIES, lines, categoryLabel, sessionHref } from "@/lib/library"
 
 interface Card {
   id: string
+  slug: string | null
   title: string
   date: string | null
   summary: string | null
@@ -31,7 +32,7 @@ function href(params: { q?: string; tag?: string; category?: string }) {
 
 function TrainingCard({ t, showCategory }: { t: Card; showCategory?: boolean }) {
   return (
-    <Link href={`/sessions/${t.id}`} style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #ECE7DE", borderRadius: 10, padding: 16, textDecoration: "none", color: "inherit" }}>
+    <Link href={sessionHref(t)} style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #ECE7DE", borderRadius: 10, padding: 16, textDecoration: "none", color: "inherit" }}>
       {showCategory && (
         <div style={{ fontSize: 10, fontWeight: 700, color: "#9C9590", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
           {categoryLabel(t.category)}
@@ -88,7 +89,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
     prisma.libraryTraining.findMany({
       where,
       select: {
-        id: true, title: true, date: true, summary: true, actionSteps: true, publishedAt: true,
+        id: true, slug: true, title: true, date: true, summary: true, actionSteps: true, publishedAt: true,
         category: true,
         tags: { select: { tag: { select: { name: true } } } },
       },
@@ -106,7 +107,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
   const cards: Card[] = trainings.map(t => {
     const steps = lines(t.actionSteps).length
     return {
-      id: t.id, title: t.title, date: t.date, summary: t.summary, published: !!t.publishedAt,
+      id: t.id, slug: t.slug, title: t.title, date: t.date, summary: t.summary, published: !!t.publishedAt,
       tags: t.tags.map(x => x.tag.name).sort(), category: t.category,
       steps, done: Math.min(doneBy.get(t.id) ?? 0, steps),
     }

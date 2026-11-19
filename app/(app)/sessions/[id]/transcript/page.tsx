@@ -1,8 +1,9 @@
 import { auth } from "@/auth"
-import { notFound, redirect } from "next/navigation"
+import { notFound, permanentRedirect, redirect } from "next/navigation"
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
-import { canSeeSessions } from "@/lib/libraryServer"
+import { canSeeSessions, sessionParamWhere } from "@/lib/libraryServer"
+import { sessionHref } from "@/lib/library"
 
 // The full, unedited transcript of a session, on its own page.
 export default async function TranscriptPage({ params }: { params: Promise<{ id: string }> }) {
@@ -10,19 +11,20 @@ export default async function TranscriptPage({ params }: { params: Promise<{ id:
   if (!session) redirect("/auth/signin")
   if (!(await canSeeSessions(session.user))) redirect("/dashboard")
   const isCoach = session.user.role === "coach"
-  const { id } = await params
+  const { id: param } = await params
 
   const training = await prisma.libraryTraining.findFirst({
-    where: { id, ...(isCoach ? {} : { publishedAt: { not: null } }) },
-    select: { title: true, date: true, transcript: true },
+    where: { ...sessionParamWhere(param), ...(isCoach ? {} : { publishedAt: { not: null } }) },
+    select: { id: true, slug: true, title: true, date: true, transcript: true },
   })
   if (!training || !training.transcript) notFound()
+  if (training.slug && param !== training.slug) permanentRedirect(`${sessionHref(training)}/transcript`)
 
   return (
     <div style={{ maxWidth: 860 }}>
       <div style={{ fontSize: 13, color: "#9C9590", marginBottom: 8 }}>
         <Link href="/sessions" style={{ color: "#9C9590", textDecoration: "none" }}>Sessions</Link>
-        {" / "}<Link href={`/sessions/${id}`} style={{ color: "#9C9590", textDecoration: "none" }}>{training.title}</Link>
+        {" / "}<Link href={sessionHref(training)} style={{ color: "#9C9590", textDecoration: "none" }}>{training.title}</Link>
       </div>
       <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, margin: "0 0 4px", color: "#1A1916" }}>Transcript</h1>
       <div style={{ fontSize: 12, color: "#9C9590", marginBottom: 18 }}>

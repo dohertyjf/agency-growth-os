@@ -14,6 +14,25 @@ export function categoryLabel(key: string): string {
   return CATEGORIES.find(c => c.key === key)?.label ?? key
 }
 
+// A session's URL slug: "The ICP Focuser" → "icp-focuser". A leading "The"
+// is dropped so URLs stay short.
+export function sessionSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/^the\s+/, "")
+    .replace(/[\s-]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80)
+    .replace(/-$/, "")
+}
+
+// Link to a session by its slug, or its id when it has none yet.
+export function sessionHref(t: { id: string; slug?: string | null }): string {
+  return `/sessions/${t.slug || t.id}`
+}
+
 // Takeaways and action steps are stored one per line.
 export function lines(text: string | null | undefined): string[] {
   return (text ?? "").split("\n").map(l => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim()).filter(Boolean)

@@ -1,10 +1,12 @@
 import "server-only"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { normalizeTags, CATEGORY_KEYS } from "@/lib/library"
+import type { Prisma } from "@/app/generated/prisma/client"
+import { normalizeTags, CATEGORY_KEYS, sessionSlug } from "@/lib/library"
 
 export const trainingSchema = z.object({
   title: z.string().trim().min(1),
+  slug: z.string().trim().nullable().optional(),
   category: z.enum(CATEGORY_KEYS),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   summary: z.string().nullable().optional(),
@@ -18,6 +20,23 @@ export const trainingSchema = z.object({
   published: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
 })
+
+// A free slug for a session, built from the wanted text (or the title):
+// "icp-focuser", then "icp-focuser-2" and so on if another session has it.
+export async function uniqueSessionSlug(wanted: string, excludeId?: string): Promise<string | null> {
+  const base = sessionSlug(wanted)
+  if (!base) return null
+  for (let n = 1; ; n++) {
+    const slug = n === 1 ? base : `${base}-${n}`
+    const taken = await prisma.libraryTraining.findFirst({ where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) }, select: { id: true } })
+    if (!taken) return slug
+  }
+}
+
+// Session pages take a slug or, for old links, the id.
+export function sessionParamWhere(param: string): Prisma.LibraryTrainingWhereInput {
+  return { OR: [{ slug: param }, { id: param }] }
+}
 
 // Replace a training's tags with exactly these names, creating any new ones.
 export async function setTrainingTags(trainingId: string, names: string[]) {

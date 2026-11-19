@@ -1,10 +1,11 @@
 "use client"
 import { useState } from "react"
 import Link from "next/link"
-import { CATEGORIES } from "@/lib/library"
+import { CATEGORIES, sessionHref, sessionSlug } from "@/lib/library"
 
 export interface EditorTraining {
   id?: string
+  slug: string
   title: string
   category: string
   date: string
@@ -48,6 +49,9 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
   const [drafting, setDrafting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
+  // A new session's URL follows its title until it's edited by hand; a saved
+  // one keeps its URL so links people have don't break.
+  const [slugTouched, setSlugTouched] = useState(!!initial.id)
 
   const set = (patch: Partial<EditorTraining>) => setT(prev => ({ ...prev, ...patch }))
 
@@ -69,6 +73,7 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
     if (!res.ok) { setError(data.error ?? "Couldn't draft this one."); return }
     set({
       title: data.title || t.title,
+      ...(!slugTouched && data.title ? { slug: sessionSlug(data.title) } : {}),
       category: t.category || data.category || "",
       summary: data.summary || t.summary,
       outline: data.outline?.length ? data.outline.join("\n") : t.outline,
@@ -82,7 +87,7 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
     if (!t.title.trim() || !t.category) { setError("Give it a title and a category."); return }
     setSaving(true); setError(null)
     const body = {
-      title: t.title, category: t.category, date: t.date || null,
+      title: t.title, slug: t.slug.trim() || null, category: t.category, date: t.date || null,
       summary: t.summary, outline: t.outline, takeaways: t.takeaways, actionSteps: t.actionSteps,
       video: t.video.trim() || null, worksheet: t.worksheet.trim() || null, transcript: t.transcript || null,
       sourceCallId: t.sourceCallId, published, tags: t.tags,
@@ -95,7 +100,7 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
     const data = await res.json().catch(() => ({}))
     setSaving(false)
     if (!res.ok) { setError(data.error ?? "Couldn't save."); return }
-    window.location.assign(`/sessions/${data.id}`)
+    window.location.assign(sessionHref(data))
   }
 
   async function remove() {
@@ -106,7 +111,7 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <Link href={t.id ? `/sessions/${t.id}` : "/sessions"} style={{ fontSize: 13, color: "#9C9590", textDecoration: "none" }}>← {t.id ? "Back to training" : "Sessions"}</Link>
+      <Link href={t.id ? sessionHref({ id: t.id, slug: initial.slug }) : "/sessions"} style={{ fontSize: 13, color: "#9C9590", textDecoration: "none" }}>← {t.id ? "Back to training" : "Sessions"}</Link>
       <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0 4px", flexWrap: "wrap" }}>
         <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 28, fontWeight: 600, margin: 0, color: "#1A1916", flex: 1 }}>
           {t.id ? "Edit training" : "New training"}
@@ -123,7 +128,17 @@ export default function TrainingEditor({ initial, allTags, sourceCallTitle, syno
 
       <div style={{ background: "#fff", border: "1px solid #ECE7DE", borderRadius: 12, padding: 24 }}>
         <Field label="Title">
-          <input value={t.title} onChange={e => set({ title: e.target.value })} placeholder="How to price a retainer" style={inputStyle} />
+          <input value={t.title} onChange={e => set({ title: e.target.value, ...(slugTouched ? {} : { slug: sessionSlug(e.target.value) }) })} placeholder="How to price a retainer" style={inputStyle} />
+        </Field>
+
+        <Field label="URL" hint={t.id ? "Changing it breaks links you've already shared" : "Fills in from the title"}>
+          <div style={{ display: "flex", alignItems: "center", border: "1px solid #ECE7DE", borderRadius: 6, background: "#fff", overflow: "hidden" }}>
+            <span style={{ padding: "8px 0 8px 12px", fontSize: 14, color: "#9C9590", whiteSpace: "nowrap" }}>/sessions/</span>
+            <input value={t.slug}
+              onChange={e => { setSlugTouched(true); set({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }) }}
+              onBlur={() => set({ slug: sessionSlug(t.slug) })}
+              placeholder="icp-focuser" style={{ ...inputStyle, border: "none", paddingLeft: 2 }} />
+          </div>
         </Field>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>

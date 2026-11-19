@@ -24,7 +24,7 @@ export default async function CallsPage() {
       : { OR: [{ clientId }, ...(groupProgramIds.length ? [{ isGroupCall: true, programId: { in: groupProgramIds } }] : [])] },
     include: {
       questions: { orderBy: { order: "asc" } },
-      libraryTrainings: { select: { id: true } },
+      libraryTrainings: { select: { id: true, slug: true } },
     },
     orderBy: { date: "desc" },
   })

@@ -2,6 +2,7 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import TrainingEditor from "@/components/library/TrainingEditor"
+import { sessionSlug } from "@/lib/library"
 
 // /sessions/new?fromCall=<callId> pre-fills the training from a call.
 export default async function NewTrainingPage({ searchParams }: { searchParams: Promise<{ fromCall?: string }> }) {
@@ -18,7 +19,7 @@ export default async function NewTrainingPage({ searchParams }: { searchParams: 
   return (
     <TrainingEditor
       initial={{
-        title: call?.title ?? "", category: "", date: call?.date ?? "",
+        title: call?.title ?? "", slug: sessionSlug(call?.title ?? ""), category: "", date: call?.date ?? "",
         summary: call?.synopsis ?? "", outline: "", takeaways: "", actionSteps: "",
         video: call?.video ?? "", worksheet: "", transcript: call?.transcript ?? "",
         sourceCallId: call?.id ?? null, published: false, tags: [],
